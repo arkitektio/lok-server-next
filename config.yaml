@@ -1,0 +1,150 @@
+db:
+  db_name: lok_db
+  engine: django.db.backends.postgresql
+  host: db
+  password: postgres
+  port: 5432
+  username: fostgres
+apps:
+  - identifier: github.io.jhnnsrs.mikroj
+    version: 0.0.1
+    scopes: 
+      - read
+      - write
+    clients:
+      - kind: website
+        token: 293j40239j4023023n09nw30d9n203nf03f
+        redirect_uris: 
+          - http://localhost:8090
+        tenant: johannes
+        composition: generic
+      - kind: development
+        token: 33908498jsoisffssss54444ffnoeinsoienfosinfe
+        user: frank
+        tenant: frank
+        composition: generic
+  - identifier: github.io.jhnnsrs.orkestrator
+    version: 0.0.1
+    scopes: 
+      - read
+      - write
+    clients:
+      - kind: website
+        token: 293j40239j4023ffff023n09nwff4523423430d9n203nf03f
+        redirect_uris: 
+          - http://localhost:7890
+          - http://localhost:7890/callback
+        tenant: johannes
+        composition: generic
+        public: true
+
+linkers:
+  - name: TemplateLinker
+    function: fakts
+
+
+deployment:
+  name: Fakts
+
+django:
+  admin:
+    email: admin@admin.com
+    password: admin
+    username: admin
+  debug: false
+  hosts:
+    - "*"
+  secret_key: t!7qh%)_#&k_6px&n(xm4bes@t3nrmgh=h2k#8f@rbgz=&y9f21
+lok:
+  issuer: lok
+  key_type: RS256
+  public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDGFj0zB7j6KrTRFEP+a2Z7toLEwJ0ROF3qSkq6vo2aK5TGRv+D3V/6VhvM2NgtUIO1iqwvf4XETamhHt2xlVzJyoyMAnAGkwkMyQJpI6wG5g7NtrRc1kkeefWbLBVW+aEI++3ec3eD9PUhnjXbQXJwju8l2ldKg2skw2fZWrjfWo0S0CuvB05nXJ8BmmAo65BBv29gGVywzZEApv/Zu16l6ftCZSEKi/zMbK6YxCekl/h3sfK7uGj6uaab7XSqqANHDZDTSotD5ws8UdMb3IP4/qoJiJm0Lsw5XpmFTt9M+ekiv/9HsWjXtzOd0BpqxynlvF1fWDr0HVnrUCh1XMzn
+redis:
+  host: redis
+  port: 6379
+private_key: "-----BEGIN PRIVATE KEY-----
+
+  MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDGFj0zB7j6KrTR
+
+  FEP+a2Z7toLEwJ0ROF3qSkq6vo2aK5TGRv+D3V/6VhvM2NgtUIO1iqwvf4XETamh
+
+  Ht2xlVzJyoyMAnAGkwkMyQJpI6wG5g7NtrRc1kkeefWbLBVW+aEI++3ec3eD9PUh
+
+  njXbQXJwju8l2ldKg2skw2fZWrjfWo0S0CuvB05nXJ8BmmAo65BBv29gGVywzZEA
+
+  pv/Zu16l6ftCZSEKi/zMbK6YxCekl/h3sfK7uGj6uaab7XSqqANHDZDTSotD5ws8
+
+  UdMb3IP4/qoJiJm0Lsw5XpmFTt9M+ekiv/9HsWjXtzOd0BpqxynlvF1fWDr0HVnr
+
+  UCh1XMznAgMBAAECggEAPz/OnsKyf76vKats4onsmUf3jVdrT5pN8odyQRqjID0W
+
+  LhFxeOtwwABKtCfxLtbsl0UGIcx4K+wYY8f1RcTJce1o3zPQDWlZlGmCiYvIXBON
+
+  WoYiJRqPEloi4D89OR5QGwxGMadw3AOVWfyoea/2GJarKc0D3lkEFyMFv9NGAJrb
+
+  bb6/e2zf4WQ+6slUW4N1djZW2q5JtZR4a4v6nW9K4laC0UgOAzlKcfgfNuym3dcL
+
+  c+VuUUWxIsF5QNKtcgOzjxekmT5axZugFFjedLo65qGzKw08Fwk5b3x2BR1DzCVr
+
+  /fl+O4DSjwsu4u72fFGex4XqnIF9ovpOmLvnP09skQKBgQDhwJW/xTa1cgayFTK2
+
+  dhGwbjTHOchfl7ZRfBBa9SXEYiV/69Qn+kLLwKYQ/Zk1LBBy4wcDcO32mLi3ZYxa
+
+  IWjPp+9tGIY3uo4gZNYPQt1Vbpndkrh+uo5arTEG2YW5AW7/q/ujw50L3SfE3AMs
+
+  CN8FM4B9SdQP7xLElm0G856A8wKBgQDgoLd7kfksLI53IDkvjFeM3Lgg1XA6fN2g
+
+  wBAx7ckBFI2jAIEs/eUmPZWFIEuWwwhyrjmf6XwZEnpXJTRGyeyOiCcfb9x5qCWK
+
+  RSh+UR9JirRYCkWIqHo+mSWaSRgLiQOCSxMwLCGycbfzfXDq0avqjFmmdW0kh7if
+
+  npnHTlRhPQKBgHAvfDtojd9tYtZsol76HaBHpAK9PE4E3p1vwdDxsmr9OxVu5GdZ
+
+  fogynFQlMlWyKBpvp7SWEitRibnZxP2lTKilE95rKYfYNXjzo0zCNauW4u+xUe3o
+
+  V4XIO2zj/AgMJlT36n1fYFPc+z5g91KStgGnrlqUrcWdUP5Qoq2ps0LxAoGAfmVQ
+
+  +YJpEBc+Tv/dzciNlyC3pxoS3YZXe1W3hzDC8w2qqTbmePeg0oTCtrc2cW3rOgSZ
+
+  Pkc2YjFIj/LKWK7UolswkHr0N6yK+yPxJirljQ80bXnSKJSMvN6WDxvkINGHHPC7
+
+  qlaa23srxCIowKkcsI0rAQSAVpbcJ00qQMDtsA0CgYEAuCw+oo9G/OIiNtGcmee+
+
+  6OB/jQB42ZMJD6RTCzTRsjAwGvN+nlkCEIyT+1A4Th4cdmrvxm6eeLABZ85VfHrZ
+
+  T8Xz5BnVAhN5QjOvielXW79b87jLun3i7CaMnsA1SGgnDdkBPpJvOe1tyCmZiN3A
+
+  X95jwe+hRAc3nA1/yc55ais=
+
+  -----END PRIVATE KEY-----
+
+  "
+public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDGFj0zB7j6KrTRFEP+a2Z7toLEwJ0ROF3qSkq6vo2aK5TGRv+D3V/6VhvM2NgtUIO1iqwvf4XETamhHt2xlVzJyoyMAnAGkwkMyQJpI6wG5g7NtrRc1kkeefWbLBVW+aEI++3ec3eD9PUhnjXbQXJwju8l2ldKg2skw2fZWrjfWo0S0CuvB05nXJ8BmmAo65BBv29gGVywzZEApv/Zu16l6ftCZSEKi/zMbK6YxCekl/h3sfK7uGj6uaab7XSqqANHDZDTSotD5ws8UdMb3IP4/qoJiJm0Lsw5XpmFTt9M+ekiv/9HsWjXtzOd0BpqxynlvF1fWDr0HVnrUCh1XMzn
+scopes:
+  can_assign: Can Assign Nodes
+  can_create: Can Create Nodes
+  can_create_identifier: Can create new identifier for the platform
+  can_forward_bounce:
+    Can reserve and assign to Nodes mimicking other Users (only
+    backend and admin)
+  can_provide: Can Provide Nodes
+  can_template: Can Template Nodes
+  introspection: Introspect the Token scope
+  provider: Can act as a provider
+  read: Reading all of your Data
+  write: Writing to all of your Data
+  read_starred: Reading all of your shared Data
+token_expire_seconds: 604800
+users:
+  - email: johannes@gmail.com
+    groups:
+      - My Perfect Team
+    password: johannes
+    username: johannes
+  - email: thierno@gmail.com
+    groups:
+      - My Perfect Team
+    password: thierno
+    username: thierno
+  - username: frank
+    password: frank

@@ -1,0 +1,104 @@
+{% extends "fakts/base.html" %}
+
+{% load static %}
+{% load i18n %}
+{% block content %}
+
+<div class="flex  text-white h-full w-full justify-center align-center">
+    {% if success %}
+    <div
+        class=" max-w-[40rem] max-h-[10rem] border border-1 border-gray-200 p-3 rounded rounded-md mt-3 align-center flex  flex-col justify-center p-4 ">
+        <span class="text-3xl"> Successfully {% if authorized %}authorized!{% else %} denied! {%endif %}</span> <span
+            class="text-xl font-light"> You can close this
+            page now</span>
+    </div>
+    {% else %}
+    <form id="authorizationForm" method="post">
+        <div
+            class=" max-w-[40rem] border border-1 border-gray-200 p-3 rounded rounded-md mt-3 align-center flex  flex-col justify-center">
+
+            <img width=100 src="{%  static 'img/lok.png' %}" />
+
+            <h1 class="text-3xl mt-2"><b> Hallo {{ request.user.username }}</b></h1>
+            <h3 class="text-xl font-bold mt-2">{% trans "Configuration Request" %}</h3>
+
+            <div class="mt-2 mb-2">
+                <span> A new device or application wants to be configured by you. Please check if you trust
+                    them and that their claims are sensical to you. If you agree with their claims. Please allow
+                    it. Otherwise deny.</span>
+            </div>
+
+            {% if app %}
+            <h1 class="text-1xl font-light">They claim to the already registered app</h1>
+            <h2 class="text-3xl font-light">{{ app.identifier}}</h2>
+            {% else %}
+            <h1 class="text-1xl font-light">They would establish a new App</h1>
+            <h2 class="text-3xl">{{staging_identifier}}</h2>
+            {% endif %}
+
+            {% if release %}
+            <h1 class="text-1xl font-light">They claim to be the same version as a previously registered app</h1>
+            <h2 class="text-3xl font-light">{{ release.version}}</h2>
+            {% else %}
+            <h1 class="text-1xl font-light">They would establish a new Version</h1>
+            <h2 class="text-3xl">{{staging_version}}</h2>
+            {% endif %}
+
+
+            {% if client %}
+            <h1 class="text-1xl font-light">They claim you have allowed them before</h1>
+            <h2 class="text-3xl font-light">{{ client.kind}}</h2>
+            {% else %}
+            <h1 class="text-1xl font-light">They would establish a new client</h1>
+            <h2 class="text-3xl">{{staging_kind}}</h2>
+            {% endif %}
+
+            {% if client %}
+            <h1 class="text-1xl font-light">This would mean they would inherit these rights</h1>
+            <h2 class="text-3xl font-light">{{release.scopes}}</h2>
+            {% else %}
+            <h1 class="text-1xl font-light">They would gain these rights</h1>
+            <h2 class="text-3xl">{{staging_scopes}}</h2>
+            {% endif %}
+
+
+
+            <div class="mt-2 mb-2">
+                <span> Please check if all of the claims are correct. Only allow them if you understand
+                    the implicaitons
+                </span>
+            </div>
+            <div class="mt-2">
+                <form method="post">{% csrf_token %}
+                    {{ form.as_p }}
+
+                    {{ form.errors }}
+                    {{ form.non_field_errors }}
+
+                    <div class="control-group">
+
+                        <br />
+                        <br />
+                        <div class="flex w-full flex-row ">
+                            <button type="submit"
+                                class="flex-1 bg-red-300 hover:bg-red-400 px-3 py-1 border-1 border border-red-900 rounded rounded-md cursor-pointer"
+                                name="action" value="cancel">Cancel </button>
+                            <button type="submit"
+                                class="flex-1 bg-green-300 hover:bg-green-400 px-3 py-1 border-1 border border-green-900 rounded rounded-md cursor-pointer"
+                                name="action" value="allow">Allow </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="mt-3">
+                <a class="border rounded rounded-md border-1 px-2 py-1 hover:bg-slate-500"
+                    href="{%  url 'login' %}?next={{request.get_full_path|urlencode}}">Change
+                    Account</a>
+            </div>
+            {% endif %}
+        </div>
+</div>
+</form>
+
+{% endblock %}
