@@ -54,6 +54,20 @@ INSTALLED_APPS = [
     "karakter",
 ]
 
+EKKE = {
+    "PUBLIC_KEY": conf.lok.get("public_key", None),
+    "PUBLIC_KEY_PEM_FILE": conf.lok.get("public_key_pem_file", None),
+    "KEY_TYPE": conf.lok.get("key_type", "RS256"),
+    "AUTHORIZATION_HEADERS": [
+        "Authorization",
+        "X-Auth-Token",
+        "AUTHORIZATION",
+        "authorization",
+    ],
+    "IMITATE_PERMISSION": "ekke.imitate",
+    "ALLOW_IMITATE": True,
+}
+
 # Authentikate section
 
 AUTH_USER_MODEL = "karakter.User"

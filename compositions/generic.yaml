@@ -54,3 +54,5 @@ rekuest_next:
   healthz: "{{"https" if request.is_secure else "http" }}://{{"rekuest_next" if request.host == "lok" else request.host}}:8020/ht"
   secure: false
   ws_endpoint_url: "{{"wss" if request.is_secure else "ws" }}://{{"rekuest_next" if request.host == "lok" else request.host}}:8020/graphql"
+  agent:
+    endpoint_url: "{{"wss" if request.is_secure else "ws" }}://{{"rekuest_next" if request.host == "lok" else request.host}}:8020/agi"

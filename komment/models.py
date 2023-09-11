@@ -23,7 +23,7 @@ class Comment(models.Model):
     parent = models.ForeignKey(
         "self", on_delete=models.CASCADE, null=True, blank=True, related_name="children"
     )
-    descendents = models.JSONField(default=list)
+    descendants = models.JSONField(default=list)
     mentions = models.ManyToManyField(
         get_user_model(), blank=True, related_name="mentioned_in"
     )

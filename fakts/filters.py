@@ -8,6 +8,7 @@ import strawberry_django
 
 @strawberry_django.filter(models.User)
 class UserFilter:
+    search: str | None
     name: Optional[FilterLookup[str]] | None
     ids: list[strawberry.ID] | None
 
@@ -15,10 +16,16 @@ class UserFilter:
         if self.ids is None:
             return queryset
         return queryset.filter(id__in=self.ids)
+    
+    def filter_search(self, queryset, info):
+        if self.search is None:
+            return queryset
+        return queryset.filter(username__contains=self.search)
 
 
 @strawberry_django.filter(models.Group)
 class GroupFilter:
+    search: str | None
     name: Optional[FilterLookup[str]] | None
     ids: list[strawberry.ID] | None
 
@@ -26,3 +33,9 @@ class GroupFilter:
         if self.ids is None:
             return queryset
         return queryset.filter(id__in=self.ids)
+    
+
+    def filter_search(self, queryset, info):
+        if self.search is None:
+            return queryset
+        return queryset.filter(name__contains=self.search)

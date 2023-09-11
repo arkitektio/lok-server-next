@@ -18,7 +18,7 @@ class Command(BaseCommand):
             if User.objects.filter(username=user_config.username).exists():
                 user = User.objects.get(username=user_config.username)
                 user.email = user_config.email
-                user.set_password(user.password.strip())
+                user.set_password(user_config.password.strip())
                 user.save()
 
                 self.stdout.write(f"Updated user {user.username}")
@@ -29,7 +29,6 @@ class Command(BaseCommand):
                     password=user_config.password,
                 )
 
-
                 self.stdout.write(f"Created user {user.username}")
             user.groups.add(
                 *[
@@ -37,4 +36,3 @@ class Command(BaseCommand):
                     for groupname in user_config.groups
                 ]
             )
-

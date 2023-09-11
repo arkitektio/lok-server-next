@@ -8,6 +8,18 @@ python manage.py migrate
 echo "=> Ensuring Superusers..."
 python manage.py ensureadmin
 
+echo "=> Ensuring Users..."
+python manage.py ensureusers
+
+
+echo "=> Ensuring Compositions..."
+python manage.py ensurecompositions
+
+
+echo "=> Ensuring Apps..."
+python manage.py ensureapps
+
+
 echo "=> Collecting Static.."
 python manage.py collectstatic --noinput
 

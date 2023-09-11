@@ -9,3 +9,7 @@ from karakter import enums, inputs, models, scalars, types
 
 def user(info: Info, id: strawberry.ID) -> types.User:
     return models.User.objects.get(id=id)
+
+
+def me(info: Info) -> types.User:
+    return info.context.request.user

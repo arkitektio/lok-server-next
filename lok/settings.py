@@ -36,6 +36,7 @@ DEPLOYMENT_NAME = conf.deployment.name
 
 INSTALLED_APPS = [
     "daphne",
+    "corsheaders",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -63,6 +64,7 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -105,6 +107,19 @@ WSGI_APPLICATION = "lok.wsgi.application"
 ASGI_APPLICATION = "lok.asgi.application"
 
 
+EKKE = {
+    "PUBLIC_KEY": conf.lok.get("public_key", None),
+    "PUBLIC_KEY_PEM_FILE": conf.lok.get("public_key_pem_file", None),
+    "KEY_TYPE": conf.lok.get("key_type", "RS256"),
+    "AUTHORIZATION_HEADERS": [
+        "Authorization",
+        "X-Auth-Token",
+        "AUTHORIZATION",
+        "authorization",
+    ],
+    "IMITATE_PERMISSION": "ekke.imitate",
+    "ALLOW_IMITATE": True,
+}
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
@@ -149,6 +164,14 @@ OAUTH2_PROVIDER = {
         "kranken",
     ],
 }
+
+OAUTH2_JWT = {
+    "PRIVATE_KEY": conf.private_key,
+    "PUBLIC_KEY": conf.public_key,
+    "KEY_TYPE": conf.get("key_type", "RS256"),
+    "ISSUER": "herre",
+}
+
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -232,8 +255,8 @@ LOGGING = {
     },
 }
 
-LOGIN_URL = 'login'
-LOGOUT_URL = 'logout'
+LOGIN_URL = "login"
+LOGOUT_URL = "logout"
 
 ENSURED_APPS = OmegaConf.to_object(conf.apps)
 

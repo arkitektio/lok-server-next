@@ -9,7 +9,7 @@ from strawberry import LazyType
 from typing import Literal, Union
 import datetime
 
-@strawberry_django.type(models.Group)
+@strawberry_django.type(models.Group, filters=filters.GroupFilter, pagination=True)
 class Group:
     id: strawberry.ID
     name: str
@@ -17,7 +17,7 @@ class Group:
 
 
 
-@strawberry_django.type(models.User, pagination=True)
+@strawberry_django.type(models.User, filters=filters.UserFilter, pagination=True)
 class User:
     id: strawberry.ID
     username: str

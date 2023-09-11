@@ -482,7 +482,7 @@ class AbstractRefreshToken(models.Model):
         on_delete=models.CASCADE,
         related_name="%(app_label)s_%(class)s",
     )
-    token = models.CharField(max_length=255)
+    token = models.CharField(max_length=6000)
     application = models.ForeignKey(
         oauth2_settings.APPLICATION_MODEL, on_delete=models.CASCADE
     )

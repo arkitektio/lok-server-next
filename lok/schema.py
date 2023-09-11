@@ -5,14 +5,19 @@ import strawberry_django
 import strawberry
 from ekke.directives import upper, replace, relation
 from strawberry_django.optimizer import DjangoOptimizerExtension
-from karakter.graphql.mutations import create_user
+from karakter.graphql import mutations as karakter_mutations
 from karakter.graphql import queries as karakter_queries
-from karakter.graphql.subscriptions import communications
+from karakter.graphql import subscriptions as karakter_subscriptions
+from fakts.graphql import mutations as fakts_mutations
+from fakts.graphql import queries as fakts_queries
+from fakts.graphql import subscriptions as fakts_subscriptions
 from fakts import types as fakts_types
 from karakter import types as karakter_types
 from komment import types as komment_types
 from komment.graphql import mutations as komment_mutations
 from komment.graphql import queries as komment_queries
+from komment.graphql import subscriptions as komment_subscriptions
+
 
 @strawberry.type
 class Query:
@@ -21,9 +26,25 @@ class Query:
     clients: list[fakts_types.Client] = strawberry_django.field()
     compositions: list[fakts_types.Composition] = strawberry_django.field()
     users: list[karakter_types.User] = strawberry_django.field()
+    groups: list[karakter_types.Group] = strawberry_django.field()
     comments: list[komment_types.Comment] = strawberry_django.field()
 
     user = strawberry_django.field(resolver=karakter_queries.user)
+    me = strawberry_django.field(resolver=karakter_queries.me)
+    group = strawberry_django.field(resolver=karakter_queries.group)
+    mygroups = strawberry_django.field(resolver=karakter_queries.mygroups)
+
+
+    app = strawberry_django.field(resolver=fakts_queries.app)
+    release = strawberry_django.field(resolver=fakts_queries.release)
+    client = strawberry_django.field(resolver=fakts_queries.client)
+    my_managed_clients = strawberry_django.field(resolver=fakts_queries.my_managed_clients)
+    scopes = strawberry_django.field(resolver=fakts_queries.scopes)
+
+
+    comment = strawberry_django.field(resolver=komment_queries.comment)
+    comments_for = strawberry_django.field(resolver=komment_queries.comments_for)
+    my_mentions = strawberry_django.field(resolver=komment_queries.my_mentions)
 
 
 
@@ -36,16 +57,23 @@ class Query:
 @strawberry.type
 class Mutation:
     create_user = strawberry_django.mutation(
-        resolver=create_user,
+        resolver=karakter_mutations.create_user,
     )
     create_comment = strawberry_django.mutation(
         resolver=komment_mutations.create_comment,
+    )
+    reply_to = strawberry_django.mutation(
+        resolver=komment_mutations.reply_to,
+    )
+    resolve_comment = strawberry_django.mutation(
+        resolver=komment_mutations.resolve_comment,
     )
 
 
 @strawberry.type
 class Subscription:
-    communication = strawberry.subscription(resolver=communications)
+    communications = strawberry.subscription(resolver=karakter_subscriptions.communications)
+    mentions = strawberry.subscription(resolver=komment_subscriptions.mentions)
 
 
 schema = strawberry.Schema(
@@ -59,6 +87,7 @@ schema = strawberry.Schema(
     types=[
         komment_types.Descendant,
         komment_types.MentionDescendant,
+        komment_types.ParagraphDescendant,
         komment_types.LeafDescendant,
     ]  # We really need to register
     # all the types here, otherwise the schema will not be able to resolve them

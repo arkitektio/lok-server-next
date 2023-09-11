@@ -15,16 +15,25 @@ from fakts import models, scalars, enums, filters
 from oauth2_provider.models import Application
 
 
+@strawberry.type()
+class Scope:
+    label: str
+    description: str
+    value: str
+
+
 @strawberry_django.type(models.Composition)
 class Composition:
+    id: strawberry.ID
     name: str 
     template: str
 
 
 @strawberry_django.type(models.App)
 class App:
+    id: strawberry.ID
     name: str
-    identifier: str
+    identifier: scalars.AppIdentifier
     logo: str
     releases: list['Release']
 
@@ -32,16 +41,19 @@ class App:
 
 @strawberry_django.type(models.App)
 class Release:
+    id: strawberry.ID
     app: App
-    version: str
+    version: scalars.Version
     name: str
     logo: str 
     scopes: list[str]
     requirements: list[str]
+    clients: list['Client']
 
 
 @strawberry_django.type(Application)
 class Oauth2Client:
+    id: strawberry.ID
     name: str
     user: types.User
     client_type: str
@@ -52,9 +64,12 @@ class Oauth2Client:
 
 @strawberry_django.type(models.Client)
 class Client:
+    id: strawberry.ID
     release: Release
     tenant: types.User
     kind: enums.ClientKind
-    oauth2_client: App
+    oauth2_client: Oauth2Client
     public: bool
     composition: Composition
+    user: types.User
+    token: str # TODO: Check if we should really expose this

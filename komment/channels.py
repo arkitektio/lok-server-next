@@ -1,3 +1,3 @@
 from ekke.channel import build_channel
 
-communication_broadcast, communicatoin_listen = build_channel("communication_broadcast")
+mention_broadcast, mention_listen = build_channel("mention_broadcast")

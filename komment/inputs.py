@@ -9,7 +9,7 @@ from strawberry import LazyType
 
 class DescendandInputModel(BaseModel):
     kind: enums.DescendantKind
-    children: list['DescendandInputModel'] | None
+    children: list["DescendandInputModel"] | None
     user: str | None
     bold: bool | None
     italic: bool | None
