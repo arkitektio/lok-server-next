@@ -7,33 +7,33 @@ db:
   username: fostgres
 apps:
   - identifier: github.io.jhnnsrs.mikroj
-    version: 0.0.1
+    version: 0.0.3
     scopes: 
       - read
       - write
     clients:
       - kind: website
-        token: 293j40239j4023023n09nw30d9n203nf03f
+        token: ddoinoinoinsoineoinoeine
         redirect_uris: 
           - http://localhost:8090
         tenant: johannes
         composition: generic
       - kind: development
-        token: 33908498jsoisffssss54444ffnoeinsoienfosinfe
+        token: dsodinsoinsoidnosi
         user: frank
         tenant: frank
         composition: generic
   - identifier: github.io.jhnnsrs.orkestrator
-    version: 0.0.1
+    version: 0.0.3
     scopes: 
       - read
       - write
     clients:
       - kind: website
-        token: 293j40239j4023ffff023n09nwff4523423430d9n203nf03f
+        token: 5oinoin2oin3oinoi33n2
         redirect_uris: 
-          - http://localhost:7890
-          - http://localhost:7890/callback
+          - http://127.0.0.1/
+          - http://127.0.0.1/callback
         tenant: johannes
         composition: generic
         public: true

@@ -92,6 +92,7 @@ def create_development_client(
         return client
 
     except models.Client.DoesNotExist:
+        print("Did not exist", user, release)
         client_secret = generate_client_secret()
         client_id = generate_client_id()
 
@@ -108,6 +109,7 @@ def create_development_client(
 
         return models.Client.objects.create(
             release=release,
+            user=user,
             tenant=user,
             token=config.token,
             kind=enums.ClientKind.DEVELOPMENT.value,

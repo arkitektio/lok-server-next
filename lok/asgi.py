@@ -39,7 +39,7 @@ application = ProtocolTypeRouter(
     {
         "http": URLRouter(
             [
-                re_path("^graphql", gql_http_consumer),
+                re_path("^graphql", gql_http_consumer, name="graphql"),
                 re_path(
                     "^", django_asgi_app
                 ),  # This might be another endpoint in your app

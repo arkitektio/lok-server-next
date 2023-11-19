@@ -89,6 +89,8 @@ schema = strawberry.Schema(
         komment_types.MentionDescendant,
         komment_types.ParagraphDescendant,
         komment_types.LeafDescendant,
+        karakter_types.GenericAccount,
+        karakter_types.OrcidAccount,
     ]  # We really need to register
     # all the types here, otherwise the schema will not be able to resolve them
     # and will throw a cryptic error

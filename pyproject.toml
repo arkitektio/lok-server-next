@@ -25,11 +25,19 @@ jwcrypto = "^1.5.0"
 jinja2 = "^3.1.2"
 django-registration = "^3.4"
 django-cors-headers = "^4.2.0"
+django-allauth = "^0.58.2"
 
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.7.0"
 django-stubs = "^4.2.3"
+pytest = "^7.4.3"
+
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "lok.settings_test"
+# -- recommended but optional:
+python_files = ["test_*.py", "*_test.py", "tests/*.py"]
 
 [build-system]
 requires = ["poetry-core"]

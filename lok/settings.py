@@ -44,6 +44,13 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "oauth2_provider",
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+
+    'allauth.socialaccount.providers.orcid',
+    # ... include the providers you want to enable:
+
     "ekke",
     "guardian",
     "komment",
@@ -51,6 +58,9 @@ INSTALLED_APPS = [
     "fakts",
     "karakter",
 ]
+
+
+ACCOUNT_EMAIL_VERIFICATION = "none" # we don't have an smpt server by default
 
 # Authentikate section
 
@@ -60,6 +70,9 @@ AUTH_USER_MODEL = "karakter.User"
 AUTHENTICATION_BACKENDS = [
     "oauth2_provider.backends.OAuth2Backend",
     "django.contrib.auth.backends.ModelBackend",
+
+    # `allauth` specific authentication methods, such as login by email
+    'allauth.account.auth_backends.AuthenticationBackend',
     "guardian.backends.ObjectPermissionBackend",
 ]
 
@@ -72,6 +85,10 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+
+
+    # Add the account middleware:
+    "allauth.account.middleware.AccountMiddleware",
 ]
 
 CHANNEL_LAYERS = {
@@ -90,7 +107,9 @@ ROOT_URLCONF = "lok.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [
+            "templates"
+        ],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -163,6 +182,7 @@ OAUTH2_PROVIDER = {
         "doks",
         "kranken",
     ],
+    "PKCE_REQUIRED": False # to allow no challenges
 }
 
 OAUTH2_JWT = {
@@ -255,9 +275,38 @@ LOGGING = {
     },
 }
 
-LOGIN_URL = "login"
-LOGOUT_URL = "logout"
+LOGIN_URL = "account_login"
+LOGOUT_URL = "account_logout"
 
 ENSURED_APPS = OmegaConf.to_object(conf.apps)
 
 ENSURED_USERS = OmegaConf.to_object(conf.users)
+
+
+SOCIALACCOUNT_PROVIDERS = {
+    "github": {
+        # For each provider, you can choose whether or not the
+        # email address(es) retrieved from the provider are to be
+        # interpreted as verified.
+        "VERIFIED_EMAIL": True
+    },
+    "orcid": {
+        # For each OAuth based provider, either add a ``SocialApp``
+        # (``socialaccount`` app) containing the required client
+        # credentials, or list them here:
+        "APPS": [
+            {
+                "client_id": "APP-AGTOUJHZGVNFR157",
+                "secret": "e135b12b-fe4f-4c7a-a9ee-1c283ad41013",
+            },
+        ],
+        # These are provider-specific settings that can only be
+        # listed here:
+        "SCOPE": [
+            "openid",
+        ],
+        "AUTH_PARAMS": {
+            "access_type": "online",
+        },
+    }
+}

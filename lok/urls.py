@@ -18,13 +18,21 @@ from django.contrib import admin
 from django.urls import path
 from django.urls import include, path
 from fakts.views import WellKnownFakts
+from django.shortcuts import render
+
+# Bootstrap Backend
+def index(request):
+    # Render that in the index template
+    return render(request, "index.html")
 
 urlpatterns = [
+
+    path("", index, name="index"),
     path("admin/", admin.site.urls),
     path("o/", include("oauth2_provider.urls", namespace="oauth2_provider")),
     path("f/", include("fakts.urls", namespace="fakts")),
     path(".well-known/fakts", WellKnownFakts.as_view()),
-    path('accounts/', include('django_registration.backends.one_step.urls')),
-    path("accounts/", include("django.contrib.auth.urls"), name="auth"),
+    path('accounts/', include('allauth.urls')),
+    path('accounts/', include('karakter.urls')),
 
 ]

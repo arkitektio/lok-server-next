@@ -53,6 +53,10 @@ class App(models.Model):
     logo = fields.S3ImageField()
 
 
+    def __str__(self):
+        return f"{self.identifier}"
+
+
 class Release(models.Model):
     app = models.ForeignKey(App, on_delete=models.CASCADE, related_name="releases")
     version = fields.VersionField()
@@ -78,7 +82,7 @@ class Release(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.identifier}:{self.version}"
+        return f"{self.app}:{self.version}"
 
 
 class Client(models.Model):
