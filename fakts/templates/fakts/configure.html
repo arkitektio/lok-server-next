@@ -4,66 +4,76 @@
 {% load i18n %}
 {% block content %}
 
-<div class="flex  text-white h-full w-full justify-center align-center">
+<div class="flex text-white h-full w-full justify-center align-center">
     {% if success %}
-    <div
-        class=" max-w-[40rem] max-h-[10rem] border border-1 border-gray-200 p-3 rounded rounded-md mt-3 align-center flex  flex-col justify-center p-4 ">
-        <span class="text-3xl"> Successfully {% if authorized %}authorized!{% else %} denied! {%endif %}</span> <span
-            class="text-xl font-light"> You can close this
-            page now</span>
-    </div>
+        <div class="flex flex-col">
+            <span class="text-3xl"> Successfully {% if authorized %}authorized!{% else %} denied! {%endif %}</span> <p
+                class="text-xl font-light"> You can close this
+                page now</p>
+        </div>
     {% else %}
-    <form id="authorizationForm" method="post">
-        <div
-            class=" max-w-[40rem] border border-1 border-gray-200 p-3 rounded rounded-md mt-3 align-center flex  flex-col justify-center">
+        {% if staging_kind == "development" %}
+        <div>
+            {% if staging_logo %}
+            <img width=100 src="{{staging_logo}}" />
+            {% endif %}
 
-            <img width=100 src="{%  static 'img/lok.png' %}" />
 
-            <h1 class="text-3xl mt-2"><b> Hallo {{ request.user.username }}</b></h1>
-            <h3 class="text-xl font-bold mt-2">{% trans "Configuration Request" %}</h3>
+            <h1 class="text-3xl mt-2 font-light"><b> Hi {{ request.user.username }} !</b></h1>
+            <h3 class="text-xl font-bold mt-2">{% trans "New Development App" %}</h3>
 
-            <div class="mt-2 mb-2">
-                <span> A new device or application wants to be configured by you. Please check if you trust
+            <div class="mt-2 mb-2 text-sm font-light">
+                <span> A new device or application wants to be configured to be an app that you control. Please check if you trust
                     them and that their claims are sensical to you. If you agree with their claims. Please allow
-                    it. Otherwise deny.</span>
+                    it. Otherwise deny. This app will only be able data that you can access.</span>
             </div>
 
             {% if app %}
-            <h1 class="text-1xl font-light">They claim to the already registered app</h1>
+            <h1 class="text-1xl font-light">They <div class="font-bold text-blue-400 inline">claim</div> to the already registered app</h1>
             <h2 class="text-3xl font-light">{{ app.identifier}}</h2>
             {% else %}
-            <h1 class="text-1xl font-light">They would establish a new App</h1>
+            <h1 class="text-1xl font-light">They <div class="font-bold text-blue-400 inline">would</div> establish a new App in your name</h1>
             <h2 class="text-3xl">{{staging_identifier}}</h2>
             {% endif %}
 
             {% if release %}
-            <h1 class="text-1xl font-light">They claim to be the same version as a previously registered app</h1>
+            <h1 class="text-1xl font-light">They <div class="font-bold text-blue-400 inline">claim</div> to be have the same version</h1>
             <h2 class="text-3xl font-light">{{ release.version}}</h2>
             {% else %}
-            <h1 class="text-1xl font-light">They would establish a new Version</h1>
+            <h1 class="text-1xl font-light">They <div class="font-bold text-blue-400 inline">would</div> establish a new Version</h1>
             <h2 class="text-3xl">{{staging_version}}</h2>
             {% endif %}
 
+            <hr class="h-px my-2 bg-gray-200 border-0 dark:bg-gray-700">
+
 
             {% if client %}
-            <h1 class="text-1xl font-light">They claim you have allowed them before</h1>
-            <h2 class="text-3xl font-light">{{ client.kind}}</h2>
+            <h1 class="text-sm font-light">They <div class="font-bold text-blue-400 inline">claim</div> that you have allowed them before</h1>
             {% else %}
-            <h1 class="text-1xl font-light">They would establish a new client</h1>
-            <h2 class="text-3xl">{{staging_kind}}</h2>
+            <h1 class="text-sm font-light">They <div class="font-bold text-blue-400 inline">would</div> establish a new client</h1>
             {% endif %}
 
             {% if client %}
-            <h1 class="text-1xl font-light">This would mean they would inherit these rights</h1>
-            <h2 class="text-3xl font-light">{{release.scopes}}</h2>
+            <h1 class="text-sm font-light">This would mean they would  <div class="font-bold text-blue-400 inline">inherit</div> these rights</h1>
+            <ul class="list-disc my-2 mx-10">
+
+                {% for scope in release.scopes %}
+                <li>{{scope}}</li>
+                {% endfor %}
+            </ul>
             {% else %}
-            <h1 class="text-1xl font-light">They would gain these rights</h1>
-            <h2 class="text-3xl">{{staging_scopes}}</h2>
+            <h1 class="text-sm font-light">They <div class="font-bold text-blue-400 inline">would</div> gain these rights</h1>
+            <ul class="list-disc my-2 mx-10">
+
+                {% for scope in staging_scopes %}
+                <li>{{scope}}</li>
+                {% endfor %}
+            </ul>
             {% endif %}
 
+            <hr class="h-px my-4 bg-gray-200 border-0 dark:bg-gray-700">
 
-
-            <div class="mt-2 mb-2">
+            <div class="mt-2 mb-2 text-sm font-light">
                 <span> Please check if all of the claims are correct. Only allow them if you understand
                     the implicaitons
                 </span>
@@ -76,29 +86,205 @@
                     {{ form.non_field_errors }}
 
                     <div class="control-group">
-
-                        <br />
-                        <br />
                         <div class="flex w-full flex-row ">
                             <button type="submit"
-                                class="flex-1 bg-red-300 hover:bg-red-400 px-3 py-1 border-1 border border-red-900 rounded rounded-md cursor-pointer"
+                            class="text-white bg-gradient-to-br from-pink-500 to-orange-400 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none focus:ring-pink-200 dark:focus:ring-pink-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center me-2 mb-2 cursor-pointer flex-1 transition transition-all"
                                 name="action" value="cancel">Cancel </button>
                             <button type="submit"
-                                class="flex-1 bg-green-300 hover:bg-green-400 px-3 py-1 border-1 border border-green-900 rounded rounded-md cursor-pointer"
+                            class="text-white bg-gradient-to-br from-purple-600 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center me-2 mb-2  cursor-pointer flex-1 transition transition-all"
                                 name="action" value="allow">Allow </button>
                         </div>
                     </div>
                 </form>
+                </div>
             </div>
+        {% elif staging_kind == "desktop" %}
+            <div>
+                {% if staging_logo %}
+                <img width=100 src="{{staging_logo}}" />
+                {% endif %}
+    
+    
+                <h1 class="text-3xl mt-2 font-light"><b> Hi {{ request.user.username }} !</b></h1>
+                <h3 class="text-xl font-bold mt-2">{% trans "New Desktop App" %}</h3>
+    
+                <div class="mt-2 mb-2 text-sm font-light">
+                    <span> This application wants to be a desktop application, that other people can use to login to
+                        the platform. The admin trusts you to be a good citizen and check this application thoroughly.
+                    </span>   
+                </div>
+    
+                {% if app %}
+                <h1 class="text-1xl font-light">They <div class="font-bold text-blue-400 inline">claim</div> to the already registered app</h1>
+                <h2 class="text-3xl font-light">{{ app.identifier}}</h2>
+                {% else %}
+                <h1 class="text-1xl font-light">They <div class="font-bold text-blue-400 inline">would</div> establish a new App in your name</h1>
+                <h2 class="text-3xl">{{staging_identifier}}</h2>
+                {% endif %}
+    
+                {% if release %}
+                <h1 class="text-1xl font-light">They <div class="font-bold text-blue-400 inline">claim</div> to be have the same version</h1>
+                <h2 class="text-3xl font-light">{{ release.version}}</h2>
+                {% else %}
+                <h1 class="text-1xl font-light">They <div class="font-bold text-blue-400 inline">would</div> establish a new Version</h1>
+                <h2 class="text-3xl">{{staging_version}}</h2>
+                {% endif %}
+    
+                <hr class="h-px my-2 bg-gray-200 border-0 dark:bg-gray-700">
+    
+    
+                {% if client %}
+                <h1 class="text-sm font-light">They <div class="font-bold text-blue-400 inline">claim</div> that you have allowed them before</h1>
+                {% else %}
+                <h1 class="text-sm font-light">They <div class="font-bold text-blue-400 inline">would</div> establish a new client</h1>
+                {% endif %}
+    
+                {% if client %}
+                <h1 class="text-sm font-light">This would mean they would  <div class="font-bold text-blue-400 inline">inherit</div> these rights from the
+                other application</h1>
+                <ul class="list-disc my-2 mx-10">
+    
+                    {% for scope in release.scopes %}
+                    <li>{{scope}}</li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <h1 class="text-sm font-light">They <div class="font-bold text-blue-400 inline">would</div> gain these rights</h1>
+                <ul class="list-disc my-2 mx-10">
+    
+                    {% for scope in staging_scopes %}
+                    <li>{{scope}}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+    
+                <hr class="h-px my-4 bg-gray-200 border-0 dark:bg-gray-700">
+    
+                <div class="mt-2 mb-2 text-sm font-light">
+                    <span> Please check if all of the claims are correct. Only allow them if you understand
+                        the implicaitons
+                    </span>
 
-            <div class="mt-3">
-                <a class="border rounded rounded-md border-1 px-2 py-1 hover:bg-slate-500"
-                    href="{%  url 'account_login' %}?next={{request.get_full_path|urlencode}}">Change
-                    Account</a>
+                    <p class="font-bold mt-2"> This app will be able to claim these rights from users that choose to use it!</p>
+                </div>
+                <div class="mt-2">
+                    <form method="post">{% csrf_token %}
+                        {{ form.as_p }}
+    
+                        {{ form.errors }}
+                        {{ form.non_field_errors }}
+    
+                            <div class="flex w-full flex-row ">
+                                <button type="submit"
+                                class="text-white bg-gradient-to-br from-pink-500 to-orange-400 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none focus:ring-pink-200 dark:focus:ring-pink-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center me-2 mb-2 cursor-pointer flex-1 transition transition-all"
+                                    name="action" value="cancel">Cancel </button>
+                                <button type="submit"
+                                class="text-white bg-gradient-to-br from-purple-600 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center me-2 mb-2  cursor-pointer flex-1 transition transition-all"
+                                    name="action" value="allow">Allow </button>
+                            </div>
+                    </form>
+                </div>
             </div>
-            {% endif %}
-        </div>
+        {% elif staging_kind == "website" %}
+            <div>
+                {% if staging_logo %}
+                <img width=100 src="{{staging_logo}}" />
+                {% endif %}
+    
+    
+                <h1 class="text-3xl mt-2 font-light"><b> Hi {{ request.user.username }} !</b></h1>
+                <h3 class="text-xl font-bold mt-2">{% trans "New Website" %}</h3>
+    
+                <div class="mt-2 mb-2 text-sm font-light">
+                    <span> This application wants to become a website that users can use to 
+                        login to the platform. The admin trusts you to be a good citizen and check this application thoroughly.
+                    </span>   
+                </div>
+    
+                {% if app %}
+                <h1 class="text-1xl font-light">They <div class="font-bold text-blue-400 inline">claim</div> to the already registered app</h1>
+                <h2 class="text-3xl font-light">{{ app.identifier}}</h2>
+                {% else %}
+                <h1 class="text-1xl font-light">They <div class="font-bold text-blue-400 inline">would</div> establish a new App in your name</h1>
+                <h2 class="text-3xl">{{staging_identifier}}</h2>
+                {% endif %}
+    
+                {% if release %}
+                <h1 class="text-1xl font-light">They <div class="font-bold text-blue-400 inline">claim</div> to be have the same version</h1>
+                <h2 class="text-3xl font-light">{{ release.version}}</h2>
+                {% else %}
+                <h1 class="text-1xl font-light">They <div class="font-bold text-blue-400 inline">would</div> establish a new Version</h1>
+                <h2 class="text-3xl">{{staging_version}}</h2>
+                {% endif %}
+    
+                <hr class="h-px my-2 bg-gray-200 border-0 dark:bg-gray-700">
+    
+    
+                {% if client %}
+                <h1 class="text-sm font-light">They <div class="font-bold text-blue-400 inline">claim</div> that you have allowed them before</h1>
+                {% else %}
+                <h1 class="text-sm font-light">They <div class="font-bold text-blue-400 inline">would</div> establish a new client</h1>
+                {% endif %}
+    
+                {% if client %}
+                <h1 class="text-sm font-light">This would mean they would  <div class="font-bold text-blue-400 inline">inherit</div> these rights from the
+                other application</h1>
+                <ul class="list-disc my-2 mx-10">
+    
+                    {% for scope in release.scopes %}
+                    <li>{{scope}}</li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <h1 class="text-sm font-light">They <div class="font-bold text-blue-400 inline">would</div> gain these rights</h1>
+                <ul class="list-disc my-2 mx-10">
+    
+                    {% for scope in staging_scopes %}
+                    <li>{{scope}}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+
+                {% if staging_redirect_uris %}
+                    <h1 class="text-sm font-light">Make sure that these redirect uris make sense for the website?</h1>
+                    <ul class="list-disc my-2 mx-10">
+    
+                        {% for scope in staging_redirect_uris %}
+                        <li> {{scope}} </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+
+                
+                <hr class="h-px my-4 bg-gray-200 border-0 dark:bg-gray-700">
+    
+                <div class="mt-2 mb-2 text-sm font-light">
+                    <span> Please check if all of the claims are correct. Only allow them if you understand
+                        the implicaitons
+                    </span>
+
+                    <p class="font-bold mt-2"> This app will be able to claim these rights from users that choose to use it!</p>
+                </div>
+                <div class="mt-2">
+                    <form method="post">{% csrf_token %}
+                        {{ form.as_p }}
+    
+                        {{ form.errors }}
+                        {{ form.non_field_errors }}
+    
+                            <div class="flex w-full flex-row ">
+                                <button type="submit"
+                                class="text-white bg-gradient-to-br from-pink-500 to-orange-400 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none focus:ring-pink-200 dark:focus:ring-pink-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center me-2 mb-2 cursor-pointer flex-1 transition transition-all"
+                                    name="action" value="cancel">Cancel </button>
+                                <button type="submit"
+                                class="text-white bg-gradient-to-br from-purple-600 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center me-2 mb-2  cursor-pointer flex-1 transition transition-all"
+                                    name="action" value="allow">Allow </button>
+                            </div>
+                    </form>
+                </div>
+            </div>
+        {% endif %}
+    {% endif %}
 </div>
-</form>
 
 {% endblock %}

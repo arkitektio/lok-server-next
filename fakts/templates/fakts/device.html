@@ -1,4 +1,4 @@
-{% extends "infos/base.html" %}
+{% extends "fakts/base.html" %}
 
 {% load static %}
 {% load i18n %}
@@ -6,15 +6,21 @@
 
 {% csrf_token %}
 <div class="block-center" style='font-family: Roboto, sans-serif'>
-    {% if not errors %}
-    <h3 class="block-center-heading">{% trans "Register a new Device" %}</h3>
-    <div>
-        <span> This device will be linked to your useraccount </span>
+    <h1 class="text-3xl mt-2 font-light"><b> Hi {{ request.user.username }} !</b></h1>
+    <h3 class="text-xl font-bold mt-2">{% trans "Device Code" %}</h3>
+
+    <div class="mt-2 mb-2 text-sm font-light">
+        <span> If yout to configure your device, please enter the code below.
+        </span>   
     </div>
+
     <br />
-    <div class="mt-2">
+    <div class="mt-2 w-full">
         <form method="post">{% csrf_token %}
-            {{ form.as_p }}
+
+            {% for field in form %}
+                {% include "./field.html" %}
+            {% endfor %}
 
             {{ form.errors }}
             {{ form.non_field_errors }}
@@ -23,9 +29,11 @@
 
                 <br />
                 <br />
-                <div class="controls btn-group">
-                    <input type="submit" class="btn btn-lg btn-danger" value="Cancel" />
-                    <input type="submit" class="btn btn-lg btn-primary" name="allow" value="Configure" />
+                <div class="flex w-full flex-row ">
+                    <input type="submit"  class="text-white bg-gradient-to-br from-pink-500 to-orange-400 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none focus:ring-pink-200 dark:focus:ring-pink-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center me-2 mb-2 cursor-pointer flex-1 transition transition-all"
+                    value="Cancel" />
+                    <input type="submit" class="text-white bg-gradient-to-br from-purple-600 to-blue-500 hover:bg-gradient-to-bl focus:ring-4 focus:outline-none focus:ring-blue-300 dark:focus:ring-blue-800 font-medium rounded-lg text-sm px-5 py-2.5 text-center me-2 mb-2  cursor-pointer flex-1 transition transition-all"
+                    name="allow" value="Configure" />
                 </div>
             </div>
         </form>
@@ -34,13 +42,4 @@
 
 </div>
 
-{{ form.errors }}
-{{ form.non_field_errors }}
-
-{% else %}
-<h2>Error: {{ error.error }}</h2>
-<p>{{ error.description }}</p>
-
-{% endif %}
-</div>
-{% endblock %}
+{% endblock content %}

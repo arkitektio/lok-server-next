@@ -96,6 +96,7 @@ class ConfigureView(LoginRequiredMixin, FormView):
             context["staging_kind"] = x.staging_kind
             context["staging_redirect_uris"] = x.staging_redirect_uris
             context["staging_scopes"] = x.staging_manifest["scopes"]
+            context["staging_logo"] = x.staging_manifest.get("logo", None)
 
             app = models.App.objects.filter(identifier=x.staging_manifest["identifier"]).first()
             if app:
@@ -144,6 +145,15 @@ class ConfigureView(LoginRequiredMixin, FormView):
                 if device_code.staging_kind == enums.ClientKindChoices.DEVELOPMENT.value:
                     config = base_models.DevelopmentClientConfig(
                         kind=enums.ClientKind.DEVELOPMENT,
+                        token=token,
+                        user=self.request.user.username,
+                        tenant=self.request.user.username,
+                        composition=composition.name,
+                    )
+
+                elif device_code.staging_kind == enums.ClientKindChoices.DESKTOP.value:
+                    config = base_models.DesktopClientConfig(
+                        kind=enums.ClientKind.DESKTOP,
                         token=token,
                         user=self.request.user.username,
                         tenant=self.request.user.username,
@@ -217,7 +227,7 @@ class DeviceView(LoginRequiredMixin, FormView):
     It will redirect to the device code view.
     """
 
-    template_name = "infos/device.html"
+    template_name = "fakts/device.html"
     form_class = DeviceForm
 
     def get_initial(self):
@@ -281,10 +291,8 @@ class StartChallengeView(View):
             expires_at=datetime.datetime.now(timezone.utc) + datetime.timedelta(seconds=start_grant.expiration_time_seconds),
             staging_kind=start_grant.requested_client_kind.value,
             staging_redirect_uris=start_grant.redirect_uris,
+            staging_logo=logo,
         )
-        if logo:
-            device_code.staging_logo.save(f"{manifest.identifier}:{manifest.version}.png", logo, save=True)
-            device_code.save()
 
         return JsonResponse(
             data={

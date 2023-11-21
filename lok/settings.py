@@ -76,6 +76,15 @@ AUTHENTICATION_BACKENDS = [
     "guardian.backends.ObjectPermissionBackend",
 ]
 
+SUPERUSERS = [
+    {
+        "USERNAME": conf.django.admin.username,
+        "EMAIL": "fake@fake.com",
+        "PASSWORD": conf.django.admin.password,
+    }
+]
+
+
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",

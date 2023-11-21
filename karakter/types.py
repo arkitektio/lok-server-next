@@ -39,11 +39,19 @@ class User:
     email: str | None
     groups: list[Group]
     avatar: str | None
+    profile: "Profile"
 
     @strawberry_django.field()
     def social_accounts(self, info) -> list["SocialAccount"]:
         return list(smodels.SocialAccount.objects.filter(user=self))
     
+
+@strawberry_django.type(models.Profile, filters=filters.ProfileFilter, pagination=True)
+class Profile:
+    bio: str
+    name: str
+
+
 
 
 @strawberry_django.interface(smodels.SocialAccount)

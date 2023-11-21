@@ -20,7 +20,7 @@ def download_logo(url: str) -> File:
         assert uo.status == 200
         img_tmp.write(uo.read())
         img_tmp.flush()
-    return File(img_tmp)
+    return File(img_tmp, f"Logo {url}")
 
 
 def download_placeholder(identifier: str, version: str) -> File:

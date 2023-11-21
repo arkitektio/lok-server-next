@@ -11,7 +11,7 @@ def create_website_client(
     composition = config.get_composition()
 
     try:
-        client = models.Client.objects.get(user=user, release=release, kind=enums.ClientKind.WEBSITE.value)
+        client = models.Client.objects.get(tenant=user, release=release, kind=enums.ClientKind.WEBSITE.value)
         if client.token != config.token:
             client.token = config.token
         client.tenant = tenant
@@ -55,6 +55,60 @@ def create_website_client(
             client_secret=client_secret,
             oauth2_client=oauth2_client,
             public=config.public,
+            composition=composition
+        )
+    
+def create_desktop_client(
+    release: models.Release, config: base_models.WebsiteClientConfig
+):
+    
+    tenant = config.get_tenant()
+    user = None # is public app so no user
+    composition = config.get_composition()
+
+    try:
+        client = models.Client.objects.get(tenant=user, release=release, kind=enums.ClientKind.DESKTOP.value)
+        if client.token != config.token:
+            client.token = config.token
+        client.tenant = tenant
+        client.composition = composition
+        client.save()
+
+        client.oauth2_client.name = f"@{release.app.identifier}:{release.version}"
+        client.oauth2_client.user = None
+        client.oauth2_client.client_type = "public"
+        client.oauth2_client.algorithm = models.Application.RS256_ALGORITHM
+        client.oauth2_client.authorization_grant_type = (
+            models.Application.GRANT_AUTHORIZATION_CODE
+        )
+        client.oauth2_client.redirect_uris = " ".join(["http://127.0.0.1/"])
+        client.oauth2_client.client_id = client.client_id
+        client.oauth2_client.client_secret = client.client_secret
+        client.oauth2_client.save()
+        return client
+
+    except models.Client.DoesNotExist:
+        client_secret = generate_client_secret()
+        client_id = generate_client_id()
+
+        oauth2_client = models.Application.objects.create(
+            client_type="public",
+            algorithm=models.Application.RS256_ALGORITHM,
+            name=f"@{release.app.identifier}:{release.version}",
+            authorization_grant_type=models.Application.GRANT_AUTHORIZATION_CODE,
+            redirect_uris=" ".join(["http://127.0.0.1/"]),
+            client_id=client_id,
+            client_secret=client_secret,
+        )
+
+        return models.Client.objects.create(
+            release=release,
+            tenant=tenant,
+            kind=enums.ClientKind.DESKTOP.value,
+            token=config.token,
+            client_id=client_id,
+            client_secret=client_secret,
+            oauth2_client=oauth2_client,
             composition=composition
         )
 
@@ -127,21 +181,23 @@ def create_client(
 ):
     from .utils import download_logo
 
-    app, _ = models.App.objects.get_or_create(identifier=manifest.identifier)
-    release, _ = models.Release.objects.get_or_create(app=app, version=manifest.version)
-    release.scopes = manifest.scopes
-    release.requirements = manifest.requirements
-    release.save()
 
-    if manifest.logo:
-        logo = download_logo(manifest.logo)
-        release.logo.save(
-            f"{manifest.identifier}-{manifest.version}.png", logo, save=True
-        )
-        release.save()
+    logo = download_logo(manifest.logo) if manifest.logo else None
+    app, _ = models.App.objects.get_or_create(identifier=manifest.identifier)
+    release, _ = models.Release.objects.update_or_create(app=app, version=manifest.version, defaults={
+        "logo": logo,
+        "scopes": manifest.scopes,
+        "requirements": manifest.requirements
+    })
+
 
     if config.kind == enums.ClientKind.WEBSITE:
         return create_website_client(release, config)
 
     if config.kind == enums.ClientKind.DEVELOPMENT:
         return create_development_client(release, config)
+    
+    if config.kind == enums.ClientKind.DESKTOP:
+        return create_desktop_client(release, config)
+    
+    raise NotImplementedError(f"No such client kind {config.kind} exists")

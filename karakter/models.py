@@ -31,6 +31,7 @@ class Profile(models.Model):
     name = models.CharField(max_length=1000, null=True, blank=True)
     bio = models.CharField(max_length=4000, null=True, blank=True)
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
+    avatar = models.ImageField(null=True, blank=True)
 
 
 class GroupProfile(models.Model):
