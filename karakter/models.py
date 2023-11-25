@@ -8,7 +8,15 @@ logger = logging.getLogger(__name__)
 
 
 class User(AbstractUser):
-    """A reflection on the real User"""
+    """A User of the System
+
+    Lok Users are the main users of the system. They can be assigned to groups and have profiles, that can be used to display information about them.
+    Each user is identifier by a unique username, and can have an email address associated with them.
+
+    
+    
+    
+    """
 
     email = models.EmailField(null=True, blank=True)
 
@@ -28,6 +36,7 @@ class User(AbstractUser):
 
 
 class Profile(models.Model):
+    """ A Profile of a User"""
     name = models.CharField(max_length=1000, null=True, blank=True)
     bio = models.CharField(max_length=4000, null=True, blank=True)
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
@@ -35,6 +44,7 @@ class Profile(models.Model):
 
 
 class GroupProfile(models.Model):
+    """ A Profile of a Group"""
     name = models.CharField(max_length=1000, null=True, blank=True)
     group = models.OneToOneField(
         Group, on_delete=models.CASCADE, related_name="profile"
@@ -42,6 +52,7 @@ class GroupProfile(models.Model):
 
 
 class ComChannel(models.Model):
+    """A Channel to send notifications to a user"""
     name = models.CharField(max_length=1000, null=True, blank=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="channels")
     token = models.CharField(max_length=1000, null=True, blank=True, unique=True)

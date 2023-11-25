@@ -3,8 +3,7 @@ import strawberry
 
 AppIdentifier = strawberry.scalar(
     NewType("AppIdentifier", str),
-    description="The `ArrayLike` scalasr typsse represents a reference to a store "
-    "previously created by the user n a datalayer",
+    description="The App identifier is a unique identifier for an app. It is used to identify the app in the database and in the code. We encourage you to use the reverse domain name notation. E.g. `com.example.myapp`",
     serialize=lambda v: v,
     parse_value=lambda v: v,
 )

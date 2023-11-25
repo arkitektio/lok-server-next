@@ -8,8 +8,6 @@ ProviderType = strawberry.enum(Enum("ProviderType", params ))
 
 
     
-
-
 class RunEventKindChoices(TextChoices):
     """Event Type for the Event Operator"""
 

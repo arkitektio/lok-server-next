@@ -201,6 +201,11 @@ OAUTH2_JWT = {
     "ISSUER": "herre",
 }
 
+STRAWBERRY_DJANGO = {
+    "TYPE_DESCRIPTION_FROM_MODEL_DOCSTRING": True,
+    "FIELD_DESCRIPTION_FROM_HELP_TEXT": True
+}
+
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators

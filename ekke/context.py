@@ -11,6 +11,9 @@ User = get_user_model()
 
 @dataclass
 class EnhancendChannelsHTTPRequest(ChannelsRequest):
+    """ An ehanced version of Channels' HTTP Request that
+    includes user, app, scopes and assignation_id from the
+    headers."""
     user: Optional[User] = None
     app: Optional[Application] = None
     scopes: Optional[list[str]] = None
@@ -51,6 +54,7 @@ class EnhancendChannelsWSRequest:
 
 @dataclass
 class ChannelsWSContext:
+    """ A context for websocket requests. """
     request: EnhancendChannelsWSRequest
     consumer: ChannelsConsumer
     connection_params: Optional[Dict[str, Any]] = None

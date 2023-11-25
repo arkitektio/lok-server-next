@@ -6,16 +6,27 @@ from fakts import enums, validators
 from typing import Literal
 
 class Manifest(BaseModel):
+    """ A Manifest is a description of a client. It contains all the information
+    necessary to create a set of client, release and app objects in the database.
+    """
     identifier: str
+    """ The identifier is a unique string that identifies the client. """
     version: str
+    """ The version is a string that identifies the version of the client. """
     logo: Optional[str] = None
+    """ The logo is a url to a logo that should be used for the client. """
     scopes: Optional[list[str]] = Field(default_factory=list)
+    """ The scopes are a list of scopes that the client can request. """
     requirements: Optional[list[str]] = Field(default_factory=list)
+    """ The requirements are a list of requirements that the client needs to run on (e.g. needs GPU)"""
 
 
 
 
 class CompositionInputModel(BaseModel):
+    """ A composition is a Jinja2 YAML template that will be rendered 
+    with the LinkingContext as context. The result of the rendering
+    will be used to send to the client as a configuration."""
     name: str
     template: str
 
@@ -31,6 +42,9 @@ class CompositionInputModel(BaseModel):
 
 
 class DeviceCodeStartRequest(BaseModel):
+    """ A DeviceCodeStartRequest is used to start the device code flow. It contains
+    the manifest of the client that wants to start the flow and the redirect uris
+    as well as the requested client kind."""
     manifest: Manifest
     expiration_time_seconds: int = 300
     redirect_uris: list[str] = Field(default_factory=list) 
@@ -38,10 +52,13 @@ class DeviceCodeStartRequest(BaseModel):
 
 
 class DeviceCodeChallengeRequest(BaseModel):
+    """ A DeviceCodeChallengeRequest is used to start the device code flow. It only 
+    contains the device code."""
     code: str
 
 
 class ConfigurationRequest(BaseModel):
+    
     grant: enums.FaktsGrantKind
     device_code: Optional[str] = None
 

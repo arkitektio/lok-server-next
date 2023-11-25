@@ -8,6 +8,10 @@ cached_settings = None
 
 
 def prepare_settings() -> EkkeSettings:
+    """ Prepare the settings for the Ekke library.
+    
+    This function will check if all the settings are set and then return a
+    EkkeSettings object with the settings."""
     try:
         user = settings.AUTH_USER_MODEL
     except AttributeError:

@@ -9,7 +9,8 @@ logger = logging.getLogger(__name__)
 
 
 class Channel:
-    """A GraphQL channel."""
+    """A Strawberry and Django Channels powered channel to
+    selectively send signals to specific subscription receivers."""
 
     name = None
 

@@ -24,8 +24,9 @@ class UserFilter:
         return queryset.filter(username__contains=self.search)
 
 
-@strawberry_django.filter(models.Group)
+@strawberry_django.filter(models.Group, description="__doc__")
 class GroupFilter:
+    """ A Filterset to Filter Groups """
     search: str | None
     name: Optional[FilterLookup[str]] | None
     ids: list[strawberry.ID] | None

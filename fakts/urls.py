@@ -5,7 +5,8 @@ from . import views
 
 app_name = "fakts"
 
-
+# Basic url patterns for fakts 
+# as described in the fakts api documentation
 base_urlpatterns = [
     re_path(r"^configure/$", views.ConfigureView.as_view(), name="configure"),
     re_path(r"^retrieve/$", views.RetrieveView.as_view(), name="retrieve"),

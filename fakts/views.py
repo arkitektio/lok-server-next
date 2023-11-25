@@ -29,7 +29,10 @@ logger = logging.getLogger(__name__)
 
 @method_decorator(csrf_exempt, name="dispatch")
 class WellKnownFakts(View):
-    """Well Known fakts Viewset (only allows get)"""
+    """Well Known fakts Viewset (only allows get). Sends
+    back the well known configuration for the fakts server Describing
+    endpoints for "Claim" and "Configure" as well as the name and version.
+    Of the Fakts Protocol"""
 
     def get(self, request, format=None):
         return JsonResponse(data={"name": settings.DEPLOYMENT_NAME, "version": "0.0.1", "description": "This is the best server", "claim": request.build_absolute_uri("/f/claim") , "base_url": request.build_absolute_uri("/f/")})
@@ -376,8 +379,9 @@ class ChallengeView(View):
 class RetrieveView(View):
     """
     Implements an endpoint that returns the faktsclaim for a given identifier and version
-    if the app was already configured and the app is marked as public
-
+    if the app was already configured and the app is marked as PUBLIC. While any app can
+    request a faktsclaim for any other app, redirect uris are set to predifined values
+    and the app will not be able to use the faktsclaim to get a configuration.
     """
 
     def post(self, request, *args, **kwargs):

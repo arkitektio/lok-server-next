@@ -5,6 +5,8 @@ from oauth2_provider.generators import generate_client_id, generate_client_secre
 def create_website_client(
     release: models.Release, config: base_models.WebsiteClientConfig
 ):
+    """ This function creates a website client. This type of client is used for 
+    websites that want to register with the lok instance."""
     
     tenant = config.get_tenant()
     user = None # is public app so no user

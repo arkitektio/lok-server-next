@@ -3,6 +3,8 @@ from jinja2 import Template, TemplateSyntaxError, TemplateError, StrictUndefined
 import yaml
 
 def is_valid_jinja2_template(template_string, render_context=None):
+    """ Checks if a template string is a valid Jinja2 template. And if it is,
+    it checks if it is a valid YAML file, wher rendered with a fakt context If it is not, it raises a ValueError"""
     try:
         template = Template(template_string, undefined=StrictUndefined)
         try:
@@ -16,6 +18,9 @@ def is_valid_jinja2_template(template_string, render_context=None):
 
 
 def jinja2_yaml_template_validator(value):
+    """ Validates that a string is a valid Jinja2 template. And if it is,
+    it checks if it is a valid YAML file, wher rendered with a fakt context If it is not, it raises a ValidationError
+    """
     from .base_models import LinkingContext, LinkingRequest, Manifest, LinkingClient
 
     fake_context = LinkingContext(

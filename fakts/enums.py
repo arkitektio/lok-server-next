@@ -13,9 +13,9 @@ class ClientKindChoices(TextChoices):
 
 @strawberry.enum
 class ClientKind(str, Enum):
-    DEVELOPMENT = "development"
-    WEBSITE = "website"
-    DESKTOP = "desktop"
+    DEVELOPMENT = strawberry.enum_value("development", description="A development client. Development clients are clients that receive a client_id and client_secret, and are always linked to a user, that grants rights when creating the application. There is no active user authentication when the app gets started. They are used for development purposes.")
+    WEBSITE = strawberry.enum_value("website", description="""A website clients. Website clients need to undergo an authentication flow, where the user is redirected to the website, before the client can be used. They are used for website applications, that want to access a user's data, and are hosted on non trusted domains.""")
+    DESKTOP = strawberry.enum_value("desktop", description="""A desktop client. Desktop clients need to undergo an authentication flow, where the user is redirect back to the application. They use redirect but only on loopback adapters.""")
 
 
 class FilterKindChoices(TextChoices):

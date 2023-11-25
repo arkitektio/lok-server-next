@@ -11,6 +11,8 @@ UserModel = get_user_model()
 
 
 class JWTToken(BaseModel):
+    """ The JWT Token that is used to authenticate users.
+    This is a pydantic model that is used to validate the token."""
     sub: str
     iss: str
     exp: int
