@@ -13,13 +13,7 @@ class DescendantKind(str, Enum):
     
     """
 
-    LEAF = strawberry.enum_value(
-        "LEAF", description="A leaf of text."
-    )
-    MENTION = strawberry.enum_value(
-        "MENTION", description="A mention of a user"
-    )
-    PARAGRAPH = strawberry.enum_value(
-        "PARGRAPTH", description="A Paragraph of text"
-    )
+    LEAF = "LEAF"
+    MENTION = "MENTION"
+    PARAGRAPH = "PARGRAPTH"
 

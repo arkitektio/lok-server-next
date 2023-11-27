@@ -145,27 +145,27 @@ class ConfigureView(LoginRequiredMixin, FormView):
                 manifest = base_models.Manifest(**device_code.staging_manifest)
                 config = None
 
-                if device_code.staging_kind == enums.ClientKindChoices.DEVELOPMENT.value:
+                if device_code.staging_kind == enums.ClientKindVanilla.DEVELOPMENT.value:
                     config = base_models.DevelopmentClientConfig(
-                        kind=enums.ClientKind.DEVELOPMENT,
+                        kind=enums.ClientKindVanilla.DEVELOPMENT.value,
                         token=token,
                         user=self.request.user.username,
                         tenant=self.request.user.username,
                         composition=composition.name,
                     )
 
-                elif device_code.staging_kind == enums.ClientKindChoices.DESKTOP.value:
+                elif device_code.staging_kind == enums.ClientKindVanilla.DESKTOP.value:
                     config = base_models.DesktopClientConfig(
-                        kind=enums.ClientKind.DESKTOP,
+                        kind=enums.ClientKindVanilla.DESKTOP.value,
                         token=token,
                         user=self.request.user.username,
                         tenant=self.request.user.username,
                         composition=composition.name,
                     )
 
-                elif device_code.staging_kind == enums.ClientKindChoices.WEBSITE.value:
+                elif device_code.staging_kind == enums.ClientKindVanilla.WEBSITE.value:
                     config = base_models.WebsiteClientConfig(
-                        kind=enums.ClientKind.WEBSITE,
+                        kind=enums.ClientKindVanilla.WEBSITE.value,
                         token=token,
                         tenant=self.request.user.username,
                         redirect_uris=device_code.staging_redirect_uris,

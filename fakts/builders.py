@@ -13,7 +13,7 @@ def create_website_client(
     composition = config.get_composition()
 
     try:
-        client = models.Client.objects.get(tenant=user, release=release, kind=enums.ClientKind.WEBSITE.value)
+        client = models.Client.objects.get(tenant=user, release=release, kind=enums.ClientKindVanilla.WEBSITE.value)
         if client.token != config.token:
             client.token = config.token
         client.tenant = tenant
@@ -51,7 +51,7 @@ def create_website_client(
         return models.Client.objects.create(
             release=release,
             tenant=tenant,
-            kind=enums.ClientKind.WEBSITE.value,
+            kind=enums.ClientKindVanilla.WEBSITE.value,
             token=config.token,
             client_id=client_id,
             client_secret=client_secret,
@@ -69,7 +69,7 @@ def create_desktop_client(
     composition = config.get_composition()
 
     try:
-        client = models.Client.objects.get(tenant=user, release=release, kind=enums.ClientKind.DESKTOP.value)
+        client = models.Client.objects.get(tenant=user, release=release, kind=enums.ClientKindVanilla.DESKTOP.value)
         if client.token != config.token:
             client.token = config.token
         client.tenant = tenant
@@ -106,7 +106,7 @@ def create_desktop_client(
         return models.Client.objects.create(
             release=release,
             tenant=tenant,
-            kind=enums.ClientKind.DESKTOP.value,
+            kind=enums.ClientKindVanilla.DESKTOP.value,
             token=config.token,
             client_id=client_id,
             client_secret=client_secret,
@@ -127,7 +127,7 @@ def create_development_client(
 
 
     try:
-        client = models.Client.objects.get(user=user, release=release, kind=enums.ClientKind.DEVELOPMENT.value)
+        client = models.Client.objects.get(user=user, release=release, kind=enums.ClientKindVanilla.DEVELOPMENT.value)
         if client.token != config.token:
             client.token = config.token
         client.tenant = tenant
@@ -168,7 +168,7 @@ def create_development_client(
             user=user,
             tenant=user,
             token=config.token,
-            kind=enums.ClientKind.DEVELOPMENT.value,
+            kind=enums.ClientKindVanilla.DEVELOPMENT.value,
             client_id=client_id,
             client_secret=client_secret,
             oauth2_client=oauth2_client,
@@ -193,13 +193,13 @@ def create_client(
     })
 
 
-    if config.kind == enums.ClientKind.WEBSITE:
+    if config.kind == enums.ClientKindVanilla.WEBSITE.value:
         return create_website_client(release, config)
 
-    if config.kind == enums.ClientKind.DEVELOPMENT:
+    if config.kind == enums.ClientKindVanilla.DEVELOPMENT.value:
         return create_development_client(release, config)
     
-    if config.kind == enums.ClientKind.DESKTOP:
+    if config.kind == enums.ClientKindVanilla.DESKTOP.value:
         return create_desktop_client(release, config)
     
     raise NotImplementedError(f"No such client kind {config.kind} exists")

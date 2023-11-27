@@ -48,7 +48,7 @@ class DeviceCodeStartRequest(BaseModel):
     manifest: Manifest
     expiration_time_seconds: int = 300
     redirect_uris: list[str] = Field(default_factory=list) 
-    requested_client_kind: enums.ClientKind = enums.ClientKind.DEVELOPMENT
+    requested_client_kind: enums.ClientKindVanilla = enums.ClientKindVanilla.DEVELOPMENT
 
 
 class DeviceCodeChallengeRequest(BaseModel):
@@ -96,19 +96,8 @@ class LinkingContext(BaseModel):
     client: LinkingClient
 
 
-
-
-
-
-
-
-
-
-
-
-
 class ClientConfig(BaseModel):
-    kind: enums.ClientKind
+    kind: enums.ClientKindVanilla
     composition: str
     token: str
     tenant: str

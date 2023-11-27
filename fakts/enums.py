@@ -11,6 +11,12 @@ class ClientKindChoices(TextChoices):
     DESKTOP = "desktop", "DESKTOP (Value represent DESKTOP Aüü)"
 
 
+class ClientKindVanilla(str, Enum):
+    WEBSITE = "website"
+    DEVELOPMENT = "development"
+    DESKTOP = "desktop"
+
+
 @strawberry.enum
 class ClientKind(str, Enum):
     DEVELOPMENT = strawberry.enum_value("development", description="A development client. Development clients are clients that receive a client_id and client_secret, and are always linked to a user, that grants rights when creating the application. There is no active user authentication when the app gets started. They are used for development purposes.")
