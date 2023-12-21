@@ -84,6 +84,9 @@ SUPERUSERS = [
     }
 ]
 
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https') # because we my be behind a proxy
+
+
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
@@ -181,7 +184,7 @@ OAUTH2_PROVIDER = {
     or 60 * 60 * 24,  # TOkens are valid for 24 Hours
     "OAUTH2_VALIDATOR_CLASS": "karakter.oauth2.validator.CustomOAuth2Validator",
     "OAUTH2_SERVER_CLASS": "karakter.oauth2.server.JWTServer",
-    "ALLOWED_REDIRECT_URI_SCHEMES": [
+    "ALLOWED_REDIRECT_URI_SCHEMES": conf.get("allowed_redirect_uri_schemes", [
         "http",
         "https",
         "tauri",
@@ -190,7 +193,7 @@ OAUTH2_PROVIDER = {
         "orkestrator",
         "doks",
         "kranken",
-    ],
+    ]),
     "PKCE_REQUIRED": False # to allow no challenges
 }
 

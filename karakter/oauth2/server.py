@@ -15,15 +15,12 @@ def custom_token_generator(request, refresh_token=False):
 
     request.claims = {
         "type": app.authorization_grant_type,
-        "tenant": app.client.tenant.id if app.client.tenant else None,
         "sub": user.id if user else None,
         "preferred_username": user.username if user else None,
         "roles": [group.name for group in user.groups.all()] if user else [],
         "scope": " ".join(request.scopes),
         "iss": "herre",
         "client_id": app.client_id,
-        "version": app.client.release.version,
-        "identifier": app.client.release.app.identifier,
     }
 
     return common.generate_signed_token(settings.OAUTH2_JWT["PRIVATE_KEY"], request)

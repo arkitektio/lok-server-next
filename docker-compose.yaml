@@ -11,7 +11,7 @@ services:
     labels:
       - "arkitekt.default.service=db"
   lok_next:
-    build: .
+    image: jhnnsrs/lok:next
     ports:
     - 8233:80
     labels:
