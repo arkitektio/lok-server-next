@@ -13,7 +13,7 @@ def create_website_client(
     composition = config.get_composition()
 
     try:
-        client = models.Client.objects.get(tenant=user, release=release, kind=enums.ClientKindVanilla.WEBSITE.value)
+        client = models.Client.objects.get(tenant=tenant, release=release, kind=enums.ClientKindVanilla.WEBSITE.value)
         if client.token != config.token:
             client.token = config.token
         client.tenant = tenant
@@ -57,7 +57,7 @@ def create_website_client(
             client_secret=client_secret,
             oauth2_client=oauth2_client,
             public=config.public,
-            composition=composition
+            composition=composition,
         )
     
 def create_desktop_client(
@@ -69,7 +69,7 @@ def create_desktop_client(
     composition = config.get_composition()
 
     try:
-        client = models.Client.objects.get(tenant=user, release=release, kind=enums.ClientKindVanilla.DESKTOP.value)
+        client = models.Client.objects.get(tenant=tenant, release=release, kind=enums.ClientKindVanilla.DESKTOP.value)
         if client.token != config.token:
             client.token = config.token
         client.tenant = tenant
@@ -191,6 +191,9 @@ def create_client(
         "scopes": manifest.scopes,
         "requirements": manifest.requirements
     })
+
+
+    print(config)
 
 
     if config.kind == enums.ClientKindVanilla.WEBSITE.value:

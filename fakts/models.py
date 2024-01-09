@@ -41,6 +41,7 @@ class DeviceCode(models.Model):
     )
     staging_manifest = models.JSONField(default=dict)
     staging_logo = fields.S3ImageField()
+    staging_public = models.BooleanField(default=False)
     staging_redirect_uris = models.JSONField(default=list)
     expires_at = models.DateTimeField()
     denied = models.BooleanField(default=False)

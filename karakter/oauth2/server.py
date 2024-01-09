@@ -23,6 +23,12 @@ def custom_token_generator(request, refresh_token=False):
         "client_id": app.client_id,
     }
 
+    if app.client and app.client.release:
+        # This is to support old services that want to use the version and identifier
+        # TODO: Remove this when all services are updated to authentikate
+        request.claims["version"] = app.client.release.version
+        request.claims["identifier"] = app.client.release.app.identifier
+
     return common.generate_signed_token(settings.OAUTH2_JWT["PRIVATE_KEY"], request)
 
 

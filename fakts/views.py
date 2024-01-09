@@ -91,8 +91,14 @@ class ConfigureView(LoginRequiredMixin, FormView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        if self.request.GET.get("device_code", None):
-            x = models.DeviceCode.objects.get(code=self.request.GET.get("device_code"))
+
+        the_code =  self.request.GET.get("device_code", None)
+        if the_code:
+
+            logger.info(f"Received Context for {the_code}")
+
+
+            x = models.DeviceCode.objects.get(code=the_code)
             context["code"] = x
             context["staging_identifier"] = x.staging_manifest["identifier"]
             context["staging_version"] = x.staging_manifest["version"]
@@ -170,6 +176,7 @@ class ConfigureView(LoginRequiredMixin, FormView):
                         tenant=self.request.user.username,
                         redirect_uris=device_code.staging_redirect_uris,
                         composition=composition.name,
+                        public=device_code.staging_public,
                     )
                 else:
                     raise Exception("Unknown client kind")
@@ -207,16 +214,23 @@ class ConfigureView(LoginRequiredMixin, FormView):
         kwargs["grant"] = configuration.grant
 
         if configuration.grant == enums.FaktsGrantKind.DEVICE_CODE.value:
+            if not configuration.device_code:
+                raise ConfigurationError("No device code provided")
+
             kwargs["device_code"] = configuration.device_code
-            challenge, _ = models.DeviceCode.objects.get_or_create(
+            challenge = models.DeviceCode.objects.get(
                 code=configuration.device_code,
             )
+
+
+            kwargs["staging_public"] = challenge.staging_public
             kwargs["created_at"] = timesince.timesince(challenge.created_at)
 
         # following two loc are here only because of https://code.djangoproject.com/ticket/17795
         form = self.get_form(self.get_form_class())
         kwargs["form"] = form
         kwargs["grant"] = configuration.grant
+
 
         # Check to see if the user has already granted access and return
         # a successful response depending on "approval_prompt" url parameter
@@ -288,6 +302,8 @@ class StartChallengeView(View):
                 }
             )
         
+        logger.info(f"Received start challenge for {manifest.identifier}:{manifest.version} {start_grant.request_public}")
+        
         device_code = models.DeviceCode.objects.create(
             code=logic.create_device_code(),
             staging_manifest=manifest.dict(),
@@ -295,6 +311,7 @@ class StartChallengeView(View):
             staging_kind=start_grant.requested_client_kind.value,
             staging_redirect_uris=start_grant.redirect_uris,
             staging_logo=logo,
+            staging_public=start_grant.request_public,
         )
 
         return JsonResponse(

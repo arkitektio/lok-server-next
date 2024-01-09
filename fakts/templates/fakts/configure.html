@@ -254,6 +254,13 @@
                         {% endfor %}
                     </ul>
                 {% endif %}
+                {% if staging_public %}
+                    <h1 class="text-sm font-light">This app wants to become public </h1>
+                    <ul class="list-disc my-2 mx-10">
+                        This means that if you allow it, the website can potentially
+                        skip this step and allow users to login directly.
+                    </ul>
+                {% endif %}
 
                 
                 <hr class="h-px my-4 bg-gray-200 border-0 dark:bg-gray-700">

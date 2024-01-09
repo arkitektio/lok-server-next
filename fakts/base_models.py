@@ -49,6 +49,7 @@ class DeviceCodeStartRequest(BaseModel):
     expiration_time_seconds: int = 300
     redirect_uris: list[str] = Field(default_factory=list) 
     requested_client_kind: enums.ClientKindVanilla = enums.ClientKindVanilla.DEVELOPMENT
+    request_public: bool = False
 
 
 class DeviceCodeChallengeRequest(BaseModel):
