@@ -64,3 +64,11 @@ omero_ark:
   ws_endpoint_url: "{{"wss" if request.is_secure else "ws" }}://{{"omero_ark" if request.host == "lok" else request.host}}:8888/graphql"
   agent:
     endpoint_url: "{{"wss" if request.is_secure else "ws" }}://{{"omero_ark" if request.host == "lok" else request.host}}:8888/agi"
+port_next:
+  base_url: "{{"https" if request.is_secure else "http" }}://{{"port_next" if request.host == "lok" else request.host}}:9030/o"
+  endpoint_url: "{{"https" if request.is_secure else "http" }}://{{"port_next" if request.host == "lok" else request.host}}:9030/graphql"
+  healthz: "{{"https" if request.is_secure else "http" }}://{{"port_next" if request.host == "lok" else request.host}}:9030/ht"
+  secure: false
+  ws_endpoint_url: "{{"wss" if request.is_secure else "ws" }}://{{"port_next" if request.host == "lok" else request.host}}:9030/graphql"
+  agent:
+    endpoint_url: "{{"wss" if request.is_secure else "ws" }}://{{"port_next" if request.host == "lok" else request.host}}:9030/agi"
