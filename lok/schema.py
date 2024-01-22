@@ -68,6 +68,9 @@ class Mutation:
     resolve_comment = strawberry_django.mutation(
         resolver=komment_mutations.resolve_comment,
     )
+    create_developmental_client = strawberry_django.mutation(
+        resolver=fakts_mutations.create_developmental_client,
+    )
 
 
 @strawberry.type
