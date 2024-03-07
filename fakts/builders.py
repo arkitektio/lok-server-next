@@ -83,7 +83,7 @@ def create_desktop_client(
         client.oauth2_client.authorization_grant_type = (
             models.Application.GRANT_AUTHORIZATION_CODE
         )
-        client.oauth2_client.redirect_uris = " ".join(["http://127.0.0.1/"])
+        client.oauth2_client.redirect_uris = " ".join(["http://127.0.0.1/", "http://127.0.0.1/callback"])
         client.oauth2_client.client_id = client.client_id
         client.oauth2_client.client_secret = client.client_secret
         client.oauth2_client.save()
@@ -98,7 +98,7 @@ def create_desktop_client(
             algorithm=models.Application.RS256_ALGORITHM,
             name=f"@{release.app.identifier}:{release.version}",
             authorization_grant_type=models.Application.GRANT_AUTHORIZATION_CODE,
-            redirect_uris=" ".join(["http://127.0.0.1/"]),
+            redirect_uris=" ".join(["http://127.0.0.1/", "http://127.0.0.1/callback"]),
             client_id=client_id,
             client_secret=client_secret,
         )
