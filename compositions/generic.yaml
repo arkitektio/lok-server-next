@@ -56,6 +56,14 @@ rekuest_next:
   ws_endpoint_url: "{{"wss" if request.is_secure else "ws" }}://{{"rekuest_next" if request.host == "lok" else request.host}}:8020/graphql"
   agent:
     endpoint_url: "{{"wss" if request.is_secure else "ws" }}://{{"rekuest_next" if request.host == "lok" else request.host}}:8020/agi"
+fluss_next:
+  base_url: "{{"https" if request.is_secure else "http" }}://{{"rekuest_next" if request.host == "lok" else request.host}}:10070/o"
+  endpoint_url: "{{"https" if request.is_secure else "http" }}://{{"rekuest_next" if request.host == "lok" else request.host}}:10070/graphql"
+  healthz: "{{"https" if request.is_secure else "http" }}://{{"rekuest_next" if request.host == "lok" else request.host}}:10070/ht"
+  secure: false
+  ws_endpoint_url: "{{"wss" if request.is_secure else "ws" }}://{{"rekuest_next" if request.host == "lok" else request.host}}:10070/graphql"
+  agent:
+    endpoint_url: "{{"wss" if request.is_secure else "ws" }}://{{"rekuest_next" if request.host == "lok" else request.host}}:10070/agi"
 omero_ark:
   base_url: "{{"https" if request.is_secure else "http" }}://{{"omero_ark" if request.host == "lok" else request.host}}:8888/o"
   endpoint_url: "{{"https" if request.is_secure else "http" }}://{{"omero_ark" if request.host == "lok" else request.host}}:8888/graphql"

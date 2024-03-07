@@ -28,6 +28,7 @@ def index(request):
 urlpatterns = [
 
     path("", index, name="index"),
+    path("ht/", include("health_check.urls")),
     path("admin/", admin.site.urls),
     path("o/", include("oauth2_provider.urls", namespace="oauth2_provider")),
     path("f/", include("fakts.urls", namespace="fakts")),

@@ -47,6 +47,8 @@ INSTALLED_APPS = [
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
+    "health_check",
+    "health_check.db",
 
     'allauth.socialaccount.providers.orcid',
     # ... include the providers you want to enable:
