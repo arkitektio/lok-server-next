@@ -13,8 +13,7 @@ from karakter import types
 import datetime
 from fakts import models, scalars, enums, filters
 from oauth2_provider.models import Application
-
-
+from fakts.backends import enums as fb_enums
 @strawberry.type(description="A scope that can be assigned to a client. Scopes are used to limit the access of a client to a user's data. They represent app-level permissions.")
 class Scope:
     label: str = strawberry.field(description="The label of the scope. This is the human readable name of the scope.")
@@ -22,12 +21,29 @@ class Scope:
     value: str = strawberry.field(description="The value of the scope. This is the value that is used in the OAuth2 flow.")
 
 
+
+@strawberry_django.type(models.Service, description="A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself.")
+class Service:
+    id: strawberry.ID
+    name: str = strawberry.field(description="The name of the service")
+    identifier: scalars.ServiceIdentifier = strawberry.field(description="The identifier of the service. This should be a globally unique string that identifies the service. We encourage you to use the reverse domain name notation. E.g. `com.example.myservice`")
+    logo: str = strawberry.field(description="The logo of the service. This should be a url to a logo that can be used to represent the service.")
+    description: str = strawberry.field(description="The description of the service. This should be a human readable description of the service.")
+
+@strawberry_django.type(models.ServiceInstance, description="A ServiceInstance is a configured instance of a Service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information.")
+class ServiceInstance:
+    id: strawberry.ID
+    service: Service = strawberry.field(description="The service that this instance belongs to.")
+    backend: fb_enums.BackendType = strawberry.field(description="The backend that this instance belongs to.")
+    composition: "Composition" = strawberry.field(description="The composition that this instance belongs to.")
+    name: str = strawberry.field(description="The name of the instance. This is a human readable name of the instance.")
+
 @strawberry_django.type(models.Composition)
 class Composition:
     id: strawberry.ID 
     name: str  = strawberry.field(description="The name of the composition")
     template: str = strawberry.field(description="The template of the composition. This is a Jinja2 YAML template that will be rendered with the LinkingContext as context. The result of the rendering will be used to send to the client as a configuration. It should never contain sensitive information.")
-
+    instances: list[ServiceInstance] = strawberry.field(description="The instances of the composition. An instance is a configured instance of a service that will be used to send to the client as a configuration. It should never contain sensitive information.")
 
 @strawberry_django.type(models.App, description="An App is the Arkitekt equivalent of a Software Application. It is a collection of `Releases` that can be all part of the same application. E.g the App `Napari` could have the releases `0.1.0` and `0.2.0`.")
 class App:

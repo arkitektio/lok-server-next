@@ -15,3 +15,10 @@ Version = strawberry.scalar(
     serialize=lambda v: v,
     parse_value=lambda v: v,
 )
+
+ServiceIdentifier = strawberry.scalar(
+    NewType("ServiceIdentifier", str),
+    description="The Service identifier is a unique identifier for a service. It is used to identify the service in the database and in the code. We encourage you to use the reverse domain name notation. E.g. `com.example.myservice`",
+    serialize=lambda v: v,
+    parse_value=lambda v: v,
+)

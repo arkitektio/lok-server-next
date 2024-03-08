@@ -3,6 +3,7 @@ import strawberry
 from django.db.models import TextChoices
 
 
+
 class ClientKindChoices(TextChoices):
     """Event Type for the Event Operator"""
 

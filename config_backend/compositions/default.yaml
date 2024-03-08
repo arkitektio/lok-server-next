@@ -1,0 +1,5 @@
+name: generic
+services:
+  lok: lok_next
+  rekuest: rekuest_next
+  fluss: fluss_next

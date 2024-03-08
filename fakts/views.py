@@ -132,7 +132,12 @@ class ConfigureView(LoginRequiredMixin, FormView):
 
 
         device_code = form.cleaned_data["device_code"]
-        composition = form.cleaned_data["composition"]
+        composition = form.cleaned_data.get("composition", None)
+
+        if not composition:
+            composition = models.Composition.objects.first()
+            if not composition:
+                raise Exception("No composition found")
 
 
         if action == "allow":
@@ -490,7 +495,7 @@ class ClaimView(View):
             else:
                 composition = client.composition
 
-            config = logic.render_template(composition, context)
+            config = logic.render_composition(composition, context)
 
             return JsonResponse(
                 data={

@@ -16,3 +16,7 @@ class ConfigurationRequestMalformed(ConfigurationError):
 
 class NoConfigurationFound(Exception):
     pass
+
+
+class BackendNotAvailable(ConfigurationError):
+    pass

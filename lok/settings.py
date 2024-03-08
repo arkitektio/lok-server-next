@@ -62,6 +62,16 @@ INSTALLED_APPS = [
 ]
 
 
+FAKTS_BACKENDS = [
+    {
+        "NAME": "contrib.docker_backend.DockerBackend", 
+    },
+    {
+        "NAME": "contrib.config_backend.backend.ConfigBackend", 
+    },
+]
+
+
 ACCOUNT_EMAIL_VERIFICATION = "none" # we don't have an smpt server by default
 
 # Authentikate section

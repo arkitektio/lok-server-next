@@ -17,14 +17,48 @@ from fakts import fields, enums
 
 
 
+class Service(models.Model):
+    name = models.CharField(max_length=1000)
+    identifier = fields.IdentifierField()
+    logo = fields.S3ImageField()
+    description = models.TextField()
+    key: str = models.CharField(max_length=1000, unique=True, default=uuid.uuid4)
+
+    def __str__(self):
+        return f"{self.identifier}: {self.key}"
+    
+
+
+
+class ServiceInstance(models.Model):
+    backend = models.CharField(max_length=1000)
+    composition = models.ManyToManyField("Composition", related_name="instances")
+    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name="instances")
+    identifier = models.CharField(max_length=1000)
+    template = models.TextField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["backend", "identifier"],
+                name="Only one instance per backend and identifier",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.service}:{self.backend}:{self.identifier}"
+
+
+
 class Composition(models.Model):
     """A template for a configuration"""
 
     name = models.CharField(max_length=1000, unique=True)
-    template = models.TextField()
+    description = models.TextField(max_length=1000, null=True, blank=True)
 
     def __str__(self) -> str:
         return self.name
+    
 
 
 

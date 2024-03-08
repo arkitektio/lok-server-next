@@ -9,12 +9,39 @@ from typing import Optional
 from fakts import fields, errors
 from django.http import HttpRequest
 from uuid import uuid4
+from fakts.backends.instances import registry as backend_registry
 
 
 
 
-def render_template(composition: models.Composition, context: base_models.LinkingContext) -> dict:
-    return yaml.load(Template(composition.template).render(context), Loader=yaml.SafeLoader)
+def render_composition(composition: models.Composition, context: base_models.LinkingContext) -> dict:
+
+    config_dict = {}
+
+    config_dict["self"] = {}
+    config_dict["self"]["deployment_name"] = context.deployment_name
+
+
+    for instance in composition.instances.all():
+
+        instance = models.ServiceInstance.objects.get(identifier=instance.identifier)
+
+        if instance.backend not in backend_registry.backends:
+            raise errors.BackendNotAvailable(f"The backend {instance.backend} for this instance is not available")
+
+        backend = backend_registry.backends[instance.backend]
+
+        value = backend.render(instance.identifier, context)
+
+        if not isinstance(value, dict):
+            raise errors.ConfigurationError(f"The backend {instance.backend} for this instance did not return a dictionary")
+        
+        config_dict[instance.service.key] = value
+
+    return config_dict
+
+
+
 
 
 def create_api_token():

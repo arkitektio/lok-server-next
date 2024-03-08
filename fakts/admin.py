@@ -5,5 +5,7 @@ from fakts.models import *
 admin.site.register(App)
 admin.site.register(Release)
 admin.site.register(Composition)
+admin.site.register(Service)
+admin.site.register(ServiceInstance)
 admin.site.register(Client)
 admin.site.register(DeviceCode)
