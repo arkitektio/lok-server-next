@@ -24,6 +24,7 @@ class Scope:
 
 @strawberry_django.type(models.Service, description="A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself.")
 class Service:
+    key: str = strawberry.field(description="The key of the service. This is a unique string that identifies the service. It is used to identify the service in the code and in the database.")
     id: strawberry.ID
     name: str = strawberry.field(description="The name of the service")
     identifier: scalars.ServiceIdentifier = strawberry.field(description="The identifier of the service. This should be a globally unique string that identifies the service. We encourage you to use the reverse domain name notation. E.g. `com.example.myservice`")
@@ -50,7 +51,7 @@ class App:
     id: strawberry.ID
     name: str  = strawberry.field(description="The name of the app")
     identifier: scalars.AppIdentifier = strawberry.field(description="The identifier of the app. This should be a globally unique string that identifies the app. We encourage you to use the reverse domain name notation. E.g. `com.example.myapp`")
-    logo: str = strawberry.field(description="The logo of the app. This should be a url to a logo that can be used to represent the app.")
+    logo: str | None = strawberry.field(description="The logo of the app. This should be a url to a logo that can be used to represent the app.")
     releases: list['Release'] = strawberry.field(description="The releases of the app. A release is a version of the app that can be installed by a user.")
 
 
@@ -61,7 +62,7 @@ class Release:
     app: App = strawberry.field(description="The app that this release belongs to.")
     version: scalars.Version = strawberry.field(description="The version of the release. This should be a string that identifies the version of the release. We enforce semantic versioning notation. E.g. `0.1.0`. The version is unique per app.")
     name: str = strawberry.field(description="The name of the release. This should be a string that identifies the release beyond the version number. E.g. `canary`.")
-    logo: str  
+    logo: str | None = strawberry.field(description="The logo of the release. This should be a url to a logo that can be used to represent the release.")
     scopes: list[str] = strawberry.field(description="The scopes of the release. Scopes are used to limit the access of a client to a user's data. They represent app-level permissions.")
     requirements: list[str] = strawberry.field(description="The requirements of the release. Requirements are used to limit the access of a client to a user's data. They represent app-level permissions.")
     clients: list['Client'] = strawberry.field(description="The clients of the release")
@@ -81,7 +82,7 @@ class Oauth2Client:
 @strawberry_django.type(models.Client, description="""A client is a way of authenticating users with a release.
  The strategy of authentication is defined by the kind of client. And allows for different authentication flow. 
  E.g a client can be a DESKTOP app, that might be used by multiple users, or a WEBSITE that wants to connect to a user's account, 
- but also a DEVELOPMENT client that is used by a developer to test the app. The client model thinly wraps the oauth2 client model, which is used to authenticate users.""")
+ but also a DEVELOPMENT client that is used by a developer to test the app. The client model thinly wraps the oauth2 client model, which is used to authenticate users.""", filters=filters.ClientFilter, pagination=True)
 class Client:
     id: strawberry.ID
     release: Release = strawberry.field(description="The release that this client belongs to.")
@@ -90,5 +91,12 @@ class Client:
     oauth2_client: Oauth2Client = strawberry.field(description="The real oauth2 client that is used to authenticate users with this client.")
     public: bool = strawberry.field(description="Is this client public? If a client is public ")
     composition: Composition = strawberry.field(description="The composition of the client. ")
-    user: types.User = strawberry.field(description="If the client is a DEVELOPMENT client, which requires no further authentication, this is the user that is authenticated with the client.")
+    user: types.User | None = strawberry.field(description="If the client is a DEVELOPMENT client, which requires no further authentication, this is the user that is authenticated with the client.")
     token: str = strawberry.field(description="A token that can be used to retrieve the configuration of the client. When providing this token during the configuration flow, the client will received its configuration (the filled in `composition`)")
+
+    @strawberry.field(description="The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information.")
+    def kind(self, info) -> enums.ClientKind:
+        if self.kind == "website": return enums.ClientKind.WEBSITE
+        if self.kind == "desktop": return enums.ClientKind.DESKTOP
+        if self.kind == "development": return enums.ClientKind.DEVELOPMENT
+        
