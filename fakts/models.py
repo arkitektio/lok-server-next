@@ -22,17 +22,15 @@ class Service(models.Model):
     identifier = fields.IdentifierField()
     logo = fields.S3ImageField()
     description = models.TextField()
-    key: str = models.CharField(max_length=1000, unique=True, default=uuid.uuid4)
 
     def __str__(self):
-        return f"{self.identifier}: {self.key}"
+        return f"{self.identifier}"
     
 
 
 
 class ServiceInstance(models.Model):
     backend = models.CharField(max_length=1000)
-    composition = models.ManyToManyField("Composition", related_name="instances")
     service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name="instances")
     identifier = models.CharField(max_length=1000)
     template = models.TextField()
@@ -47,19 +45,35 @@ class ServiceInstance(models.Model):
 
     def __str__(self):
         return f"{self.service}:{self.backend}:{self.identifier}"
-
-
+    
 
 class Composition(models.Model):
     """A template for a configuration"""
 
     name = models.CharField(max_length=1000, unique=True)
     description = models.TextField(max_length=1000, null=True, blank=True)
+    type = models.CharField(max_length=1000, default="arkitekt")
 
     def __str__(self) -> str:
         return self.name
     
 
+
+class ServiceInstanceMapping(models.Model):
+    composition = models.ForeignKey(Composition, on_delete=models.CASCADE, related_name="mappings")
+    instance = models.ForeignKey(ServiceInstance, on_delete=models.CASCADE, related_name="mappings")
+    key = models.CharField(max_length=1000)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["key", "composition"],
+                name="Only one instance per key and composition",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.key}:{self.instance}@{self.composition}"     
 
 
 

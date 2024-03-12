@@ -28,7 +28,7 @@ class Command(BaseCommand):
             for service_description in registry.get_service_descriptors():
                 
                 service, created = models.Service.objects.update_or_create(
-                    identifier=service_description.identifier, defaults=dict(name=service_description.name or service_description.identifier, logo=service_description.logo, description=service_description.description, key=service_description.key)
+                    identifier=service_description.identifier, defaults=dict(name=service_description.name or service_description.identifier, logo=service_description.logo, description=service_description.description)
                 )
 
                 print("Ensured service", service_description.identifier)
@@ -53,10 +53,20 @@ class Command(BaseCommand):
                 
                 print("Ensured Composition", composition_description.name)
 
-                for service, instance in composition_description.services.items():
-                    instance = models.ServiceInstance.objects.get(identifier=instance.instance_identifier)
-                    graph.instances.add(instance)
-                    print("Ensured service", instance.identifier, "in composition", graph.name)
+                for key, instance_map in composition_description.services.items():
+                    try:
+                        instance = models.ServiceInstance.objects.get(identifier=instance_map.instance_identifier, backend=instance_map.backend_identifier)
+                    except models.ServiceInstance.DoesNotExist:
+                        print("Service", instance_map.instance_identifier, "not found on backend", instance_map.backend_identifier)
+                        raise
+
+                    mapping, created = models.ServiceInstanceMapping.objects.update_or_create(
+                        key=key, composition=graph, defaults=dict(instance=instance)
+                    )
+
+                    print("Ensured mapping", mapping, key, "to", instance)
+
+
 
                      
 

@@ -22,9 +22,10 @@ def render_composition(composition: models.Composition, context: base_models.Lin
     config_dict["self"]["deployment_name"] = context.deployment_name
 
 
-    for instance in composition.instances.all():
+    for mapping in composition.mappings.all():
 
-        instance = models.ServiceInstance.objects.get(identifier=instance.identifier)
+        instance = mapping.instance
+
 
         if instance.backend not in backend_registry.backends:
             raise errors.BackendNotAvailable(f"The backend {instance.backend} for this instance is not available")
@@ -36,7 +37,7 @@ def render_composition(composition: models.Composition, context: base_models.Lin
         if not isinstance(value, dict):
             raise errors.ConfigurationError(f"The backend {instance.backend} for this instance did not return a dictionary")
         
-        config_dict[instance.service.key] = value
+        config_dict[mapping.key] = value
 
     return config_dict
 
