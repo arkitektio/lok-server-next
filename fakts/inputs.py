@@ -25,3 +25,12 @@ class DevelopmentClientInput:
     manifest: ManifestInput
     composition: strawberry.ID | None = None
 
+
+class ScanBackendInputModel(BaseModel):
+    backend: str | None
+
+
+
+@pydantic.input(ScanBackendInputModel)
+class ScanBackendInput:
+    backend: str | None = None

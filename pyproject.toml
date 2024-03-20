@@ -28,7 +28,7 @@ django-cors-headers = "^4.2.0"
 django-allauth = "^0.58.2"
 pillow = "^10.1.0"
 django-health-check = "^3.18.1"
-docker = "^7.0.0"
+docker = ">6,<7"
 
 
 [tool.poetry.group.dev.dependencies]

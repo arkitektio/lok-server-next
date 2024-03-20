@@ -71,6 +71,9 @@ class Mutation:
     create_developmental_client = strawberry_django.mutation(
         resolver=fakts_mutations.create_developmental_client,
     )
+    scan = strawberry_django.mutation(
+        resolver=fakts_mutations.scan_backend,
+    )
 
 
 @strawberry.type
