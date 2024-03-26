@@ -32,6 +32,10 @@ class ConfigBackend(BackendBase):
         print(self.loaded_compositions)
 
 
+    def rescan(self):
+        pass
+
+
     def _load_instances(self) -> dict[str, InstanceDescriptor]:
         instances = {}
 

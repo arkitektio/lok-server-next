@@ -86,4 +86,31 @@ def create_linking_context(request: HttpRequest, client: models.Client) -> base_
 
 
 
+def create_fake_linking_context(client: models.Client, host, port, secure=False) -> base_models.LinkingContext:
+    
+
+    return base_models.LinkingContext(
+        request=base_models.LinkingRequest(
+            host=host,
+            port=port,
+            is_secure=secure,
+        ),
+        manifest=base_models.Manifest(
+            identifier=client.release.app.identifier,
+            version=client.release.version,
+            scopes=client.release.scopes,
+        ),
+        client=base_models.LinkingClient(
+            client_id=client.client_id,
+            client_secret=client.client_secret,
+            client_type=client.oauth2_client.client_type,
+            authorization_grant_type=client.oauth2_client.authorization_grant_type,
+            name=client.oauth2_client.name,
+            redirect_uris=client.oauth2_client.redirect_uris.split(" "),
+        ),
+    )
+
+
+
+
 

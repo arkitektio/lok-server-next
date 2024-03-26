@@ -38,13 +38,32 @@ class ServiceInstance:
     backend: fb_enums.BackendType = strawberry.field(description="The backend that this instance belongs to.")
     composition: "Composition" = strawberry.field(description="The composition that this instance belongs to.")
     name: str = strawberry.field(description="The name of the instance. This is a human readable name of the instance.")
+    identifier: str = strawberry.field(description="The identifier of the instance. This is a unique string that identifies the instance. It is used to identify the instance in the code and in the database.")
+
+@strawberry_django.type(models.ServiceInstanceMapping, description="A ServiceInstance is a configured instance of a Service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information.")
+class ServiceInstanceMapping:
+    id: strawberry.ID
+    instance: ServiceInstance = strawberry.field(description="The service that this instance belongs to.")
+    composition: "Composition" = strawberry.field(description="The composition that this instance belongs to.")
+    key: str = strawberry.field(description="The key of the instance. This is a unique string that identifies the instance. It is used to identify the instance in the code and in the database.")
+
+
+
+
+
 
 @strawberry_django.type(models.Composition)
 class Composition:
     id: strawberry.ID 
     name: str  = strawberry.field(description="The name of the composition")
     template: str = strawberry.field(description="The template of the composition. This is a Jinja2 YAML template that will be rendered with the LinkingContext as context. The result of the rendering will be used to send to the client as a configuration. It should never contain sensitive information.")
-    instances: list[ServiceInstance] = strawberry.field(description="The instances of the composition. An instance is a configured instance of a service that will be used to send to the client as a configuration. It should never contain sensitive information.")
+    mappings: list[ServiceInstanceMapping] = strawberry.field(description="The mappings of the composition. A mapping is a mapping of a service to a service instance. This is used to configure the composition.")
+    
+   
+
+
+
+
 
 @strawberry_django.type(models.App, description="An App is the Arkitekt equivalent of a Software Application. It is a collection of `Releases` that can be all part of the same application. E.g the App `Napari` could have the releases `0.1.0` and `0.2.0`.")
 class App:

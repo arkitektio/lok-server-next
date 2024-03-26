@@ -74,6 +74,9 @@ class Mutation:
     scan = strawberry_django.mutation(
         resolver=fakts_mutations.scan_backend,
     )
+    render = strawberry_django.mutation(
+        resolver=fakts_mutations.render_composition,
+    )
 
 
 @strawberry.type

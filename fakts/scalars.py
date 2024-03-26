@@ -1,4 +1,5 @@
 from typing import NewType
+from typing import Any
 import strawberry
 
 AppIdentifier = strawberry.scalar(
@@ -19,6 +20,14 @@ Version = strawberry.scalar(
 ServiceIdentifier = strawberry.scalar(
     NewType("ServiceIdentifier", str),
     description="The Service identifier is a unique identifier for a service. It is used to identify the service in the database and in the code. We encourage you to use the reverse domain name notation. E.g. `com.example.myservice`",
+    serialize=lambda v: v,
+    parse_value=lambda v: v,
+)
+
+
+Fakt = strawberry.scalar(
+    NewType("Fakt", strawberry.scalars.JSON),
+    description="The `Fakt` scalar type represents a reference to a fakt",
     serialize=lambda v: v,
     parse_value=lambda v: v,
 )

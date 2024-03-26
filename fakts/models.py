@@ -21,7 +21,7 @@ class Service(models.Model):
     name = models.CharField(max_length=1000)
     identifier = fields.IdentifierField()
     logo = fields.S3ImageField()
-    description = models.TextField()
+    description = models.TextField(default="No description available", null=True, blank=True)
 
     def __str__(self):
         return f"{self.identifier}"

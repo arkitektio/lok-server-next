@@ -1,0 +1,4 @@
+endpoint_url: "{{"https" if request.is_secure else "http" }}://{{"fluss" if request.host == "lok" else request.host + ":" + service.port_map["80/tcp"]}}/graphql"
+healthz: "{{"https" if request.is_secure else "http" }}://{{"fluss" if request.host == "lok" else request.host + ":" + service.port_map["80/tcp"]}}/ht"
+ws_endpoint_url: "{{"wss" if request.is_secure else "ws" }}://{{"fluss" if request.host == "lok" else request.host + ":" + service.port_map["80/tcp"]}}/graphql"  
+__service: service.identifier

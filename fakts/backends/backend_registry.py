@@ -23,7 +23,7 @@ class ServiceDescriptor(BaseModel):
     """ The service name"""
     logo:  Optional[str]
     """ The service logo"""
-    description:  Optional[str]
+    description:  Optional[str] = "No description available"
     """ The service description"""
 
 class InstanceDescriptor(BaseModel):
@@ -75,6 +75,10 @@ class Backend(Protocol):
 
     def get_composition_descriptors(cls) -> list[CompositionDescriptor]: ...
 
+    @abstractmethod
+    def rescan(self) -> None: ...
+
+
 
 
 class BackendBase(ABC):
@@ -98,6 +102,10 @@ class BackendBase(ABC):
     def get_composition_descriptors(cls) -> list[CompositionDescriptor]:
         pass
     
+    @abstractmethod
+    def rescan(self):
+        pass
+
 
 
 
@@ -156,6 +164,12 @@ class BackendRegistry:
             instances.extend(i.get_instance_descriptors())
 
         return instances
+    
+
+    def rescan(self):
+        for i in self.backends.values():
+            print("Rescanning", i.get_name())
+            i.rescan()
     
 
 
