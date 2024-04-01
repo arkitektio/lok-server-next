@@ -64,10 +64,16 @@ INSTALLED_APPS = [
 
 FAKTS_BACKENDS = [
     {
-        "NAME": "contrib.docker_backend.DockerBackend", 
+        "NAME": "contrib.backends.docker_backend.DockerBackend", 
+        "BUILDERS": [
+            "arkitekt.lok",
+            "arkitekt.generic",
+            "arkitekt.rekuest"
+        ],
+        "DEFAULT_BUILDER": "arkitekt.generic",
     },
     {
-        "NAME": "contrib.config_backend.backend.ConfigBackend", 
+        "NAME": "contrib.backends.config_backend.ConfigBackend", 
     },
 ]
 

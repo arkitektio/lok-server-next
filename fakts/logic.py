@@ -10,8 +10,8 @@ from fakts import fields, errors
 from django.http import HttpRequest
 from uuid import uuid4
 from fakts.backends.instances import registry as backend_registry
-
-
+from fakts.base_models import Manifest
+from hashlib import sha256
 
 
 def render_composition(composition: models.Composition, context: base_models.LinkingContext) -> dict:
@@ -32,7 +32,10 @@ def render_composition(composition: models.Composition, context: base_models.Lin
 
         backend = backend_registry.backends[instance.backend]
 
-        value = backend.render(instance.identifier, context)
+        try:
+            value = backend.render(instance.identifier, context)
+        except Exception as e:
+            raise errors.BackendError(f"An error occurred while rendering the backend instance {instance}: {str(e)}") from e
 
         if not isinstance(value, dict):
             raise errors.ConfigurationError(f"The backend {instance.backend} for this instance did not return a dictionary")
@@ -42,7 +45,96 @@ def render_composition(composition: models.Composition, context: base_models.Lin
     return config_dict
 
 
+def find_instance_for_requirement(service: models.Service, requirement: base_models.Requirement) -> models.ServiceInstance:
 
+    instance = models.ServiceInstance.objects.filter(
+        service=service,
+    ).first()
+
+
+    if instance is None:
+        raise errors.InstanceNotFound(f"Instance {requirement.instance} not found for service {service.identifier}")
+
+    return instance
+
+
+
+def hash_requirements(requirements: dict[str, base_models.Requirement]) -> str:
+    return sha256(".".join([key + req.service for key, req in requirements.items()]).encode()).hexdigest()
+
+
+def auto_create_composition(manifest: base_models.Manifest) -> models.Composition:
+
+
+    composition, _ = models.Composition.objects.get_or_create(
+        requirements_hash=hash_requirements(manifest.requirements),
+        defaults=dict(
+            name=f"Auto created composition for {manifest.identifier}/{manifest.version}",
+            type="auto",
+        )
+    )
+
+
+    errors = []
+    warnings = []
+
+    for key, req in manifest.requirements.items():
+
+        try:
+            service = models.Service.objects.get(identifier=req.service)
+        
+            instance = find_instance_for_requirement(service, req)
+
+            models.ServiceInstanceMapping.objects.create(
+                composition=composition,
+                instance=instance,
+                key=key,
+            )
+
+        except Exception as e:
+            if req.optional:
+                continue
+            else:
+                errors.append(str(e))
+
+
+    if len(errors) > 0:
+        composition.valid = False
+    else:
+        composition.valid = True
+
+    
+    composition.errors = errors
+    composition.warnings = warnings
+    composition.save()
+
+    return composition
+
+
+def check_compability(manifest: base_models.Manifest) -> list[str] | list[str]:
+
+    errors = []
+    warnings = []
+
+    for key, req in manifest.requirements.items():
+
+        try:
+            try:
+                service = models.Service.objects.get(identifier=req.service)
+            except models.Service.DoesNotExist:
+                errors.append(f"Service {req.service} not found on this server. Please contact the administrator.")
+                continue
+        
+            instance = find_instance_for_requirement(service, req)
+
+        except Exception as e:
+            if req.optional:
+                continue
+            else:
+                errors.append(str(e))
+
+
+    return errors , warnings
 
 
 def create_api_token():

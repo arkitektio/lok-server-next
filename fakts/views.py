@@ -99,13 +99,37 @@ class ConfigureView(LoginRequiredMixin, FormView):
 
 
             x = models.DeviceCode.objects.get(code=the_code)
-            context["code"] = x
+
+
+            manifest = base_models.Manifest(**x.staging_manifest)
+
+
+            composition_errors, composition_warnings = logic.check_compability(manifest)
+            if len(composition_errors) > 0:
+                context["composition_valid"] = False
+            else:
+                context["composition_valid"] = True
+
+
+            print(manifest.requirements)
+
+            context["composition_requirements"] = {key: req.service for key, req in manifest.requirements.items()}
+            context["composition_errors"] = composition_errors
+            context["composition_warnings"] = composition_warnings
             context["staging_identifier"] = x.staging_manifest["identifier"]
             context["staging_version"] = x.staging_manifest["version"]
             context["staging_kind"] = x.staging_kind
             context["staging_redirect_uris"] = x.staging_redirect_uris
             context["staging_scopes"] = x.staging_manifest["scopes"]
             context["staging_logo"] = x.staging_manifest.get("logo", None)
+
+            context["code"] = x
+
+
+
+
+
+
 
             app = models.App.objects.filter(identifier=x.staging_manifest["identifier"]).first()
             if app:
@@ -132,12 +156,6 @@ class ConfigureView(LoginRequiredMixin, FormView):
 
 
         device_code = form.cleaned_data["device_code"]
-        composition = form.cleaned_data.get("composition", None)
-
-        if not composition:
-            composition = models.Composition.objects.first()
-            if not composition:
-                raise Exception("No composition found")
 
 
         if action == "allow":
@@ -145,6 +163,10 @@ class ConfigureView(LoginRequiredMixin, FormView):
             device_code = models.DeviceCode.objects.get(
                 code=device_code,
             )
+
+            manifest = base_models.Manifest(**device_code.staging_manifest)
+
+
 
             client = models.Client.objects.filter(release__app__identifier=device_code.staging_manifest["identifier"], release__version=device_code.staging_manifest["version"], kind=device_code.staging_kind, tenant=self.request.user).first()
                 
@@ -162,7 +184,6 @@ class ConfigureView(LoginRequiredMixin, FormView):
                         token=token,
                         user=self.request.user.username,
                         tenant=self.request.user.username,
-                        composition=composition.name,
                     )
 
                 elif device_code.staging_kind == enums.ClientKindVanilla.DESKTOP.value:
@@ -171,7 +192,6 @@ class ConfigureView(LoginRequiredMixin, FormView):
                         token=token,
                         user=self.request.user.username,
                         tenant=self.request.user.username,
-                        composition=composition.name,
                     )
 
                 elif device_code.staging_kind == enums.ClientKindVanilla.WEBSITE.value:
@@ -180,7 +200,6 @@ class ConfigureView(LoginRequiredMixin, FormView):
                         token=token,
                         tenant=self.request.user.username,
                         redirect_uris=device_code.staging_redirect_uris,
-                        composition=composition.name,
                         public=device_code.staging_public,
                     )
                 else:
@@ -196,6 +215,10 @@ class ConfigureView(LoginRequiredMixin, FormView):
             device_code.save()
 
         else:
+            device_code = models.DeviceCode.objects.get(
+                code=device_code,
+            )
+
             device_code.denied = True
             device_code.save()
 

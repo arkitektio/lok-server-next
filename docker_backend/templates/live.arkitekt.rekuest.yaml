@@ -1,6 +1,0 @@
-agent:
-  endpoint_url: "{{"wss" if request.is_secure else "ws" }}://{{"rekuest" if request.host == "lok" else request.host + ":11020"}}/agi"
-endpoint_url: "{{"https" if request.is_secure else "http" }}://{{"rekuest" if request.host == "lok" else request.host + ":11020"}}/graphql"
-healthz: "{{"https" if request.is_secure else "http" }}://{{"rekuest" if request.host == "lok" else request.host + ":11020"}}/ht"
-ws_endpoint_url: "{{"wss" if request.is_secure else "ws" }}://{{"rekuest" if request.host == "lok" else request.host + ":11020"}}/graphql"  
-__service: "live.arkitekt.rekuest-next"

@@ -1,16 +1,16 @@
 from fakts import base_models, models, enums
 from oauth2_provider.generators import generate_client_id, generate_client_secret
+from fakts import logic
 
 
 def create_website_client(
-    release: models.Release, config: base_models.WebsiteClientConfig
+    release: models.Release, composition: models.Composition, config: base_models.WebsiteClientConfig
 ):
     """ This function creates a website client. This type of client is used for 
     websites that want to register with the lok instance."""
     
     tenant = config.get_tenant()
     user = None # is public app so no user
-    composition = config.get_composition()
 
     try:
         client = models.Client.objects.get(tenant=tenant, release=release, kind=enums.ClientKindVanilla.WEBSITE.value)
@@ -61,12 +61,11 @@ def create_website_client(
         )
     
 def create_desktop_client(
-    release: models.Release, config: base_models.WebsiteClientConfig
+    release: models.Release,  composition: models.Composition, config: base_models.WebsiteClientConfig
 ):
     
     tenant = config.get_tenant()
     user = None # is public app so no user
-    composition = config.get_composition()
 
     try:
         client = models.Client.objects.get(tenant=tenant, release=release, kind=enums.ClientKindVanilla.DESKTOP.value)
@@ -116,12 +115,11 @@ def create_desktop_client(
 
 
 def create_development_client(
-    release: models.Release, config: base_models.DevelopmentClientConfig
+    release: models.Release,  composition: models.Composition, config: base_models.DevelopmentClientConfig
 ):
     
     tenant = config.get_tenant()
     user = config.get_user()
-    composition = config.get_composition()
     print(tenant, user, composition)
 
 
@@ -189,20 +187,23 @@ def create_client(
     release, _ = models.Release.objects.update_or_create(app=app, version=manifest.version, defaults={
         "logo": logo,
         "scopes": manifest.scopes,
-        "requirements": manifest.requirements
+        "requirements": manifest.dict()["requirements"]
     })
+
+
+    composition = logic.auto_create_composition(manifest)
 
 
     print(config)
 
 
     if config.kind == enums.ClientKindVanilla.WEBSITE.value:
-        return create_website_client(release, config)
+        return create_website_client(release, composition, config)
 
     if config.kind == enums.ClientKindVanilla.DEVELOPMENT.value:
-        return create_development_client(release, config)
+        return create_development_client(release,composition, config)
     
     if config.kind == enums.ClientKindVanilla.DESKTOP.value:
-        return create_desktop_client(release, config)
+        return create_desktop_client(release, composition,config)
     
     raise NotImplementedError(f"No such client kind {config.kind} exists")

@@ -17,14 +17,14 @@ class ServiceDescriptor(BaseModel):
     """
     identifier: str
     """ The service identifier"""
-    key: str
-    """ The service key"""
     name: Optional[str]
     """ The service name"""
     logo:  Optional[str]
     """ The service logo"""
     description:  Optional[str] = "No description available"
     """ The service description"""
+    validator: Optional[str]
+    """ The service validator that will be used to validate the instance"""
 
 class InstanceDescriptor(BaseModel):
     """ An instance of a service
@@ -42,23 +42,6 @@ class InstanceDescriptor(BaseModel):
 
 
 
-class InstanceMap(BaseModel):
-    instance_identifier: str
-    backend_identifier: str
-
-
-class CompositionDescriptor(BaseModel):
-    """ A composition of services
-    
-    This is a pydantic model that represents a composition of services. It is used to
-    represent a service composition in the database and in the code.
-    
-    """
-    name: Optional[str]
-    services: dict[str, InstanceMap]
-    """ A map of service identifiers to the correct instance on a backend"""
-
-
 
 class Backend(Protocol):
 
@@ -73,7 +56,6 @@ class Backend(Protocol):
 
     def get_instance_descriptors(cls) -> list[InstanceDescriptor]: ...
 
-    def get_composition_descriptors(cls) -> list[CompositionDescriptor]: ...
 
     @abstractmethod
     def rescan(self) -> None: ...
@@ -98,9 +80,6 @@ class BackendBase(ABC):
     def get_instance_descriptors(cls) -> list[InstanceDescriptor]:
         pass
 
-    @abstractmethod
-    def get_composition_descriptors(cls) -> list[CompositionDescriptor]:
-        pass
     
     @abstractmethod
     def rescan(self):
@@ -121,7 +100,12 @@ class BackendRegistry:
         for i in self.backend_configs:
             assert isinstance(i, dict), "Backend configuration must be a dictionary"
             assert "NAME" in i, "Backend configuration must have a NAME"
-            self.register(import_string(i["NAME"])(i))
+            try:
+                backend = import_string(i["NAME"])(i)
+            except Exception as e:
+                raise Exception(f"Could not import backend {i['NAME']}") from e
+
+            self.register(backend)
 
         pass
 
@@ -150,13 +134,6 @@ class BackendRegistry:
 
         return services
     
-
-    def get_composition_descriptors(self) -> list[CompositionDescriptor]:
-        compositions = []
-        for i in self.backends.values():
-            compositions.extend(i.get_composition_descriptors())
-
-        return compositions
     
     def get_instance_descriptors(self) -> list[InstanceDescriptor]:
         instances = []
@@ -164,6 +141,10 @@ class BackendRegistry:
             instances.extend(i.get_instance_descriptors())
 
         return instances
+    
+
+    def render(self, service_instance, context: LinkingContext) -> Dict[str, Any]:
+        return self.backends[service_instance.backend].render(service_instance, context)
     
 
     def rescan(self):

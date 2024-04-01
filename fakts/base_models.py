@@ -5,6 +5,24 @@ from enum import Enum
 from fakts import enums, validators
 from typing import Literal
 
+
+
+
+
+class Requirement(BaseModel):
+    service: str
+    """ The service is the service that will be used to fill the key, it will be used to find the correct instance. It needs to fullfill
+    the reverse domain naming scheme"""
+    optional: bool = False 
+    """ The optional flag indicates if the requirement is optional or not. Users should be able to use the client even if the requirement is not met. """
+    description: Optional[str] = None
+    """ The description is a human readable description of the requirement. Will be show to the user when asking for the requirement."""
+
+
+
+
+
+
 class Manifest(BaseModel):
     """ A Manifest is a description of a client. It contains all the information
     necessary to create a set of client, release and app objects in the database.
@@ -17,8 +35,10 @@ class Manifest(BaseModel):
     """ The logo is a url to a logo that should be used for the client. """
     scopes: Optional[list[str]] = Field(default_factory=list)
     """ The scopes are a list of scopes that the client can request. """
-    requirements: Optional[list[str]] = Field(default_factory=list)
+    requirements: Optional[dict[str, Requirement]] = Field(default_factory=dict)
     """ The requirements are a list of requirements that the client needs to run on (e.g. needs GPU)"""
+
+
 
 
 
@@ -99,7 +119,6 @@ class LinkingContext(BaseModel):
 
 class ClientConfig(BaseModel):
     kind: enums.ClientKindVanilla
-    composition: str
     token: str
     tenant: str
 
@@ -111,16 +130,6 @@ class ClientConfig(BaseModel):
         except get_user_model().DoesNotExist:
             raise ValueError(
                 f"Tenant {self.tenant} does not exist. Please create them first"
-            )
-        
-    def get_composition(self):
-        from .models import Composition
-
-        try:
-            return Composition.objects.get(name=self.composition)
-        except Composition.DoesNotExist:
-            raise ValueError(
-                f"Composition {self.composition} does not exist. Please create it first"
             )
 
 

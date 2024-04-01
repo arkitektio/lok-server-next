@@ -51,13 +51,14 @@ class LinkingContextInput:
 
 
 class RenderInputModel(BaseModel):
-    composition: str
+    client: str
+    composition: str | None = None
     request: LinkingRequest | None = None
     manifest: Manifest | None = None
 
 @pydantic.input(RenderInputModel)
 class RenderInput:
-    composition: strawberry.ID
     client: strawberry.ID
+    composition: strawberry.ID | None = None
     request: LinkingRequestInput | None = None
     manifest: ManifestInput | None = None

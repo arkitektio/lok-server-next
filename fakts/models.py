@@ -28,6 +28,21 @@ class Service(models.Model):
     
 
 
+    def validate_instance(self, instance: Dict[str, Any]) -> List[str]:
+        errors = []
+        warnings = []
+
+        if not instance.get("key"):
+            errors.append("Instance does not contain a key")
+
+        return errors + warnings
+    
+
+
+
+    
+
+
 
 class ServiceInstance(models.Model):
     backend = models.CharField(max_length=1000)
@@ -47,12 +62,32 @@ class ServiceInstance(models.Model):
         return f"{self.service}:{self.backend}:{self.identifier}"
     
 
+
+class InstanceConfig(models.Model):
+    instance = models.ForeignKey(ServiceInstance, on_delete=models.CASCADE, related_name="configs")
+    key = models.CharField(max_length=1000)
+    value = models.JSONField(default=dict)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["instance", "key"],
+                name="Only one config per instance and key",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.key}:{self.instance}"
+    
+
 class Composition(models.Model):
     """A template for a configuration"""
-
-    name = models.CharField(max_length=1000, unique=True)
+    name = models.CharField(max_length=1000)
     description = models.TextField(max_length=1000, null=True, blank=True)
+    errors = models.JSONField(default=list)
+    warnings = models.JSONField(default=list)
     type = models.CharField(max_length=1000, default="arkitekt")
+    requirements_hash = models.CharField(max_length=1000, unique=True)
 
     def __str__(self) -> str:
         return self.name
@@ -63,6 +98,7 @@ class ServiceInstanceMapping(models.Model):
     composition = models.ForeignKey(Composition, on_delete=models.CASCADE, related_name="mappings")
     instance = models.ForeignKey(ServiceInstance, on_delete=models.CASCADE, related_name="mappings")
     key = models.CharField(max_length=1000)
+    description= models.TextField(max_length=1000, null=True, blank=True)
 
     class Meta:
         constraints = [
@@ -114,7 +150,7 @@ class Release(models.Model):
     name = models.CharField(max_length=1000)
     logo = fields.S3ImageField()
     scopes = models.JSONField(default=list)
-    requirements = models.JSONField(default=list)
+    requirements = models.JSONField(default=dict)
 
     def is_latest(self):
         return self.app.releases.filter(is_latest=True).count() == 1
