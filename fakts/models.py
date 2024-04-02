@@ -121,7 +121,7 @@ class DeviceCode(models.Model):
     staging_kind = TextChoicesField(
         choices_enum=enums.ClientKindChoices,
         default=enums.ClientKindChoices.DEVELOPMENT.value,
-        help_text="The kind of transformation",
+        help_text="The kind of staging client",
     )
     staging_manifest = models.JSONField(default=dict)
     staging_logo = fields.S3ImageField()
