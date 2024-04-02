@@ -72,6 +72,13 @@ class DeviceCodeStartRequest(BaseModel):
     request_public: bool = False
 
 
+
+class ReedeemTokenRequest(BaseModel):
+    """ A RedeemTokenRequest is used to redeem a token for a development client. It only contains the token."""
+    token: str
+    manifest: Manifest
+
+
 class DeviceCodeChallengeRequest(BaseModel):
     """ A DeviceCodeChallengeRequest is used to start the device code flow. It only 
     contains the device code."""

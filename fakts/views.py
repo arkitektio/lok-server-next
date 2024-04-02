@@ -418,6 +418,10 @@ class ChallengeView(View):
                 "message": "User  has not verfied the challenge",
             }
         )
+    
+
+
+
 
 
 @method_decorator(csrf_exempt, name="dispatch")
@@ -478,6 +482,95 @@ class RetrieveView(View):
             }
         )
 
+
+@method_decorator(csrf_exempt, name="dispatch")
+class RedeemView(View):
+    """
+    Implements an endpoint that returns the faktsclaim for a given identifier and version
+    if the app was already configured and the app is marked as PUBLIC. While any app can
+    request a faktsclaim for any other app, redirect uris are set to predifined values
+    and the app will not be able to use the faktsclaim to get a configuration.
+    """
+
+    def post(self, request, *args, **kwargs):
+        json_data = json.loads(request.body)
+        try:
+            redeem_request = base_models.ReedeemTokenRequest(**json_data)
+        except Exception as e:
+            logger.error(e, exc_info=True)
+            return JsonResponse(
+                data={
+                    "status": "error",
+                    "error": f"Malformed request: {str(e)}",
+                }
+            )
+        
+
+        manifest = redeem_request.manifest
+        token = redeem_request.token
+
+        try:
+            valid_token = models.RedeemToken.objects.get(token=token)
+        except models.RedeemToken.DoesNotExist:
+            return JsonResponse(
+                data={
+                    "status": "error",
+                    "message": "Invalid redeem token",
+                }
+            )
+        if valid_token.expires_at:
+            if valid_token.expires_at < datetime.datetime.now(timezone.utc):
+                return JsonResponse(
+                    data={
+                        "status": "error",
+                        "message": "Redeem token expired",
+                    }
+                )
+        
+        if valid_token.client:
+            return JsonResponse(
+                data={
+                    "status": "granted",
+                    "token": valid_token.client.token,
+                }
+            )
+        
+        else:
+            try:
+                token = logic.create_api_token()
+
+                config = None
+
+                config = base_models.DevelopmentClientConfig(
+                    kind=enums.ClientKindVanilla.DEVELOPMENT.value,
+                    token=token,
+                    user=valid_token.user.username,
+                    tenant=valid_token.user.username,
+                )
+
+                
+                client = builders.create_client(
+                    manifest=manifest,
+                    config=config,
+                )
+
+                valid_token.client = client
+                valid_token.save()
+
+                return JsonResponse(
+                    data={
+                        "status": "granted",
+                        "token": client.token,
+                    }
+                )
+            except Exception as e:
+                logger.error(e, exc_info=True)
+                return JsonResponse(
+                    data={
+                        "status": "error",
+                        "message": str(e),
+                    }
+                )
 
 
 @method_decorator(csrf_exempt, name="dispatch")

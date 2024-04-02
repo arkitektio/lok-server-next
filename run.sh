@@ -14,6 +14,9 @@ python manage.py ensureusers
 echo "=> Ensuring Compositions..."
 python manage.py ensurecompositions
 
+echo "=> Ensuring Redeem Tokens..."
+python manage.py ensuretokens
+
 echo "=> Ensuring Apps..."
 python manage.py ensureapps
 

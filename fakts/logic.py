@@ -93,7 +93,7 @@ def auto_create_composition(manifest: base_models.Manifest) -> models.Compositio
 
         except Exception as e:
             if req.optional:
-                continue
+                warnings.append(str(e))
             else:
                 errors.append(str(e))
 
@@ -122,14 +122,13 @@ def check_compability(manifest: base_models.Manifest) -> list[str] | list[str]:
             try:
                 service = models.Service.objects.get(identifier=req.service)
             except models.Service.DoesNotExist:
-                errors.append(f"Service {req.service} not found on this server. Please contact the administrator.")
-                continue
+               raise Exception(f"Service {req.service} not found on this server. Please contact the administrator.")
         
             instance = find_instance_for_requirement(service, req)
 
         except Exception as e:
             if req.optional:
-                continue
+                warnings.append(str(e))
             else:
                 errors.append(str(e))
 

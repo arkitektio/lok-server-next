@@ -15,5 +15,5 @@ class DescendantKind(str, Enum):
 
     LEAF = "LEAF"
     MENTION = "MENTION"
-    PARAGRAPH = "PARGRAPTH"
+    PARAGRAPH = "PARAGRAPH"
 

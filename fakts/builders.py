@@ -181,8 +181,12 @@ def create_client(
 ):
     from .utils import download_logo
 
-
-    logo = download_logo(manifest.logo) if manifest.logo else None
+    try:
+        logo = download_logo(manifest.logo) if manifest.logo else None
+    except Exception as e:
+        raise ValueError(f"Could not download logo {e}")
+    
+    
     app, _ = models.App.objects.get_or_create(identifier=manifest.identifier)
     release, _ = models.Release.objects.update_or_create(app=app, version=manifest.version, defaults={
         "logo": logo,

@@ -5,8 +5,8 @@ from ekke.types import Info
 from fakts import enums, inputs, models, scalars, types
 
 
-def client(info: Info, id: strawberry.ID | None,  client_id: strawberry.ID | None) -> types.Client:
-    return models.Client.get(id=id)
+def client(info: Info, id: strawberry.ID | None,  client_id: strawberry.ID | None = None) -> types.Client:
+    return models.Client.objects.get(id=id)
 
 
 

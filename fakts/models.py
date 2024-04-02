@@ -109,8 +109,25 @@ class ServiceInstanceMapping(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.key}:{self.instance}@{self.composition}"     
+        return f"{self.key}:{self.instance}@{self.composition}" 
 
+
+
+
+class RedeemToken(models.Model):
+    """ A redeem token is a token that can be used to redeed the rights to create
+    a client. It is used to give the recipient the right to create a client.
+
+    If the token is not redeemed within the expires_at time, it will be invalid.
+    If the token has been redeemed, but the manifest has changed, the token will be invalid.
+    
+    
+    """
+    client = models.OneToOneField("Client", on_delete=models.CASCADE, related_name="redeemed_client", null=True)
+    token = models.CharField(max_length=1000, unique=True, default=uuid.uuid4)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True)
+    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="issued_tokens")
 
 
 class DeviceCode(models.Model):

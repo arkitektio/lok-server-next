@@ -50,7 +50,7 @@ def lok(self: "SelfServiceDescriptor", context: "LinkingContext", descriptor: "D
 
 
 
-    return { "base_url": base_url + "/o", "userinfo_url ": f"{base_url}/o/userinfo", "token_url": f"{base_url}/o/token", "authorization_url": f"{base_url}/o/authorize", "client_id": context.client.client_id, "client_secret": context.client.client_secret, "client_type": context.client.client_type, "authorization_grant_type": context.client.authorization_grant_type, "name": context.client.name, "scopes": context.manifest.scopes, "__service": "live.arkitekt.lok"} | generic(self, context, descriptor)
+    return { "base_url": base_url + "/o", "userinfo_url ": f"{base_url}/o/userinfo", "token_url": f"{base_url}/o/token", "authorization_url": f"{base_url}/o/authorize", "client_id": context.client.client_id, "client_secret": context.client.client_secret, "client_type": context.client.client_type, "grant_type": context.client.authorization_grant_type, "name": context.client.name, "scopes": context.manifest.scopes, "__service": "live.arkitekt.lok"} | generic(self, context, descriptor)
 
 
 def generic(self: "SelfServiceDescriptor", context: "LinkingContext", descriptor: "DockerServiceDescriptor"):
