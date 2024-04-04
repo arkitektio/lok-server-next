@@ -68,7 +68,9 @@ FAKTS_BACKENDS = [
         "BUILDERS": [
             "arkitekt.lok",
             "arkitekt.generic",
-            "arkitekt.rekuest"
+            "arkitekt.rekuest",
+            "arkitekt.datalayer",
+            "arkitekt.lok_dep"
         ],
         "DEFAULT_BUILDER": "arkitekt.generic",
     },

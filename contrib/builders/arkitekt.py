@@ -7,14 +7,14 @@ if TYPE_CHECKING:
     from contrib.backends.docker_backend import DockerServiceDescriptor, SelfServiceDescriptor
 
 
-def _create_base_url(self: "SelfServiceDescriptor", context: "LinkingContext", descriptor: "DockerServiceDescriptor"):
+def _create_base_url(self: "SelfServiceDescriptor", context: "LinkingContext", descriptor: "DockerServiceDescriptor", inside_port="80/tcp"):
     try:
-        outside_port = descriptor.port_map['80/tcp']
+        outside_port = descriptor.port_map[inside_port]
     except KeyError:
-        raise Exception(f"Service {descriptor.internal_host} does not expose port 80 only exposes ports: " + str(descriptor.port_map.keys()))
+        raise Exception(f"Service {descriptor.internal_host} does not expose port {inside_port} only exposes ports: " + str(descriptor.port_map.keys()))
 
     protocol = "https" if context.request.is_secure else "http"
-    inside_base_url = f"{protocol}://{descriptor.internal_host}:80"
+    inside_base_url = f"{protocol}://{descriptor.internal_host}:{inside_port.split('/')[0]}"
     outside_base_url = f"{protocol}://{context.request.host}:{outside_port}"
     
     # Depending on how the service is accessed, we need to return the correct base_url
@@ -53,6 +53,22 @@ def lok(self: "SelfServiceDescriptor", context: "LinkingContext", descriptor: "D
     return { "base_url": base_url + "/o", "userinfo_url ": f"{base_url}/o/userinfo", "token_url": f"{base_url}/o/token", "authorization_url": f"{base_url}/o/authorize", "client_id": context.client.client_id, "client_secret": context.client.client_secret, "client_type": context.client.client_type, "grant_type": context.client.authorization_grant_type, "name": context.client.name, "scopes": context.manifest.scopes, "__service": "live.arkitekt.lok"} | generic(self, context, descriptor)
 
 
+def lok_dep(self: "SelfServiceDescriptor", context: "LinkingContext", descriptor: "DockerServiceDescriptor"):
+
+    base_url = _create_base_url(self, context, descriptor)
+
+
+
+    return lok(self, context, descriptor) 
+
+
+
+
+
+
+
+
+
 def generic(self: "SelfServiceDescriptor", context: "LinkingContext", descriptor: "DockerServiceDescriptor"):
 
     base_url = _create_base_url(self, context, descriptor)
@@ -74,3 +90,10 @@ def rekuest(self: "SelfServiceDescriptor", context: "LinkingContext", descriptor
     return generic(self, context, descriptor) | { "agent": {"endpoint_url:": ws_base_url + "/agi"}}
 
 
+def datalayer(self: "SelfServiceDescriptor", context: "LinkingContext", descriptor: "DockerServiceDescriptor"):
+
+    base_url = _create_base_url(self, context, descriptor, inside_port="9000/tcp")
+
+
+
+    return { "endpoint_url": base_url}

@@ -317,7 +317,11 @@ class DockerBackend(BackendBase):
         assert service.builder in self.loaded_builders, f"Builder {service.builder} not found in loaded builders"
         builder = self.loaded_builders[service.builder]
 
-        return builder(self.self_service_descriptor, context, service)
+        try:
+            return builder(self.self_service_descriptor, context, service)
+        except Exception as e:
+            logger.exception(f"Could not render service {service_instance}")
+            raise Exception(f"Could not render service {service_instance} with {service.builder}") from e
 
 
     def get_service_descriptors(self) -> list[ServiceDescriptor]:
