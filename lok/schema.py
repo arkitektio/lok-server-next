@@ -45,6 +45,7 @@ class Query:
     comment = strawberry_django.field(resolver=komment_queries.comment)
     comments_for = strawberry_django.field(resolver=komment_queries.comments_for)
     my_mentions = strawberry_django.field(resolver=komment_queries.my_mentions)
+    redeem_tokens: list[fakts_types.RedeemToken] = strawberry_django.field()
 
 
 

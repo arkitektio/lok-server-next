@@ -127,8 +127,11 @@ class DockerBackend(BackendBase):
         self.config = DockerConfig(**config_values)
 
 
-
-        self.client = docker.from_env()
+        try:
+            self.client = docker.from_env()
+        except Exception as e:
+            logger.exception("Could not connect to Docker")
+            raise Exception("Could not connect to Docker. Did you mount the socket?") from e
 
         self.loaded_services = {}
         self.loaded_instances = {}

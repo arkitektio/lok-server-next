@@ -6,15 +6,15 @@ db:
   port: 5432
   username: fostgres
 apps:
-  - identifier: github.io.jhnnsrs.mikroj
+  - identifier: github.io.jhnnsrs.mikrojss
     version: 0.0.3
-    scopes: 
+    scopes:
       - read
       - write
     clients:
       - kind: website
         token: ddoinoinoinsoineoinoeine
-        redirect_uris: 
+        redirect_uris:
           - http://localhost:8090
         tenant: johannes
         composition: generic
@@ -25,13 +25,13 @@ apps:
         composition: generic
   - identifier: github.io.jhnnsrs.orkestrator
     version: 0.0.3
-    scopes: 
+    scopes:
       - read
       - write
     clients:
       - kind: website
         token: 5oinoin2oin3oinoi33n2
-        redirect_uris: 
+        redirect_uris:
           - http://127.0.0.1/
           - http://127.0.0.1/callback
         tenant: johannes
@@ -41,7 +41,6 @@ apps:
 linkers:
   - name: TemplateLinker
     function: fakts
-
 
 deployment:
   name: Fakts

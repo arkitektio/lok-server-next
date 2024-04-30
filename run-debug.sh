@@ -19,6 +19,8 @@ python manage.py ensurecompositions
 echo "=> Ensuring Apps..."
 python manage.py ensureapps
 
+echo "=> Ensuring Token..."
+python manage.py ensuretokens
 
 echo "=> Collecting Static.."
 python manage.py collectstatic --noinput

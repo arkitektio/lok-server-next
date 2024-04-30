@@ -87,7 +87,7 @@ def rekuest(self: "SelfServiceDescriptor", context: "LinkingContext", descriptor
 
 
 
-    return generic(self, context, descriptor) | { "agent": {"endpoint_url:": ws_base_url + "/agi"}}
+    return generic(self, context, descriptor) | { "agent": {"endpoint_url": ws_base_url + "/agi"}}
 
 
 def datalayer(self: "SelfServiceDescriptor", context: "LinkingContext", descriptor: "DockerServiceDescriptor"):

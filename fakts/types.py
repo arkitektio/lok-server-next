@@ -63,8 +63,6 @@ class Composition:
 
 
 
-
-
 @strawberry_django.type(models.App, description="An App is the Arkitekt equivalent of a Software Application. It is a collection of `Releases` that can be all part of the same application. E.g the App `Napari` could have the releases `0.1.0` and `0.2.0`.")
 class App:
     id: strawberry.ID
@@ -119,3 +117,16 @@ class Client:
         if self.kind == "desktop": return enums.ClientKind.DESKTOP
         if self.kind == "development": return enums.ClientKind.DEVELOPMENT
         
+
+
+
+@strawberry_django.type(models.RedeemToken, filters=filters.RedeemTokenFilter, pagination=True)
+class RedeemToken:
+    id: strawberry.ID 
+    token: str  = strawberry.field(description="The token of the redeem token")
+    client: Client | None = strawberry.field(description="The client that this redeem token belongs to.")
+    user: types.User = strawberry.field(description="The user that this redeem token belongs to.")
+
+
+
+
