@@ -7,7 +7,7 @@ class CreateStashInput:
 
 @strawberry.input
 class DeleteStashInput:
-    id: str
+    stash: strawberry.ID
 
 @strawberry.input
 class StashItemInput:

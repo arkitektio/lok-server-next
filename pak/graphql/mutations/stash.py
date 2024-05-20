@@ -37,11 +37,11 @@ def update_stash(info: Info, input: inputs.UpdateStashInput) -> types.Stash:
     return stash
 
 
-def delete_stash(info: Info, input: inputs.DeleteStashInput) -> types.Stash:
+def delete_stash(info: Info, input: inputs.DeleteStashInput) -> strawberry.ID:
         
     user = info.context.request.user
 
-    stash = models.Stash.objects.get(id=input.id, owner=user)
+    stash = models.Stash.objects.get(id=input.stash)
     stash.delete()
 
     return stash
