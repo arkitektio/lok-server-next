@@ -10,10 +10,10 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
-from pathlib import Path
-from omegaconf import OmegaConf
 import os
+from pathlib import Path
 
+from omegaconf import OmegaConf
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -44,44 +44,43 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "oauth2_provider",
-    'allauth',
-    'allauth.account',
-    'allauth.socialaccount',
+    "allauth",
+    "allauth.account",
+    "allauth.socialaccount",
     "health_check",
     "health_check.db",
     "pak",
-
-    'allauth.socialaccount.providers.orcid',
+    "allauth.socialaccount.providers.orcid",
     # ... include the providers you want to enable:
-
     "ekke",
     "guardian",
     "komment",
     "channels",
     "fakts",
     "karakter",
+    "kammer",
 ]
 
 
 FAKTS_BACKENDS = [
     {
-        "NAME": "contrib.backends.docker_backend.DockerBackend", 
+        "NAME": "contrib.backends.docker_backend.DockerBackend",
         "BUILDERS": [
             "arkitekt.lok",
             "arkitekt.generic",
             "arkitekt.rekuest",
             "arkitekt.datalayer",
-            "arkitekt.lok_dep"
+            "arkitekt.lok_dep",
         ],
         "DEFAULT_BUILDER": "arkitekt.generic",
     },
     {
-        "NAME": "contrib.backends.config_backend.ConfigBackend", 
+        "NAME": "contrib.backends.config_backend.ConfigBackend",
     },
 ]
 
 
-ACCOUNT_EMAIL_VERIFICATION = "none" # we don't have an smpt server by default
+ACCOUNT_EMAIL_VERIFICATION = "none"  # we don't have an smpt server by default
 
 # Authentikate section
 
@@ -91,9 +90,8 @@ AUTH_USER_MODEL = "karakter.User"
 AUTHENTICATION_BACKENDS = [
     "oauth2_provider.backends.OAuth2Backend",
     "django.contrib.auth.backends.ModelBackend",
-
     # `allauth` specific authentication methods, such as login by email
-    'allauth.account.auth_backends.AuthenticationBackend',
+    "allauth.account.auth_backends.AuthenticationBackend",
     "guardian.backends.ObjectPermissionBackend",
 ]
 
@@ -105,8 +103,10 @@ SUPERUSERS = [
     }
 ]
 
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https') # because we my be behind a proxy
-
+SECURE_PROXY_SSL_HEADER = (
+    "HTTP_X_FORWARDED_PROTO",
+    "https",
+)  # because we my be behind a proxy
 
 
 MIDDLEWARE = [
@@ -118,8 +118,6 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-
-
     # Add the account middleware:
     "allauth.account.middleware.AccountMiddleware",
 ]
@@ -140,9 +138,7 @@ ROOT_URLCONF = "lok.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [
-            "templates"
-        ],
+        "DIRS": ["templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -154,6 +150,15 @@ TEMPLATES = [
         },
     },
 ]
+
+INITIAL_MESSAGE_TEMPLATE = [
+    {
+        "title": "Welcome {user.name} :) This will be fun",
+        "description": "It will be fun setting this up for you",
+        "unique": "initial_message",
+    }
+]
+
 
 WSGI_APPLICATION = "lok.wsgi.application"
 ASGI_APPLICATION = "lok.asgi.application"
@@ -201,24 +206,27 @@ OAUTH2_PROVIDER = {
     "OIDC_RSA_PRIVATE_KEY": conf.private_key,
     "SCOPES": {
         "openid": "OpenID Connect scope",
-        **conf.scopes
+        **conf.scopes,
         # ... any other scopes that you use
     },
     "ACCESS_TOKEN_EXPIRE_SECONDS": conf.token_expire_seconds
     or 60 * 60 * 24,  # TOkens are valid for 24 Hours
     "OAUTH2_VALIDATOR_CLASS": "karakter.oauth2.validator.CustomOAuth2Validator",
     "OAUTH2_SERVER_CLASS": "karakter.oauth2.server.JWTServer",
-    "ALLOWED_REDIRECT_URI_SCHEMES": conf.get("allowed_redirect_uri_schemes", [
-        "http",
-        "https",
-        "tauri",
-        "arkitekt",
-        "exp",
-        "orkestrator",
-        "doks",
-        "kranken",
-    ]),
-    "PKCE_REQUIRED": False # to allow no challenges
+    "ALLOWED_REDIRECT_URI_SCHEMES": conf.get(
+        "allowed_redirect_uri_schemes",
+        [
+            "http",
+            "https",
+            "tauri",
+            "arkitekt",
+            "exp",
+            "orkestrator",
+            "doks",
+            "kranken",
+        ],
+    ),
+    "PKCE_REQUIRED": False,  # to allow no challenges
 }
 
 OAUTH2_JWT = {
@@ -230,7 +238,7 @@ OAUTH2_JWT = {
 
 STRAWBERRY_DJANGO = {
     "TYPE_DESCRIPTION_FROM_MODEL_DOCSTRING": True,
-    "FIELD_DESCRIPTION_FROM_HELP_TEXT": True
+    "FIELD_DESCRIPTION_FROM_HELP_TEXT": True,
 }
 
 
@@ -349,5 +357,5 @@ SOCIALACCOUNT_PROVIDERS = {
         "AUTH_PARAMS": {
             "access_type": "online",
         },
-    }
+    },
 }
