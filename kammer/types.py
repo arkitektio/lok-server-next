@@ -13,31 +13,28 @@ from strawberry import LazyType
 from strawberry.experimental import pydantic
 
 
-@strawberry_django.type(models.Structure)
+@strawberry_django.type(models.Structure, pagination=True)
 class Structure:
     id: strawberry.ID
     object: strawberry.ID
     identifier: str
 
 
-@strawberry_django.type(models.Room)
+@strawberry_django.type(models.Room, pagination=True, filters=filters.RoomFilter)
 class Room:
     id: strawberry.ID
     title: str
     description: str
-
-    @strawberry_django.field()
-    def messages(self, info) -> list["Message"]:
-        return models.Message.objects.filter(agent__room=self).all()
+    messages: list["Message"]
 
 
-@strawberry_django.type(models.Agent)
+@strawberry_django.type(models.Agent, pagination=True)
 class Agent:
     id: strawberry.ID
     room: Room
 
 
-@strawberry_django.type(models.Message)
+@strawberry_django.type(models.Message, pagination=True, filters=filters.MessageFilter)
 class Message:
     id: strawberry.ID
     title: str
