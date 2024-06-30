@@ -9,7 +9,9 @@ from fakts.graphql import mutations as fakts_mutations
 from fakts.graphql import queries as fakts_queries
 from fakts.graphql import subscriptions as fakts_subscriptions
 from kammer import types as kammer_types
+from kammer.graphql import mutations as kammer_mutations
 from kammer.graphql import queries as kammer_queries
+from kammer.graphql import subscriptions as kammer_subscriptions
 from karakter import types as karakter_types
 from karakter.graphql import mutations as karakter_mutations
 from karakter.graphql import queries as karakter_queries
@@ -83,6 +85,11 @@ class Mutation:
     create_comment = strawberry_django.mutation(
         resolver=komment_mutations.create_comment,
     )
+
+    create_room = strawberry_django.mutation(resolver=kammer_mutations.create_room)
+
+    send = strawberry_django.mutation(resolver=kammer_mutations.send)
+
     reply_to = strawberry_django.mutation(
         resolver=komment_mutations.reply_to,
     )
@@ -127,6 +134,7 @@ class Subscription:
         resolver=karakter_subscriptions.communications
     )
     mentions = strawberry.subscription(resolver=komment_subscriptions.mentions)
+    room = strawberry.subscription(resolver=kammer_subscriptions.room)
 
 
 schema = strawberry.Schema(

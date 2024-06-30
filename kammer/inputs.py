@@ -1,10 +1,10 @@
-from komment import enums, scalars
+from typing import Any, Optional
+
 import strawberry
-from typing import Optional
+from komment import enums, scalars
 from pydantic import BaseModel
-from strawberry.experimental import pydantic
-from typing import Any
 from strawberry import LazyType
+from strawberry.experimental import pydantic
 
 
 class DescendandInputModel(BaseModel):

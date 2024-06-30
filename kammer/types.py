@@ -24,3 +24,23 @@ class Structure:
 class Room:
     id: strawberry.ID
     title: str
+    description: str
+
+    @strawberry_django.field()
+    def messages(self, info) -> list["Message"]:
+        return models.Message.objects.filter(agent__room=self).all()
+
+
+@strawberry_django.type(models.Agent)
+class Agent:
+    id: strawberry.ID
+    room: Room
+
+
+@strawberry_django.type(models.Message)
+class Message:
+    id: strawberry.ID
+    title: str
+    text: str
+    agent: Agent
+    attached_structures: list[Structure]

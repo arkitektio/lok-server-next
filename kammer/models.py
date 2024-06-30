@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
-from fakts.models import App
+from oauth2_provider.models import Application
 
 # Create your models here.
 
@@ -34,7 +34,7 @@ class Room(models.Model):
 class Agent(models.Model):
     room = models.ForeignKey(Room, on_delete=models.CASCADE)
     name = models.CharField(max_length=10000, null=True)
-    app = models.ForeignKey(App, on_delete=models.CASCADE)
+    app = models.ForeignKey(Application, on_delete=models.CASCADE)
     user = models.ForeignKey(
         get_user_model(),
         on_delete=models.CASCADE,
@@ -83,3 +83,6 @@ class Message(models.Model):
         related_name="addressed_in",
         help_text="The users that got mentioned in this comment",
     )
+
+
+from .signals import *

@@ -1,9 +1,11 @@
+import logging
+from typing import Any
+
+from asgiref.sync import sync_to_async
+from ekke.context import ChannelsWSContext, EnhancendChannelsWSRequest
+from ekke.utils import authenticate_token_or_none
 from strawberry.channels import GraphQLWSConsumer
 from strawberry.channels.handlers.ws_handler import ChannelsConsumer
-from typing import Any
-from ekke.context import ChannelsWSContext, EnhancendChannelsWSRequest
-from asgiref.sync import sync_to_async
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +17,9 @@ class EkkeWsConsumer(GraphQLWSConsumer):
         self, request: ChannelsConsumer, connection_params: Any
     ) -> ChannelsWSContext:
         try:
-            auth = None
+            auth = await sync_to_async(authenticate_token_or_none)(
+                connection_params.get("token", None)
+            )
             if auth:
                 user = auth.user
                 app = auth.app

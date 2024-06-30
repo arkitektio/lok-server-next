@@ -1,10 +1,11 @@
-from ekke.structs import Auth
-from ekke.decode import decode_token
-from ekke.settings import get_settings, EkkeSettings
-import re
 import logging
+import re
+
+from ekke.decode import decode_token
 from ekke.expand import expand_token
 from ekke.imitate import imitate_user
+from ekke.settings import EkkeSettings, get_settings
+from ekke.structs import Auth
 
 logger = logging.getLogger(__name__)  #
 
@@ -18,6 +19,20 @@ def authenticate_token(token: str, settings: EkkeSettings) -> Auth:
 
     decoded = decode_token(token, settings.algorithms, settings.public_key)
     return expand_token(decoded, settings.force_client)
+
+
+def authenticate_token_or_none(token: str, settings: EkkeSettings) -> Auth:
+    """
+    Authenticate a token and return the auth context
+    (containing user, app and scopes)
+
+    """
+    try:
+        decoded = decode_token(token, settings.algorithms, settings.public_key)
+        return expand_token(decoded, settings.force_client)
+    except Exception:
+        logger.error("Error authenticating token. Skipping!", exc_info=True)
+        return None
 
 
 jwt_re = re.compile(r"Bearer\s(?P<token>[^\s]*)")
