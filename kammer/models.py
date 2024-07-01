@@ -30,6 +30,10 @@ class Room(models.Model):
         help_text="The users that have pinned the workspace",
     )
 
+    @property
+    def messages(self):
+        return Message.objects.filter(agent__room=self).all()
+
 
 class Agent(models.Model):
     room = models.ForeignKey(Room, on_delete=models.CASCADE)
