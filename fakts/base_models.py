@@ -86,7 +86,6 @@ class DeviceCodeChallengeRequest(BaseModel):
 
 
 class ConfigurationRequest(BaseModel):
-    
     grant: enums.FaktsGrantKind
     device_code: Optional[str] = None
 

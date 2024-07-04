@@ -15,15 +15,15 @@ from kammer import inputs
 
 @strawberry.input
 class CreateRoomInput:
-    description: str | None
-    title: str | None
+    description: str | None = None
+    title: str | None = None
 
 
 def create_room(info: Info, input: CreateRoomInput) -> types.Room:
     creator = info.context.request.user
 
     exp = models.Room.objects.create(
-        title=input.title or "Untited",
+        title=input.title or "Untitled",
         description=input.description or "No description",
     )
 
