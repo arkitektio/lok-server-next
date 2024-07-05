@@ -5,6 +5,26 @@ from typing import Optional
 from pydantic import BaseModel, Field
 import uuid
 
+
+
+
+class RequirementModel(BaseModel):
+    service: str
+    optional: bool = False
+    description: Optional[str] = None
+    key: str
+
+
+@pydantic.input(RequirementModel)
+class Requirement:
+    service: str
+    optional: bool = False
+    description: Optional[str] = None
+    key: str
+
+
+
+
 @pydantic.input(Manifest)
 class ManifestInput:
     identifier: str
@@ -17,6 +37,7 @@ class ManifestInput:
 class DevelopmentClientInputModel(BaseModel):
     manifest: Manifest 
     composition: str | None = None
+    requirements: list[RequirementModel] = Field(default_factory=list)
 
 
 
@@ -24,6 +45,7 @@ class DevelopmentClientInputModel(BaseModel):
 class DevelopmentClientInput:
     manifest: ManifestInput
     composition: strawberry.ID | None = None
+    requirements: list[Requirement] 
 
 
 class ScanBackendInputModel(BaseModel):
