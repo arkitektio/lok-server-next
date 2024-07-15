@@ -69,6 +69,8 @@ def build_config_dict(labels):
 def build_ports_dict(container):
     ports = container.attrs["NetworkSettings"]["Ports"]
     for key, port in ports.items():
+        if not port:
+            continue
         first_port = port[0]
         yield key, first_port["HostPort"]
 

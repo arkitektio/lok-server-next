@@ -8,14 +8,9 @@ if TYPE_CHECKING:
 
 
 def _create_base_url(self: "SelfServiceDescriptor", context: "LinkingContext", descriptor: "DockerServiceDescriptor", inside_port="80/tcp"):
-    try:
-        outside_port = descriptor.port_map[inside_port]
-    except KeyError:
-        raise Exception(f"Service {descriptor.internal_host} does not expose port {inside_port} only exposes ports: " + str(descriptor.port_map.keys()))
-
-    protocol = "https" if context.request.is_secure else "http"
+    protocol = "https" if context.secure else "http"
     inside_base_url = f"{protocol}://{descriptor.internal_host}:{inside_port.split('/')[0]}"
-    outside_base_url = f"{protocol}://{context.request.host}:{outside_port}"
+    outside_base_url = f"{protocol}://{context.request.host}" + (f"/{descriptor.internal_host}" if descriptor.internal_host != 'lok' else '')
     
     # Depending on how the service is accessed, we need to return the correct base_url
     if context.request.host == self.internal_host:
@@ -25,15 +20,12 @@ def _create_base_url(self: "SelfServiceDescriptor", context: "LinkingContext", d
 
     return base_url
 
-def _create_base_wsurl(self: "SelfServiceDescriptor", context: "LinkingContext", descriptor: "DockerServiceDescriptor"):
-    try:
-        outside_port = descriptor.port_map['80/tcp']
-    except KeyError:
-        raise Exception(f"Service {descriptor.internal_host} does not expose port 80 only exposes ports: " + str(descriptor.port_map.keys()))
 
-    protocol = "wss" if context.request.is_secure else "ws"
+def _create_base_wsurl(self: "SelfServiceDescriptor", context: "LinkingContext", descriptor: "DockerServiceDescriptor"):
+    
+    protocol = "wss" if context.secure else "ws"
     inside_base_url = f"{protocol}://{descriptor.internal_host}:80"
-    outside_base_url = f"{protocol}://{context.request.host}:{outside_port}"
+    outside_base_url = f"{protocol}://{context.request.host}/{descriptor.internal_host}"
     
     # Depending on how the service is accessed, we need to return the correct base_url
     if context.request.host == self.internal_host:
@@ -92,7 +84,15 @@ def rekuest(self: "SelfServiceDescriptor", context: "LinkingContext", descriptor
 
 def datalayer(self: "SelfServiceDescriptor", context: "LinkingContext", descriptor: "DockerServiceDescriptor"):
 
-    base_url = _create_base_url(self, context, descriptor, inside_port="9000/tcp")
+    protocol = "https" if context.secure else "http"
+    inside_base_url = f"{protocol}://{descriptor.internal_host}:9000"
+    outside_base_url = f"{protocol}://{context.request.host}"
+
+     # Depending on how the service is accessed, we need to return the correct base_url
+    if context.request.host == self.internal_host:
+        base_url = inside_base_url
+    else:
+        base_url = outside_base_url
 
 
 

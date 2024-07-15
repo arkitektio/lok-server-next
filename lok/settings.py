@@ -167,6 +167,9 @@ ASGI_APPLICATION = "lok.asgi.application"
 REDEEM_TOKENS = conf.get("redeem_tokens", [])
 
 
+CA_FILE = conf.get("ca_file", "/certs/ca.crt")
+
+
 EKKE = {
     "PUBLIC_KEY": conf.lok.get("public_key", None),
     "PUBLIC_KEY_PEM_FILE": conf.lok.get("public_key_pem_file", None),

@@ -94,6 +94,8 @@ class ConfigurationRequest(BaseModel):
 class ClaimRequest(BaseModel):
     token: str
     composition: Optional[str] = None
+    requirements: Optional[list[Requirement]] = Field(default_factory=list)
+    secure: bool = False
 
 
 
@@ -121,6 +123,7 @@ class LinkingContext(BaseModel):
     "Everything is a string"
     manifest: Manifest
     client: LinkingClient
+    secure: bool = False
 
 
 class ClientConfig(BaseModel):

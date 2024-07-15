@@ -15,6 +15,8 @@ base_urlpatterns = [
     re_path(r"^start/$", views.StartChallengeView.as_view(), name="start"),
     re_path(r"^device/$", views.DeviceView.as_view(), name="device"),
     re_path(r"^claim/$", views.ClaimView.as_view(), name="claim"),
+    re_path(r"^success/$", views.SuccessView.as_view(), name="success"),
+    re_path(r"^failure/$", views.FailureView.as_view(), name="failure"),
 ]
 
 

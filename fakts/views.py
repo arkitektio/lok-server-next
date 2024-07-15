@@ -5,7 +5,7 @@ from django.http import  HttpResponse, JsonResponse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
-from django.views.generic import FormView, View
+from django.views.generic import FormView, View, TemplateView
 from .forms import ConfigureForm, DeviceForm
 from .errors import ConfigurationRequestMalformed, ConfigurationError
 import logging
@@ -15,11 +15,11 @@ import datetime
 from .utils import (
     download_logo,
 )
+from django.urls import reverse
 from django.utils import timesince
 from django.shortcuts import redirect
 from fakts import base_models, enums, models, builders, logic
 from django.conf import settings
-
 
 import uuid
 logger = logging.getLogger(__name__)
@@ -34,8 +34,18 @@ class WellKnownFakts(View):
     endpoints for "Claim" and "Configure" as well as the name and version.
     Of the Fakts Protocol"""
 
+
+
+
     def get(self, request, format=None):
-        return JsonResponse(data={"name": settings.DEPLOYMENT_NAME, "version": "0.0.1", "description": "This is the best server", "claim": request.build_absolute_uri("/f/claim") , "base_url": request.build_absolute_uri("/f/")})
+
+        with open(settings.CA_FILE, "r") as f:
+            ca = f.read()
+
+
+
+
+        return JsonResponse(data={"name": settings.DEPLOYMENT_NAME, "version": "0.0.1", "description": "This is the best server", "claim": request.build_absolute_uri("/f/claim") , "base_url": request.build_absolute_uri("/f/"), "ca_crt" : ca})
 
 
 
@@ -214,6 +224,8 @@ class ConfigureView(LoginRequiredMixin, FormView):
             device_code.client = client
             device_code.save()
 
+            return redirect(reverse("fakts:success"))
+
         else:
             device_code = models.DeviceCode.objects.get(
                 code=device_code,
@@ -222,14 +234,9 @@ class ConfigureView(LoginRequiredMixin, FormView):
             device_code.denied = True
             device_code.save()
 
+            return redirect(reverse("fakts:failure"))
+
         
-        kwargs = {}
-        kwargs["success"] = True
-        kwargs["authorized"] = action == "allow"
-
-
-
-        return self.render_to_response(self.get_context_data(**kwargs))
 
 
     def get(self, request, *args, **kwargs):
@@ -294,6 +301,33 @@ class DeviceView(LoginRequiredMixin, FormView):
 
         return self.render_to_response(self.get_context_data(**kwargs))
     
+
+class SuccessView(LoginRequiredMixin, TemplateView):
+    """
+    This is the start view for the device flow.
+    It will redirect to the device code view.
+    """
+
+    template_name = "fakts/success.html"
+
+
+    def get(self, request, *args, **kwargs):
+
+        return self.render_to_response(self.get_context_data(**kwargs))
+
+class FailureView(LoginRequiredMixin, TemplateView):
+    """
+    This is the start view for the device flow.
+    It will redirect to the device code view.
+    """
+
+    template_name = "fakts/denied.html"
+
+
+    def get(self, request, *args, **kwargs):
+        return self.render_to_response(self.get_context_data(**kwargs))
+
+
 
 @method_decorator(csrf_exempt, name="dispatch")
 class StartChallengeView(View):
@@ -596,7 +630,7 @@ class ClaimView(View):
         try:
             client = models.Client.objects.get(token=claim.token)
 
-            context = logic.create_linking_context(request, client)
+            context = logic.create_linking_context(request, client, claim)
 
             if claim.composition:
                 try:

@@ -144,7 +144,7 @@ def create_device_code():
     return "".join([str(uuid4())[-1] for _ in range(8)])
 
 
-def create_linking_context(request: HttpRequest, client: models.Client) -> base_models.LinkingContext:
+def create_linking_context(request: HttpRequest, client: models.Client, claim: base_models.ClaimRequest) -> base_models.LinkingContext:
     host_string = request.get_host().split(":")
     if len(host_string) == 2:
         host = host_string[0]
@@ -159,6 +159,7 @@ def create_linking_context(request: HttpRequest, client: models.Client) -> base_
             port=port,
             is_secure=request.is_secure(),
         ),
+        secure=claim.secure,
         manifest=base_models.Manifest(
             identifier=client.release.app.identifier,
             version=client.release.version,
@@ -186,6 +187,7 @@ def create_fake_linking_context(client: models.Client, host, port, secure=False)
             port=port,
             is_secure=secure,
         ),
+        secure=secure,
         manifest=base_models.Manifest(
             identifier=client.release.app.identifier,
             version=client.release.version,
