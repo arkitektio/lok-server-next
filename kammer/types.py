@@ -26,12 +26,38 @@ class Room:
     title: str
     description: str
     messages: list["Message"]
+    agents: list["Agent"]
+
+    @strawberry_django.field
+    def streams(self, info: Info) -> list["Stream"]:
+        return models.Stream.objects.filter(agent__room=self).all()
 
 
 @strawberry_django.type(models.Agent, pagination=True)
 class Agent:
     id: strawberry.ID
     room: Room
+
+
+
+
+
+
+
+@strawberry_django.type(models.Stream, pagination=True)
+class Stream:
+    id: strawberry.ID
+    agent: Agent
+    title: str
+
+    @strawberry.field
+    def token(self, info: Info) -> str: 
+        return self.token
+
+
+
+
+
 
 
 @strawberry_django.type(models.Message, pagination=True, filters=filters.MessageFilter)
@@ -41,3 +67,6 @@ class Message:
     text: str
     agent: Agent
     attached_structures: list[Structure]
+
+
+

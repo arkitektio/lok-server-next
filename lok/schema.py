@@ -127,6 +127,16 @@ class Mutation:
         resolver=pak_mutations.delete_stash,
     )
 
+    create_stream = strawberry_django.mutation(
+        resolver=kammer_mutations.create_video_stream
+    )
+    leave_stream = strawberry_django.mutation(
+        resolver=kammer_mutations.leave_video_stream
+    )
+    join_stream = strawberry_django.mutation(
+        resolver=kammer_mutations.join_video_stream
+    )
+
 
 @strawberry.type
 class Subscription:

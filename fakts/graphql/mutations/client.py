@@ -9,7 +9,7 @@ import strawberry_django
 from ekke.types import Info
 
 from fakts import enums, inputs, models, scalars, types
-from fakts.base_models import DevelopmentClientConfig, Manifest
+from fakts.base_models import DevelopmentClientConfig, Manifest, Requirement
 from fakts.builders import create_client
 from fakts.models import Composition
 
@@ -39,7 +39,7 @@ def create_developmental_client(info: Info, input: inputs.DevelopmentClientInput
         version=input.manifest.version,
         logo=input.manifest.logo,
         scopes=input.manifest.scopes or [],
-        requirements=[],
+        requirements={x.key: Requirement(service=x.service, optional=x.optional, description=x.description) for x in input.requirements},
     )
 
     client = create_client(

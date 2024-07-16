@@ -33,6 +33,11 @@ class Room(models.Model):
     @property
     def messages(self):
         return Message.objects.filter(agent__room=self).all()
+    
+
+    @property
+    def streamlit_room_id(self):
+        return f"lok-room-{self.id}"
 
 
 class Agent(models.Model):
@@ -45,6 +50,29 @@ class Agent(models.Model):
         related_name="agents",
         help_text="The user that created this comment",
     )
+
+
+class Stream(models.Model):
+    agent = models.ForeignKey(
+        "Agent",
+        on_delete=models.CASCADE,
+        related_name="streams",
+        help_text="The agent that created this stream",
+    )
+    title = models.CharField(max_length=1000, help_text="The Title of the Stream")
+    token = models.CharField(max_length=4000, help_text="The token of the stream")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["agent", "title"], name="Unique stream for agent"
+            )
+        ]
+        
+
+
+
+
 
 
 class Message(models.Model):

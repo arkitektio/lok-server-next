@@ -71,6 +71,8 @@ FAKTS_BACKENDS = [
             "arkitekt.rekuest",
             "arkitekt.datalayer",
             "arkitekt.lok_dep",
+            "livekitio.livekit",
+            "ollama.ollama",
         ],
         "DEFAULT_BUILDER": "arkitekt.generic",
     },
@@ -108,6 +110,13 @@ SECURE_PROXY_SSL_HEADER = (
     "https",
 )  # because we my be behind a proxy
 
+
+
+LIVEKIT = {
+    "API_KEY": conf.livekit.api_key,
+    "API_SECRET": conf.livekit.api_secret,
+    "API_URL": conf.livekit.api_url,
+}
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
@@ -333,6 +342,11 @@ LOGOUT_URL = "account_logout"
 ENSURED_APPS = OmegaConf.to_object(conf.apps)
 
 ENSURED_USERS = OmegaConf.to_object(conf.users)
+
+SYSTEM_MESSAGES = conf.get("system_messages", [{
+    "title": "Welcome to Lok",
+    "message": "Now that you are here, you can start creating your own compositions",
+}])
 
 
 SOCIALACCOUNT_PROVIDERS = {
