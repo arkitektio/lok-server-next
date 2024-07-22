@@ -69,8 +69,7 @@ FAKTS_BACKENDS = [
             "arkitekt.lok",
             "arkitekt.generic",
             "arkitekt.rekuest",
-            "arkitekt.datalayer",
-            "arkitekt.lok_dep",
+            "arkitekt.s3",
             "livekitio.livekit",
             "ollama.ollama",
         ],
@@ -295,6 +294,8 @@ STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+CSRF_TRUSTED_ORIGINS = conf.get("csrf_trusted_origins", ["http://localhost", "https://localhost"])
+MY_SCRIPT_NAME = conf.get("force_script_name", "lok")
 
 LOGGING = {
     "version": 1,
@@ -338,6 +339,7 @@ LOGGING = {
 
 LOGIN_URL = "account_login"
 LOGOUT_URL = "account_logout"
+
 
 ENSURED_APPS = OmegaConf.to_object(conf.apps)
 

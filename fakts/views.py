@@ -45,7 +45,7 @@ class WellKnownFakts(View):
 
 
 
-        return JsonResponse(data={"name": settings.DEPLOYMENT_NAME, "version": "0.0.1", "description": "This is the best server", "claim": request.build_absolute_uri("/f/claim") , "base_url": request.build_absolute_uri("/f/"), "ca_crt" : ca})
+        return JsonResponse(data={"name": settings.DEPLOYMENT_NAME, "version": "0.0.1", "description": "This is the best servesssr", "claim": request.build_absolute_uri(reverse("fakts:claim")) , "base_url": request.build_absolute_uri(reverse("fakts:index")), "ca_crt" : ca})
 
 
 

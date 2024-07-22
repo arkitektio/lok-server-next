@@ -5,9 +5,15 @@ from . import views
 
 app_name = "fakts"
 
+
+def index(request):
+    # Render that in the index template
+    raise NotImplementedError("This view is not implemented yet.")
+
 # Basic url patterns for fakts 
 # as described in the fakts api documentation
 base_urlpatterns = [
+    re_path(r"^$", index, name="index"),
     re_path(r"^configure/$", views.ConfigureView.as_view(), name="configure"),
     re_path(r"^retrieve/$", views.RetrieveView.as_view(), name="retrieve"),
     re_path(r"^redeem/$", views.RedeemView.as_view(), name="redeem"),

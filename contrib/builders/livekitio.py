@@ -8,14 +8,10 @@ if TYPE_CHECKING:
 
 
 def _create_base_url(self: "SelfServiceDescriptor", context: "LinkingContext", descriptor: "DockerServiceDescriptor", inside_port="80/tcp"):
-    try:
-        outside_port = descriptor.port_map[inside_port]
-    except KeyError:
-        raise Exception(f"Service {descriptor.internal_host} does not expose port {inside_port} only exposes ports: " + str(descriptor.port_map.keys()))
 
     protocol = "http" #TODO: Until livekit supports custom certificates
     inside_base_url = f"{protocol}://{descriptor.internal_host}:{inside_port.split('/')[0]}"
-    outside_base_url = f"{protocol}://{context.request.host}:{outside_port}"
+    outside_base_url = f"{protocol}://{context.request.host}:7880"
     
     # Depending on how the service is accessed, we need to return the correct base_url
     if context.request.host == self.internal_host:
@@ -29,7 +25,7 @@ def _create_base_url(self: "SelfServiceDescriptor", context: "LinkingContext", d
 
 def livekit(self: "SelfServiceDescriptor", context: "LinkingContext", descriptor: "DockerServiceDescriptor"):
 
-    base_url = _create_base_url(self, context, descriptor, inside_port="7880/tcp")
+    base_url = _create_base_url(self, context, descriptor)
 
 
 

@@ -23,7 +23,7 @@ from django.urls import re_path
 from django.core.asgi import get_asgi_application
 from ekke.consumers import EkkeHTTPConsumer, EkkeWsConsumer
 from ekke.cors import CorsMiddleware
-
+from .basepath import basepath, re_basepath
 
 
 # Initialize Django ASGI application early to ensure the AppRegistry
@@ -39,16 +39,16 @@ gql_ws_consumer = EkkeWsConsumer.as_asgi(schema=schema)
 
 
 websocket_urlpatterns = [
-    re_path(r"graphql", gql_ws_consumer),
+    re_basepath(r"graphql", gql_ws_consumer),
 ]
 
 application = ProtocolTypeRouter(
     {
         "http": URLRouter(
             [
-                re_path("^graphql", gql_http_consumer, name="graphql"),
+                re_basepath("graphql", gql_http_consumer, name="graphql"),
                 re_path(
-                    "^", django_asgi_app
+                    "", django_asgi_app
                 ),  # This might be another endpoint in your app
             ]
         ),

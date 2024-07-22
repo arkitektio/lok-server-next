@@ -19,7 +19,10 @@ from django.urls import path
 from django.urls import include, path
 from fakts.views import WellKnownFakts
 from django.shortcuts import render
+from django.conf import settings
+from .basepath import basepath
 
+from django.urls import path, include, re_path
 # Bootstrap Backend
 def index(request):
     # Render that in the index template
@@ -27,13 +30,15 @@ def index(request):
 
 urlpatterns = [
 
-    path("", index, name="index"),
-    path("ht/", include("health_check.urls")),
-    path("admin/", admin.site.urls),
-    path("o/", include("oauth2_provider.urls", namespace="oauth2_provider")),
-    path("f/", include("fakts.urls", namespace="fakts")),
-    path(".well-known/fakts", WellKnownFakts.as_view()),
-    path('accounts/', include('allauth.urls')),
-    path('accounts/', include('karakter.urls')),
+    basepath("", index, name="index"),
+    basepath("ht/", include("health_check.urls")),
+    basepath("admin/", admin.site.urls),
+    basepath("o/", include("oauth2_provider.urls", namespace="oauth2_provider")),
+    basepath("f/", include("fakts.urls", namespace="fakts")),
+    basepath(".well-known/fakts", WellKnownFakts.as_view()),
+    basepath('accounts/', include('allauth.urls')),
+    basepath('accounts/', include('karakter.urls')),
 
 ]
+
+
