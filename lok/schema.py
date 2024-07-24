@@ -48,6 +48,7 @@ class Query:
     mygroups = strawberry_django.field(resolver=karakter_queries.mygroups)
 
     room = strawberry_django.field(resolver=kammer_queries.room)
+    stream = strawberry_django.field(resolver=kammer_queries.stream)
 
     app = strawberry_django.field(resolver=fakts_queries.app)
     release = strawberry_django.field(resolver=fakts_queries.release)
@@ -73,7 +74,7 @@ class Query:
 
     @strawberry_django.field()
     def hallo(self, info: Info) -> str:
-        print("hallo")
+        print("hallosss")
         return "hallo"
 
 

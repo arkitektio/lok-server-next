@@ -39,11 +39,6 @@ class Agent:
     room: Room
 
 
-
-
-
-
-
 @strawberry_django.type(models.Stream, pagination=True)
 class Stream:
     id: strawberry.ID
@@ -51,13 +46,8 @@ class Stream:
     title: str
 
     @strawberry.field
-    def token(self, info: Info) -> str: 
+    def token(self, info: Info) -> str:
         return self.token
-
-
-
-
-
 
 
 @strawberry_django.type(models.Message, pagination=True, filters=filters.MessageFilter)
@@ -67,6 +57,3 @@ class Message:
     text: str
     agent: Agent
     attached_structures: list[Structure]
-
-
-
