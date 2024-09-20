@@ -91,6 +91,7 @@ class Oauth2Client:
     name: str
     user: types.User
     client_type: str
+    client_id: str
     algorithm: str
     authorization_grant_type: str
     redirect_uris: str
@@ -109,13 +110,17 @@ class Client:
     public: bool = strawberry.field(description="Is this client public? If a client is public ")
     composition: Composition = strawberry.field(description="The composition of the client. ")
     user: types.User | None = strawberry.field(description="If the client is a DEVELOPMENT client, which requires no further authentication, this is the user that is authenticated with the client.")
-    token: str = strawberry.field(description="A token that can be used to retrieve the configuration of the client. When providing this token during the configuration flow, the client will received its configuration (the filled in `composition`)")
-
+    
     @strawberry.field(description="The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information.")
     def kind(self, info) -> enums.ClientKind:
         if self.kind == "website": return enums.ClientKind.WEBSITE
         if self.kind == "desktop": return enums.ClientKind.DESKTOP
         if self.kind == "development": return enums.ClientKind.DEVELOPMENT
+
+    @strawberry.field(description="The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information.")
+    def token(self, info) -> str:
+        # TODO: Implement only tenant should be able to see the token
+        return self.token
         
 
 

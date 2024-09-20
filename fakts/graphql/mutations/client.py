@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 
-def create_developmental_client(info: Info, input: inputs.DevelopmentClientInput) -> str:
+def create_developmental_client(info: Info, input: inputs.DevelopmentClientInput) -> types.Client:
 
 
     composition = Composition.objects.get(name=input.composition) if input.composition else Composition.objects.first()
@@ -48,7 +48,7 @@ def create_developmental_client(info: Info, input: inputs.DevelopmentClientInput
     )
 
 
-    return token
+    return client
 
 
 
