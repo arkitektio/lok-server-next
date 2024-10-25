@@ -17,5 +17,5 @@ def comments_for(
     return models.Comment.objects.filter(identifier=identifier, object=object)
 
 
-def my_mentions(info: Info) -> types.Comment:
-    return models.Comment.objects.filter(mentions__contains=info.context.request.user)
+def my_mentions(info: Info) -> list[types.Comment]:
+    return models.Comment.objects.filter(mentions=info.context.request.user)
