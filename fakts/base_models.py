@@ -10,6 +10,7 @@ from typing import Literal
 
 
 class Requirement(BaseModel):
+    key: str
     service: str
     """ The service is the service that will be used to fill the key, it will be used to find the correct instance. It needs to fullfill
     the reverse domain naming scheme"""
@@ -35,7 +36,7 @@ class Manifest(BaseModel):
     """ The logo is a url to a logo that should be used for the client. """
     scopes: Optional[list[str]] = Field(default_factory=list)
     """ The scopes are a list of scopes that the client can request. """
-    requirements: Optional[dict[str, Requirement]] = Field(default_factory=dict)
+    requirements: Optional[List[Requirement]] = Field(default_factory=list)
     """ The requirements are a list of requirements that the client needs to run on (e.g. needs GPU)"""
 
 

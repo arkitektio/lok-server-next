@@ -123,7 +123,7 @@ class ConfigureView(LoginRequiredMixin, FormView):
 
             print(manifest.requirements)
 
-            context["composition_requirements"] = {key: req.service for key, req in manifest.requirements.items()}
+            context["composition_requirements"] = {req.key: req.service for req in manifest.requirements}
             context["composition_errors"] = composition_errors
             context["composition_warnings"] = composition_warnings
             context["staging_identifier"] = x.staging_manifest["identifier"]

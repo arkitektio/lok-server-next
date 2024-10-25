@@ -59,8 +59,8 @@ def find_instance_for_requirement(service: models.Service, requirement: base_mod
 
 
 
-def hash_requirements(requirements: dict[str, base_models.Requirement]) -> str:
-    return sha256(".".join([key + req.service for key, req in requirements.items()]).encode()).hexdigest()
+def hash_requirements(requirements: list[base_models.Requirement]) -> str:
+    return sha256(".".join([req.service + req.key for req in requirements]).encode()).hexdigest()
 
 
 def auto_create_composition(manifest: base_models.Manifest) -> models.Composition:
@@ -78,7 +78,7 @@ def auto_create_composition(manifest: base_models.Manifest) -> models.Compositio
     errors = []
     warnings = []
 
-    for key, req in manifest.requirements.items():
+    for req in manifest.requirements:
 
         try:
             service = models.Service.objects.get(identifier=req.service)
@@ -88,7 +88,7 @@ def auto_create_composition(manifest: base_models.Manifest) -> models.Compositio
             models.ServiceInstanceMapping.objects.create(
                 composition=composition,
                 instance=instance,
-                key=key,
+                key=req.key,
             )
 
         except Exception as e:
@@ -116,7 +116,7 @@ def check_compability(manifest: base_models.Manifest) -> list[str] | list[str]:
     errors = []
     warnings = []
 
-    for key, req in manifest.requirements.items():
+    for req in manifest.requirements:
 
         try:
             try:

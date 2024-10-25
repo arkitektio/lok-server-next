@@ -39,7 +39,7 @@ def create_developmental_client(info: Info, input: inputs.DevelopmentClientInput
         version=input.manifest.version,
         logo=input.manifest.logo,
         scopes=input.manifest.scopes or [],
-        requirements={x.key: Requirement(service=x.service, optional=x.optional, description=x.description) for x in input.requirements},
+        requirements=[strawberry.asdict(x) for x in input.requirements],
     )
 
     client = create_client(
