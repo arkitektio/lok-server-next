@@ -60,7 +60,8 @@ def find_instance_for_requirement(service: models.Service, requirement: base_mod
 
 
 def hash_requirements(requirements: list[base_models.Requirement]) -> str:
-    return sha256(".".join([req.service + req.key for req in requirements]).encode()).hexdigest()
+    # Order the requirements by service and key and hash them
+    return sha256(".".join(sorted([req.service + req.key for req in requirements])).encode()).hexdigest()
 
 
 def auto_create_composition(manifest: base_models.Manifest) -> models.Composition:
