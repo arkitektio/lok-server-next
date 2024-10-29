@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "allauth.socialaccount",
     "health_check",
     "health_check.db",
+    "django_probes",
     "pak",
     "allauth.socialaccount.providers.orcid",
     # ... include the providers you want to enable:
