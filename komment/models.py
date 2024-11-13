@@ -28,7 +28,7 @@ class Comment(models.Model):
 
 
     identifier = models.CharField(max_length=1000, help_text="The identifier of the object. Consult the documentation for the format")
-    object = models.PositiveIntegerField(help_text="The object id of the object, on its associated service")
+    object = models.CharField(max_length=1000,help_text="The object id of the object, on its associated service")
     user = models.ForeignKey(
         get_user_model(),
         on_delete=models.CASCADE,
