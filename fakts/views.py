@@ -147,7 +147,7 @@ class ConfigureView(LoginRequiredMixin, FormView):
                 release = models.Release.objects.filter(app=app, version=x.staging_manifest["version"]).first()
                 if release:
                     context["release"] = release
-                    client = models.Client.objects.filter(release=release, kind=x.staging_kind, tenant=self.request.user).first()
+                    client = models.Client.objects.filter(release=release, kind=x.staging_kind, tenant=self.request.user, redirect_uris=" ".join(x.staging_redirect_uris)).first()
                     if client:
                         context["client"] = client
 
@@ -177,8 +177,11 @@ class ConfigureView(LoginRequiredMixin, FormView):
             manifest = base_models.Manifest(**device_code.staging_manifest)
 
 
+            redirect_uris = " ".join(device_code.staging_redirect_uris),
 
-            client = models.Client.objects.filter(release__app__identifier=device_code.staging_manifest["identifier"], release__version=device_code.staging_manifest["version"], kind=device_code.staging_kind, tenant=self.request.user).first()
+
+
+            client = models.Client.objects.filter(release__app__identifier=device_code.staging_manifest["identifier"], release__version=device_code.staging_manifest["version"], kind=device_code.staging_kind, tenant=self.request.user, redirect_uris=redirect_uris).first()
                 
 
             if not client:

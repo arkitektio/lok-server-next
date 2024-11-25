@@ -54,6 +54,7 @@ def create_website_client(
             client_id=client_id,
             client_secret=client_secret,
             oauth2_client=oauth2_client,
+            redirect_uris=" ".join(config.redirect_uris),
             public=config.public,
             composition=composition,
         )
@@ -106,6 +107,7 @@ def create_desktop_client(
             client_id=client_id,
             client_secret=client_secret,
             oauth2_client=oauth2_client,
+            redirect_uris=" ".join(["http://127.0.0.1/", "http://127.0.0.1/callback"]),
             composition=composition
         )
 
@@ -164,6 +166,7 @@ def create_development_client(
             client_id=client_id,
             client_secret=client_secret,
             oauth2_client=oauth2_client,
+            redirect_uris="",
             public=False,
             composition=composition
         )

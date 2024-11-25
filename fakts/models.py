@@ -202,6 +202,7 @@ class Client(models.Model):
         default=enums.ClientKindChoices.DEVELOPMENT.value,
         help_text="The kind of transformation",
     )
+    redirect_uris = models.CharField(max_length=1000, default=" ")
     public = models.BooleanField(default=False)
     token = models.CharField(
         default=uuid.uuid4, unique=True, max_length=10000
