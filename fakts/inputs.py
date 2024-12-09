@@ -4,6 +4,7 @@ from fakts.base_models import Manifest, LinkingContext, LinkingRequest
 from typing import Optional
 from pydantic import BaseModel, Field
 import uuid
+from fakts import enums
 
 
 
@@ -84,3 +85,28 @@ class RenderInput:
     composition: strawberry.ID | None = None
     request: LinkingRequestInput | None = None
     manifest: ManifestInput | None = None
+
+
+
+class KeyValueInputModel(BaseModel):
+    key: str
+    value: str
+    as_type: enums.FaktValueType
+
+
+class UserDefinedServiceInstanceInputModel(BaseModel):
+    identifier: str
+    values: list[KeyValueInputModel] = Field(default_factory=list)
+    
+@pydantic.input(KeyValueInputModel)
+class KeyValueInput:
+    key: str
+    value: str
+    as_type: enums.FaktValueType 
+
+
+
+@pydantic.input(UserDefinedServiceInstanceInputModel)
+class UserDefinedServiceInstanceInput:
+    identifier: str
+    values: list[KeyValueInput] = strawberry.field(default_factory=list)

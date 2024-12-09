@@ -34,6 +34,11 @@ COMPOSITIONS_DIR = os.path.join(BASE_DIR, "compositions")
 DEPLOYMENT_NAME = conf.deployment.name
 # Application definition
 
+
+USER_DEFINED_BACKEND_NAME = "user_defined"
+
+
+
 INSTALLED_APPS = [
     "daphne",
     "corsheaders",
@@ -113,9 +118,9 @@ SECURE_PROXY_SSL_HEADER = (
 
 
 LIVEKIT = {
-    "API_KEY": conf.livekit.api_key,
-    "API_SECRET": conf.livekit.api_secret,
-    "API_URL": conf.livekit.api_url,
+    "API_KEY": conf.livekit.get("api_key", None),
+    "API_SECRET": conf.livekit.get("api_secret", None),
+    "API_URL": conf.livekit.get("api_url", None),
 }
 
 MIDDLEWARE = [

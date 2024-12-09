@@ -8,6 +8,7 @@ from fakts import types as fakts_types
 from fakts.graphql import mutations as fakts_mutations
 from fakts.graphql import queries as fakts_queries
 from fakts.graphql import subscriptions as fakts_subscriptions
+from fakts import models as fakts_models
 from kammer import types as kammer_types
 from kammer.graphql import mutations as kammer_mutations
 from kammer.graphql import queries as kammer_queries
@@ -41,6 +42,8 @@ class Query:
     groups: list[karakter_types.Group] = strawberry_django.field()
     comments: list[komment_types.Comment] = strawberry_django.field()
     rooms: list[kammer_types.Room] = strawberry_django.field()
+    services: list[fakts_types.Service] = strawberry_django.field()
+    service_instances: list[fakts_types.ServiceInstance] = strawberry_django.field()
 
     user = strawberry_django.field(resolver=karakter_queries.user)
     me = strawberry_django.field(resolver=karakter_queries.me)
@@ -72,10 +75,20 @@ class Query:
     )
     message = strawberry_django.field(resolver=karakter_queries.message)
 
+
     @strawberry_django.field()
     def hallo(self, info: Info) -> str:
         print("hallosss")
         return "hallo"
+    
+    @strawberry_django.field()
+    def service(self, info: Info, id: strawberry.ID) -> fakts_types.Service:
+        return fakts_models.Service.objects.get(id=id)
+    
+
+    @strawberry_django.field()
+    def service_instance(self, info: Info, id: strawberry.ID) -> fakts_types.ServiceInstance:
+        return fakts_models.ServiceInstance.objects.get(id=id)
 
 
 @strawberry.type
@@ -136,6 +149,11 @@ class Mutation:
     )
     join_stream = strawberry_django.mutation(
         resolver=kammer_mutations.join_video_stream
+    )
+
+
+    create_user_defined_service_instance = strawberry_django.mutation(
+        resolver=fakts_mutations.create_user_defined_service_instance,
     )
 
 

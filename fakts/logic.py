@@ -1,7 +1,7 @@
 from fakts import base_models
-from fakts import models
+from fakts import models, inputs, enums
 import re
-from jinja2 import Template, TemplateSyntaxError, TemplateError
+from string import Template
 import yaml
 from pydantic import BaseModel, Field
 import re
@@ -12,6 +12,41 @@ from uuid import uuid4
 from fakts.backends.instances import registry as backend_registry
 from fakts.base_models import Manifest
 from hashlib import sha256
+from django.conf import settings
+
+
+def render_user_defined(instance: models.ServiceInstanceMapping, context: base_models.LinkingContext) -> dict:
+
+    user_defined = models.UserDefinedServiceInstance.objects.filter(
+        instance=instance
+    ).first()
+
+
+    if user_defined is None:
+        raise errors.ConfigurationError(f"No user defined instance found for {instance}")
+    
+    
+    values = {}
+
+    for value in user_defined.values:
+        x = inputs.KeyValueInput(**value)
+
+
+        value = Template(x.value).safe_substitute(context.dict())
+        if x.as_type == enums.FaktValueType.STRING:
+            values[x.key] = value
+        elif x.as_type == enums.FaktValueType.INT:
+            values[x.key] = int(value)
+        elif x.as_type == enums.FaktValueType.FLOAT:
+            values[x.key] = float(value)
+        elif x.as_type == enums.FaktValueType.BOOL:
+            values[x.key] = bool(value)
+
+
+
+    return values
+
+
 
 
 def render_composition(composition: models.Composition, context: base_models.LinkingContext) -> dict:
@@ -27,20 +62,25 @@ def render_composition(composition: models.Composition, context: base_models.Lin
         instance = mapping.instance
 
 
-        if instance.backend not in backend_registry.backends:
-            raise errors.BackendNotAvailable(f"The backend {instance.backend} for this instance is not available")
+        if instance.backend == settings.USER_DEFINED_BACKEND_NAME:
+            value = render_user_defined(instance, context)
 
-        backend = backend_registry.backends[instance.backend]
+            config_dict[mapping.key] = value
+        else:
+            if instance.backend not in backend_registry.backends:
+                raise errors.BackendNotAvailable(f"The backend {instance.backend} for this instance is not available")
 
-        try:
-            value = backend.render(instance.identifier, context)
-        except Exception as e:
-            raise errors.BackendError(f"An error occurred while rendering the backend instance {instance}: {str(e)}") from e
+            backend = backend_registry.backends[instance.backend]
 
-        if not isinstance(value, dict):
-            raise errors.ConfigurationError(f"The backend {instance.backend} for this instance did not return a dictionary")
+            try:
+                value = backend.render(instance.identifier, context)
+            except Exception as e:
+                raise errors.BackendError(f"An error occurred while rendering the backend instance {instance}: {str(e)}") from e
+
+            if not isinstance(value, dict):
+                raise errors.ConfigurationError(f"The backend {instance.backend} for this instance did not return a dictionary")
         
-        config_dict[mapping.key] = value
+            config_dict[mapping.key] = value
 
     return config_dict
 

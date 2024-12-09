@@ -92,6 +92,10 @@ class BackendRegistry:
     backends: dict[str, Backend] = {}
 
     def __init__(self) -> None:
+        self.with_user_defined = True
+
+
+
         if not hasattr(settings, "FAKTS_BACKENDS"):
             self.backend_configs = []
         else:
@@ -107,10 +111,15 @@ class BackendRegistry:
 
             self.register(backend)
 
+        
+
         pass
 
     def get_backend_identifiers(self):
         names = []
+
+        if self.with_user_defined:
+            names.append(settings.USER_DEFINED_BACKEND_NAME)
 
         for i in self.backends.values():
             names.append(i.get_name())

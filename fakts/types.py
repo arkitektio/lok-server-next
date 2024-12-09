@@ -1,5 +1,4 @@
 import strawberry_django
-from karakter import models, scalars, enums, filters
 import strawberry
 from enum import Enum
 from typing import Optional
@@ -11,7 +10,7 @@ from strawberry import LazyType
 from typing import Literal, Union
 from karakter import types
 import datetime
-from fakts import models, scalars, enums, filters
+from fakts import models, scalars, enums, filters, enums
 from oauth2_provider.models import Application
 from fakts.backends import enums as fb_enums
 @strawberry.type(description="A scope that can be assigned to a client. Scopes are used to limit the access of a client to a user's data. They represent app-level permissions.")
@@ -22,16 +21,20 @@ class Scope:
 
 
 
-@strawberry_django.type(models.Service, description="A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself.")
+
+
+@strawberry_django.type(models.Service, description="A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself.", pagination=True, filters=filters.ServiceFilter)
 class Service:
-    key: str = strawberry.field(description="The key of the service. This is a unique string that identifies the service. It is used to identify the service in the code and in the database.")
     id: strawberry.ID
     name: str = strawberry.field(description="The name of the service")
     identifier: scalars.ServiceIdentifier = strawberry.field(description="The identifier of the service. This should be a globally unique string that identifies the service. We encourage you to use the reverse domain name notation. E.g. `com.example.myservice`")
-    logo: str = strawberry.field(description="The logo of the service. This should be a url to a logo that can be used to represent the service.")
-    description: str = strawberry.field(description="The description of the service. This should be a human readable description of the service.")
+    logo: str  | None = strawberry.field(description="The logo of the service. This should be a url to a logo that can be used to represent the service.")
+    description: str | None = strawberry.field(description="The description of the service. This should be a human readable description of the service.")
+    instances: list["ServiceInstance"] = strawberry_django.field(description="The instances of the service. A service instance is a configured instance of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information.")
 
-@strawberry_django.type(models.ServiceInstance, description="A ServiceInstance is a configured instance of a Service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information.")
+
+
+@strawberry_django.type(models.ServiceInstance, description="A ServiceInstance is a configured instance of a Service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information.", pagination=True, filters=filters.ServiceInstanceFilter)
 class ServiceInstance:
     id: strawberry.ID
     service: Service = strawberry.field(description="The service that this instance belongs to.")
@@ -39,6 +42,7 @@ class ServiceInstance:
     composition: "Composition" = strawberry.field(description="The composition that this instance belongs to.")
     name: str = strawberry.field(description="The name of the instance. This is a human readable name of the instance.")
     identifier: str = strawberry.field(description="The identifier of the instance. This is a unique string that identifies the instance. It is used to identify the instance in the code and in the database.")
+    user_definitions: list["UserDefinedServiceInstance"] = strawberry_django.field(description="The user defined instances of the service instance. These instances are used to configure the service instance with user defined values.")
 
 @strawberry_django.type(models.ServiceInstanceMapping, description="A ServiceInstance is a configured instance of a Service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information.")
 class ServiceInstanceMapping:
@@ -48,8 +52,28 @@ class ServiceInstanceMapping:
     key: str = strawberry.field(description="The key of the instance. This is a unique string that identifies the instance. It is used to identify the instance in the code and in the database.")
 
 
+@strawberry.type 
+class DefinedValue:
+    key: str
+    value: str
+    as_type: enums.FaktValueType
 
 
+
+@strawberry_django.type(models.UserDefinedServiceInstance, description="A UserDefinedServiceInstance is a user defined instance of a service. It is used to configure a service instance with user defined values.")
+class UserDefinedServiceInstance:
+    id: strawberry.ID
+    creator: types.User = strawberry.field(description="The user that created this user defined instance.")
+    instance: ServiceInstance = strawberry.field(description="The instance that this user defined instance belongs to.")
+    
+    @strawberry_django.field(description="The values of the user defined instance. These values will be used to configure the instance.")
+    def values(self, info) -> list[DefinedValue]:
+        return [DefinedValue(**value) for value in self.values]
+
+
+    @strawberry_django.field(description="The values of the user defined instance. These values will be used to configure the instance.")
+    def rendered_values(self, info) -> scalars.Fakt:
+        return self.values
 
 
 @strawberry_django.type(models.Composition)

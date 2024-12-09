@@ -4,7 +4,7 @@
 {% load i18n %}
 {% block content %}
 
-<div class="flex text-white h-full w-full justify-center align-center flex-col">
+<div class="flex dark:text-white text-slate-900 h-full w-full justify-center align-center flex-col">
     {% if success %}
         <div class="flex flex-col">
             <span class="text-3xl"> Successfully {% if authorized %}authorized!{% else %} denied! {%endif %}</span> <p

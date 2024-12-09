@@ -63,6 +63,19 @@ class ServiceInstance(models.Model):
     
 
 
+
+class UserDefinedServiceInstance(models.Model):
+    instance = models.ForeignKey(ServiceInstance, on_delete=models.CASCADE, related_name="user_definitions")
+    creator = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="services")
+    values = models.JSONField(default=list)
+
+
+
+
+
+    
+
+
 class InstanceConfig(models.Model):
     instance = models.ForeignKey(ServiceInstance, on_delete=models.CASCADE, related_name="configs")
     key = models.CharField(max_length=1000)
