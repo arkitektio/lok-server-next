@@ -17,9 +17,9 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 
-
-
-def create_user_defined_service_instance(info: Info, input: inputs.UserDefinedServiceInstanceInput) -> types.UserDefinedServiceInstance:
+def create_user_defined_service_instance(
+    info: Info, input: inputs.UserDefinedServiceInstanceInput
+) -> types.UserDefinedServiceInstance:
 
     service, _ = models.Service.objects.get_or_create(
         identifier=input.identifier,
@@ -29,17 +29,14 @@ def create_user_defined_service_instance(info: Info, input: inputs.UserDefinedSe
         ),
     )
 
-
-    instance, _  = models.ServiceInstance.objects.get_or_create(
+    instance, _ = models.ServiceInstance.objects.get_or_create(
         service=service,
         backend=settings.USER_DEFINED_BACKEND_NAME,
         identifier=service.identifier,
-        defaults=dict(
-            template="None"
-        ),
+        defaults=dict(template="None"),
     )
 
-    user_defined, _  = models.UserDefinedServiceInstance.objects.update_or_create(
+    user_defined, _ = models.UserDefinedServiceInstance.objects.update_or_create(
         instance=instance,
         creator=info.context.request.user,
         defaults=dict(
@@ -47,9 +44,4 @@ def create_user_defined_service_instance(info: Info, input: inputs.UserDefinedSe
         ),
     )
 
-
-
     return user_defined
-
-
-

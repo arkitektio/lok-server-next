@@ -10,7 +10,8 @@ def index(request):
     # Render that in the index template
     raise NotImplementedError("This view is not implemented yet.")
 
-# Basic url patterns for fakts 
+
+# Basic url patterns for fakts
 # as described in the fakts api documentation
 base_urlpatterns = [
     re_path(r"^$", index, name="index"),

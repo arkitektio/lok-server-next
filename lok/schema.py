@@ -75,19 +75,19 @@ class Query:
     )
     message = strawberry_django.field(resolver=karakter_queries.message)
 
-
     @strawberry_django.field()
     def hallo(self, info: Info) -> str:
         print("hallosss")
         return "hallo"
-    
+
     @strawberry_django.field()
     def service(self, info: Info, id: strawberry.ID) -> fakts_types.Service:
         return fakts_models.Service.objects.get(id=id)
-    
 
     @strawberry_django.field()
-    def service_instance(self, info: Info, id: strawberry.ID) -> fakts_types.ServiceInstance:
+    def service_instance(
+        self, info: Info, id: strawberry.ID
+    ) -> fakts_types.ServiceInstance:
         return fakts_models.ServiceInstance.objects.get(id=id)
 
 
@@ -150,7 +150,6 @@ class Mutation:
     join_stream = strawberry_django.mutation(
         resolver=kammer_mutations.join_video_stream
     )
-
 
     create_user_defined_service_instance = strawberry_django.mutation(
         resolver=fakts_mutations.create_user_defined_service_instance,

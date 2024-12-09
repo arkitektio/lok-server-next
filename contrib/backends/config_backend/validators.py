@@ -3,26 +3,26 @@ from fakts.base_models import LinkingContext, LinkingRequest, Manifest, LinkingC
 from jinja2 import Template, TemplateSyntaxError, TemplateError, StrictUndefined
 import yaml
 
+
 def is_valid_jinja2_template(template_string, render_context=None):
-    """ Checks if a template string is a valid Jinja2 template. And if it is,
-    it checks if it is a valid YAML file, wher rendered with a fakt context If it is not, it raises a ValueError"""
+    """Checks if a template string is a valid Jinja2 template. And if it is,
+    it checks if it is a valid YAML file, wher rendered with a fakt context If it is not, it raises a ValueError
+    """
     try:
         template = Template(template_string, undefined=StrictUndefined)
         try:
-            rendered_template = template.render(render_context )
+            rendered_template = template.render(render_context)
             yaml.safe_load(rendered_template)
         except (TemplateError, yaml.YAMLError) as e:
             raise ValueError(f"Rendering error: {e}") from e
     except TemplateSyntaxError as e:
         raise ValueError(f"Template syntax error: {e}") from e
-    
 
 
 def jinja2_yaml_template_validator(value):
-    """ Validates that a string is a valid Jinja2 template. And if it is,
+    """Validates that a string is a valid Jinja2 template. And if it is,
     it checks if it is a valid YAML file, wher rendered with a fakt context If it is not, it raises a ValidationError
     """
-    
 
     fake_context = LinkingContext(
         request=LinkingRequest(
@@ -45,19 +45,16 @@ def jinja2_yaml_template_validator(value):
         ),
     )
 
-
     try:
         is_valid_jinja2_template(value, fake_context.dict())
     except ValidationError as e:
         raise ValueError(e)
-    
+
     return value
 
 
 def fake_load_yaml(value):
-    """ Loads a string as a YAML file. If it is not a valid YAML file, it raises a ValidationError"""
-
-
+    """Loads a string as a YAML file. If it is not a valid YAML file, it raises a ValidationError"""
 
     try:
         return yaml.safe_load(value)

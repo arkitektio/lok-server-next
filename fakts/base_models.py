@@ -6,28 +6,22 @@ from fakts import enums, validators
 from typing import Literal
 
 
-
-
-
 class Requirement(BaseModel):
     key: str
     service: str
     """ The service is the service that will be used to fill the key, it will be used to find the correct instance. It needs to fullfill
     the reverse domain naming scheme"""
-    optional: bool = False 
+    optional: bool = False
     """ The optional flag indicates if the requirement is optional or not. Users should be able to use the client even if the requirement is not met. """
     description: Optional[str] = None
     """ The description is a human readable description of the requirement. Will be show to the user when asking for the requirement."""
 
 
-
-
-
-
 class Manifest(BaseModel):
-    """ A Manifest is a description of a client. It contains all the information
+    """A Manifest is a description of a client. It contains all the information
     necessary to create a set of client, release and app objects in the database.
     """
+
     identifier: str
     """ The identifier is a unique string that identifies the client. """
     version: str
@@ -40,14 +34,11 @@ class Manifest(BaseModel):
     """ The requirements are a list of requirements that the client needs to run on (e.g. needs GPU)"""
 
 
-
-
-
-
 class CompositionInputModel(BaseModel):
-    """ A composition is a Jinja2 YAML template that will be rendered 
+    """A composition is a Jinja2 YAML template that will be rendered
     with the LinkingContext as context. The result of the rendering
     will be used to send to the client as a configuration."""
+
     name: str
     template: str
 
@@ -56,33 +47,29 @@ class CompositionInputModel(BaseModel):
         return validators.jinja2_yaml_template_validator(v)
 
 
-
-
-
-
-
-
 class DeviceCodeStartRequest(BaseModel):
-    """ A DeviceCodeStartRequest is used to start the device code flow. It contains
+    """A DeviceCodeStartRequest is used to start the device code flow. It contains
     the manifest of the client that wants to start the flow and the redirect uris
     as well as the requested client kind."""
+
     manifest: Manifest
     expiration_time_seconds: int = 300
-    redirect_uris: list[str] = Field(default_factory=list) 
+    redirect_uris: list[str] = Field(default_factory=list)
     requested_client_kind: enums.ClientKindVanilla = enums.ClientKindVanilla.DEVELOPMENT
     request_public: bool = False
 
 
-
 class ReedeemTokenRequest(BaseModel):
-    """ A RedeemTokenRequest is used to redeem a token for a development client. It only contains the token."""
+    """A RedeemTokenRequest is used to redeem a token for a development client. It only contains the token."""
+
     token: str
     manifest: Manifest
 
 
 class DeviceCodeChallengeRequest(BaseModel):
-    """ A DeviceCodeChallengeRequest is used to start the device code flow. It only 
+    """A DeviceCodeChallengeRequest is used to start the device code flow. It only
     contains the device code."""
+
     code: str
 
 
@@ -91,13 +78,11 @@ class ConfigurationRequest(BaseModel):
     device_code: Optional[str] = None
 
 
-
 class ClaimRequest(BaseModel):
     token: str
     composition: Optional[str] = None
     requirements: Optional[list[Requirement]] = Field(default_factory=list)
     secure: bool = False
-
 
 
 class RetrieveRequest(BaseModel):
@@ -117,6 +102,7 @@ class LinkingClient(BaseModel):
     client_id: str
     client_secret: str
     name: str
+
 
 class LinkingContext(BaseModel):
     deployment_name: str = Field(default=settings.DEPLOYMENT_NAME)

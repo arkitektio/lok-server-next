@@ -18,6 +18,9 @@ async def relation(value: str, on: str):
     return await sync_to_async(value.filter)(descend_links__assignation_id=on)
 
 
-@strawberry.directive(locations=[DirectiveLocation.FIELD], description="Replace a substring with another substring")
+@strawberry.directive(
+    locations=[DirectiveLocation.FIELD],
+    description="Replace a substring with another substring",
+)
 def replace(value: str, old: str, new: str):
     return value.replace(old, new)

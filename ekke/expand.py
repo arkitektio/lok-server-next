@@ -39,17 +39,13 @@ def expand_token(token: structs.JWTToken, force_client: bool = True) -> structs.
 
     if token.client_id is None:
         if force_client:
-            raise EkkePermissionDenied(
-                "Missing client_id parameter in JWT token"
-            )
+            raise EkkePermissionDenied("Missing client_id parameter in JWT token")
 
     try:
         if token.client_id is None:
             app = None
         else:
-            app =  Application.objects.get(
-                client_id=token.client_id
-            )
+            app = Application.objects.get(client_id=token.client_id)
 
         user = User.objects.get(id=token.sub)
 

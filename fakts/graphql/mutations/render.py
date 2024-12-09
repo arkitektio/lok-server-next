@@ -18,25 +18,17 @@ from fakts.logic import render_composition as rc, create_fake_linking_context
 logger = logging.getLogger(__name__)
 
 
-
-
-
-
 def render_composition(info: Info, input: inputs.RenderInput) -> scalars.Fakt:
 
-
     client = models.Client.objects.get(pk=input.client)
-    composition = models.Composition.objects.get(pk=input.composition) if input.composition else client.composition
+    composition = (
+        models.Composition.objects.get(pk=input.composition)
+        if input.composition
+        else client.composition
+    )
 
     context = create_fake_linking_context(client, "localhost", "8000", secure=False)
 
     config = rc(composition, context)
 
-
-    
-
-
     return config
-
-
-

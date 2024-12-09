@@ -17,8 +17,10 @@ class Command(BaseCommand):
             config = base_models.AppConfig(**app)
 
             for client in config.clients:
-                client  = builders.create_client(
+                client = builders.create_client(
                     config,
                     client,
                 )
-                self.stdout.write(f"Created client {client.client_id} for app {config.identifier}")
+                self.stdout.write(
+                    f"Created client {client.client_id} for app {config.identifier}"
+                )

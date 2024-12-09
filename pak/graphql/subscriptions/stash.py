@@ -13,7 +13,6 @@ class StashEvent:
     delete: str
 
 
-
 async def stash_items(
     self, info: Info, stash: strawberry.ID
 ) -> AsyncGenerator[StashEvent, None]:
@@ -21,4 +20,3 @@ async def stash_items(
     async for message in stash_changed_listen(info, [f"stash_{stash}"]):
         print("ID", message)
         yield message
-

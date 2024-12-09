@@ -15,18 +15,16 @@ from typing import Optional
 from fakts import fields, enums
 
 
-
-
 class Service(models.Model):
     name = models.CharField(max_length=1000)
     identifier = fields.IdentifierField()
     logo = fields.S3ImageField()
-    description = models.TextField(default="No description available", null=True, blank=True)
+    description = models.TextField(
+        default="No description available", null=True, blank=True
+    )
 
     def __str__(self):
         return f"{self.identifier}"
-    
-
 
     def validate_instance(self, instance: Dict[str, Any]) -> List[str]:
         errors = []
@@ -36,17 +34,13 @@ class Service(models.Model):
             errors.append("Instance does not contain a key")
 
         return errors + warnings
-    
-
-
-
-    
-
 
 
 class ServiceInstance(models.Model):
     backend = models.CharField(max_length=1000)
-    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name="instances")
+    service = models.ForeignKey(
+        Service, on_delete=models.CASCADE, related_name="instances"
+    )
     identifier = models.CharField(max_length=1000)
     template = models.TextField()
 
@@ -60,24 +54,22 @@ class ServiceInstance(models.Model):
 
     def __str__(self):
         return f"{self.service}:{self.backend}:{self.identifier}"
-    
-
 
 
 class UserDefinedServiceInstance(models.Model):
-    instance = models.ForeignKey(ServiceInstance, on_delete=models.CASCADE, related_name="user_definitions")
-    creator = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="services")
+    instance = models.ForeignKey(
+        ServiceInstance, on_delete=models.CASCADE, related_name="user_definitions"
+    )
+    creator = models.ForeignKey(
+        get_user_model(), on_delete=models.CASCADE, related_name="services"
+    )
     values = models.JSONField(default=list)
 
 
-
-
-
-    
-
-
 class InstanceConfig(models.Model):
-    instance = models.ForeignKey(ServiceInstance, on_delete=models.CASCADE, related_name="configs")
+    instance = models.ForeignKey(
+        ServiceInstance, on_delete=models.CASCADE, related_name="configs"
+    )
     key = models.CharField(max_length=1000)
     value = models.JSONField(default=dict)
 
@@ -91,10 +83,11 @@ class InstanceConfig(models.Model):
 
     def __str__(self):
         return f"{self.key}:{self.instance}"
-    
+
 
 class Composition(models.Model):
     """A template for a configuration"""
+
     name = models.CharField(max_length=1000)
     description = models.TextField(max_length=1000, null=True, blank=True)
     errors = models.JSONField(default=list)
@@ -104,14 +97,17 @@ class Composition(models.Model):
 
     def __str__(self) -> str:
         return self.name
-    
 
 
 class ServiceInstanceMapping(models.Model):
-    composition = models.ForeignKey(Composition, on_delete=models.CASCADE, related_name="mappings")
-    instance = models.ForeignKey(ServiceInstance, on_delete=models.CASCADE, related_name="mappings")
+    composition = models.ForeignKey(
+        Composition, on_delete=models.CASCADE, related_name="mappings"
+    )
+    instance = models.ForeignKey(
+        ServiceInstance, on_delete=models.CASCADE, related_name="mappings"
+    )
     key = models.CharField(max_length=1000)
-    description= models.TextField(max_length=1000, null=True, blank=True)
+    description = models.TextField(max_length=1000, null=True, blank=True)
 
     class Meta:
         constraints = [
@@ -122,25 +118,28 @@ class ServiceInstanceMapping(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.key}:{self.instance}@{self.composition}" 
-
-
+        return f"{self.key}:{self.instance}@{self.composition}"
 
 
 class RedeemToken(models.Model):
-    """ A redeem token is a token that can be used to redeed the rights to create
+    """A redeem token is a token that can be used to redeed the rights to create
     a client. It is used to give the recipient the right to create a client.
 
     If the token is not redeemed within the expires_at time, it will be invalid.
     If the token has been redeemed, but the manifest has changed, the token will be invalid.
-    
-    
+
+
     """
-    client = models.OneToOneField("Client", on_delete=models.CASCADE, related_name="redeemed_client", null=True)
+
+    client = models.OneToOneField(
+        "Client", on_delete=models.CASCADE, related_name="redeemed_client", null=True
+    )
     token = models.CharField(max_length=1000, unique=True, default=uuid.uuid4)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(null=True)
-    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="issued_tokens")
+    user = models.ForeignKey(
+        get_user_model(), on_delete=models.CASCADE, related_name="issued_tokens"
+    )
 
 
 class DeviceCode(models.Model):
@@ -161,12 +160,10 @@ class DeviceCode(models.Model):
     denied = models.BooleanField(default=False)
 
 
-
 class App(models.Model):
     name = models.CharField(max_length=1000)
     identifier = fields.IdentifierField()
     logo = fields.S3ImageField()
-
 
     def __str__(self):
         return f"{self.identifier}"

@@ -10,7 +10,7 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):
         superusers = settings.SUPERUSERS
 
-        #TODO: Implement validaiton of superusers
+        # TODO: Implement validaiton of superusers
 
         for superuser in superusers:
             User = get_user_model()

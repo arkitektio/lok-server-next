@@ -9,7 +9,6 @@ def imitate_user(auth: Auth, imitate_id: str, settings: EkkeSettings) -> Auth:
     user and then return a new auth object with the new user.
     """
 
-
     sub, iss = imitate_id.split("@")
     user = get_user_model().objects.get(sub=sub, iss=iss)
 

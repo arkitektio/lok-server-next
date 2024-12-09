@@ -11,14 +11,16 @@ class Stash(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
-    shared_with = models.ManyToManyField(get_user_model(), related_name='shared_stashes')
+    shared_with = models.ManyToManyField(
+        get_user_model(), related_name="shared_stashes"
+    )
 
     def __str__(self):
         return self.name
-    
+
 
 class StashItem(models.Model):
-    stash = models.ForeignKey(Stash, on_delete=models.CASCADE, related_name='items')
+    stash = models.ForeignKey(Stash, on_delete=models.CASCADE, related_name="items")
     identifier = models.CharField(max_length=100)
     object = models.CharField(max_length=100)
     added_by = models.ForeignKey(get_user_model(), on_delete=models.CASCADE)
@@ -27,5 +29,3 @@ class StashItem(models.Model):
 
     def __str__(self):
         return self.name
-    
-

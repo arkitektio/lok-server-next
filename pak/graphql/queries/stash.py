@@ -15,6 +15,7 @@ def stash(info: Info, id: strawberry.ID) -> types.Stash:
 
     return stash
 
+
 def my_stashes(info: Info) -> list[types.Stash]:
 
     user = info.context.request.user
@@ -22,6 +23,7 @@ def my_stashes(info: Info) -> list[types.Stash]:
     stashes = models.Stash.objects.filter(user=user)
 
     return stashes
+
 
 def stash_item(info: Info, id: strawberry.ID) -> types.StashItem:
 

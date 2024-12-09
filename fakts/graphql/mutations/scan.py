@@ -13,18 +13,12 @@ from fakts.base_models import DevelopmentClientConfig, Manifest
 from fakts.builders import create_client
 from fakts.models import Composition
 from fakts.scan import scan
+
 logger = logging.getLogger(__name__)
-
-
 
 
 def scan_backend(info: Info, input: inputs.ScanBackendInput) -> str:
 
     token = scan()
-    
-
 
     return token
-
-
-

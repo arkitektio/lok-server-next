@@ -16,16 +16,19 @@ from fakts.models import Composition
 logger = logging.getLogger(__name__)
 
 
+def create_developmental_client(
+    info: Info, input: inputs.DevelopmentClientInput
+) -> types.Client:
 
-
-def create_developmental_client(info: Info, input: inputs.DevelopmentClientInput) -> types.Client:
-
-
-    composition = Composition.objects.get(name=input.composition) if input.composition else Composition.objects.first()
+    composition = (
+        Composition.objects.get(name=input.composition)
+        if input.composition
+        else Composition.objects.first()
+    )
     assert composition, "No composition found"
 
     token = uuid.uuid4().hex
-    
+
     config = DevelopmentClientConfig(
         kind=enums.ClientKindVanilla.DEVELOPMENT.value,
         composition=composition.name,
@@ -47,8 +50,4 @@ def create_developmental_client(info: Info, input: inputs.DevelopmentClientInput
         config,
     )
 
-
     return client
-
-
-

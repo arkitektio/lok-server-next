@@ -11,11 +11,14 @@ from karakter.types import User
 from ekke.types import Info
 
 
-
-
-@strawberry_django.type(models.StashItem, filters=filters.StashItemFilter, pagination=True, description="""
+@strawberry_django.type(
+    models.StashItem,
+    filters=filters.StashItemFilter,
+    pagination=True,
+    description="""
 A stashed item
-""")
+""",
+)
 class StashItem:
     id: strawberry.ID
     identifier: str
@@ -25,9 +28,14 @@ class StashItem:
     updated_at: datetime.datetime
 
 
-@strawberry_django.type(models.Stash, filters=filters.StashFilter, pagination=True, description="""
+@strawberry_django.type(
+    models.Stash,
+    filters=filters.StashFilter,
+    pagination=True,
+    description="""
 A Stash
-""")
+""",
+)
 class Stash:
     id: strawberry.ID
     name: str
@@ -36,10 +44,8 @@ class Stash:
     updated_at: datetime.datetime
     is_active: bool
 
-    items: list['StashItem']
+    items: list["StashItem"]
 
     @strawberry.field(description="The number of items in the stash")
     def owner(self, info: Info) -> User:
         return self.owner
-
-    

@@ -17,7 +17,7 @@ class UserFilter:
         if self.ids is None:
             return queryset
         return queryset.filter(id__in=self.ids)
-    
+
     def filter_search(self, queryset, info):
         if self.search is None:
             return queryset
@@ -34,7 +34,6 @@ class GroupFilter:
         if self.ids is None:
             return queryset
         return queryset.filter(id__in=self.ids)
-    
 
     def filter_search(self, queryset, info):
         if self.search is None:
@@ -51,14 +50,11 @@ class ClientFilter:
         if self.ids is None:
             return queryset
         return queryset.filter(id__in=self.ids)
-    
 
     def filter_search(self, queryset, info):
         if self.search is None:
             return queryset
         return queryset.filter(name__contains=self.search)
-    
-
 
 
 @strawberry_django.filter(fakts_models.RedeemToken)
@@ -70,13 +66,12 @@ class RedeemTokenFilter:
         if self.ids is None:
             return queryset
         return queryset.filter(id__in=self.ids)
-    
 
     def filter_search(self, queryset, info):
         if self.search is None:
             return queryset
         return queryset.filter(name__contains=self.search)
-    
+
 
 @strawberry_django.filter(fakts_models.Service)
 class ServiceFilter:
@@ -87,13 +82,12 @@ class ServiceFilter:
         if self.ids is None:
             return queryset
         return queryset.filter(id__in=self.ids)
-    
 
     def filter_search(self, queryset, info):
         if self.search is None:
             return queryset
         return queryset.filter(name__contains=self.search)
-    
+
 
 @strawberry_django.filter(fakts_models.ServiceInstance)
 class ServiceInstanceFilter:
@@ -104,7 +98,6 @@ class ServiceInstanceFilter:
         if self.ids is None:
             return queryset
         return queryset.filter(id__in=self.ids)
-    
 
     def filter_search(self, queryset, info):
         if self.search is None:

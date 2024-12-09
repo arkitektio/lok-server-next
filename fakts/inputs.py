@@ -7,8 +7,6 @@ import uuid
 from fakts import enums
 
 
-
-
 class RequirementModel(BaseModel):
     service: str
     optional: bool = False
@@ -24,8 +22,6 @@ class Requirement:
     key: str
 
 
-
-
 @pydantic.input(Manifest)
 class ManifestInput:
     identifier: str
@@ -34,24 +30,21 @@ class ManifestInput:
     scopes: list[str]
 
 
-
 class DevelopmentClientInputModel(BaseModel):
-    manifest: Manifest 
+    manifest: Manifest
     composition: str | None = None
     requirements: list[RequirementModel] = Field(default_factory=list)
-
 
 
 @pydantic.input(DevelopmentClientInputModel)
 class DevelopmentClientInput:
     manifest: ManifestInput
     composition: strawberry.ID | None = None
-    requirements: list[Requirement] 
+    requirements: list[Requirement]
 
 
 class ScanBackendInputModel(BaseModel):
     backend: str | None
-
 
 
 @pydantic.input(ScanBackendInputModel)
@@ -72,12 +65,12 @@ class LinkingContextInput:
     manifest: ManifestInput
 
 
-
 class RenderInputModel(BaseModel):
     client: str
     composition: str | None = None
     request: LinkingRequest | None = None
     manifest: Manifest | None = None
+
 
 @pydantic.input(RenderInputModel)
 class RenderInput:
@@ -85,7 +78,6 @@ class RenderInput:
     composition: strawberry.ID | None = None
     request: LinkingRequestInput | None = None
     manifest: ManifestInput | None = None
-
 
 
 class KeyValueInputModel(BaseModel):
@@ -97,13 +89,13 @@ class KeyValueInputModel(BaseModel):
 class UserDefinedServiceInstanceInputModel(BaseModel):
     identifier: str
     values: list[KeyValueInputModel] = Field(default_factory=list)
-    
+
+
 @pydantic.input(KeyValueInputModel)
 class KeyValueInput:
     key: str
     value: str
-    as_type: enums.FaktValueType 
-
+    as_type: enums.FaktValueType
 
 
 @pydantic.input(UserDefinedServiceInstanceInputModel)

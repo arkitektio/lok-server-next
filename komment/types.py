@@ -20,12 +20,21 @@ class DescendantModel(BaseModel):
     children: list["DescendantUnion"] | None
 
 
-@pydantic.interface(DescendantModel, description="A descendant of a comment. Descendend are used to render rich text in the frontend.")
+@pydantic.interface(
+    DescendantModel,
+    description="A descendant of a comment. Descendend are used to render rich text in the frontend.",
+)
 class Descendant:
-    kind: enums.DescendantKind = strawberry.field(description="The Kind of a Descendant")
-    children: list[LazyType["Descendant", __name__]] | None = strawberry.field(description="The children of this descendant. Always empty for leafs")
+    kind: enums.DescendantKind = strawberry.field(
+        description="The Kind of a Descendant"
+    )
+    children: list[LazyType["Descendant", __name__]] | None = strawberry.field(
+        description="The children of this descendant. Always empty for leafs"
+    )
 
-    @strawberry.field(description="Unsafe children are not typed and fall back to json. This is a workaround if queries get too complex.")
+    @strawberry.field(
+        description="Unsafe children are not typed and fall back to json. This is a workaround if queries get too complex."
+    )
     def unsafe_children(self, info: Info) -> list[scalars.UnsafeChild] | None:
         return json.loads(json.dumps(self.children)) if self.children else None
 
@@ -39,13 +48,22 @@ class LeafDescendantModel(DescendantModel):
     code: str | None
 
 
-@pydantic.type(LeafDescendantModel, description="A leaf of text. This is the most basic descendant and always ends a tree.")
+@pydantic.type(
+    LeafDescendantModel,
+    description="A leaf of text. This is the most basic descendant and always ends a tree.",
+)
 class LeafDescendant(Descendant):
     bold: bool | None = strawberry.field(description="Should we render this text bold?")
-    italic: bool | None = strawberry.field(description="Should we render this text italic?")
-    underline: bool | None = strawberry.field(description="Should we render this text underlined?")
+    italic: bool | None = strawberry.field(
+        description="Should we render this text italic?"
+    )
+    underline: bool | None = strawberry.field(
+        description="Should we render this text underlined?"
+    )
     text: str | None = strawberry.field(description="The text of the leaf")
-    code: str | None = strawberry.field(description="Should we render this text as code?")
+    code: str | None = strawberry.field(
+        description="Should we render this text as code?"
+    )
 
 
 class MentionDescendantModel(DescendantModel):
@@ -55,7 +73,9 @@ class MentionDescendantModel(DescendantModel):
 
 @pydantic.type(MentionDescendantModel, description="A mention of a user")
 class MentionDescendant(Descendant):
-    user: types.User | None = strawberry.field(description="The user that got mentioned")
+    user: types.User | None = strawberry.field(
+        description="The user that got mentioned"
+    )
 
 
 class ParagraphDescendantModel(DescendantModel):
@@ -79,7 +99,8 @@ ParagraphDescendantModel.update_forward_refs()
 
 
 class Serializer(BaseModel):
-    """ A simple serializer to convert the descendants to a pydantic model. As union types are not supported yet, we need to do this manually."""
+    """A simple serializer to convert the descendants to a pydantic model. As union types are not supported yet, we need to do this manually."""
+
     inside: list[DescendantUnion]
 
 
@@ -88,7 +109,9 @@ class Comment:
     id: strawberry.ID
     object: str
     identifier: scalars.Identifier
-    children: list["Comment"] = strawberry.field(description="The children of this comment")
+    children: list["Comment"] = strawberry.field(
+        description="The children of this comment"
+    )
     parent: Optional["Comment"]
     created_at: datetime.datetime
     mentions: list[types.User]

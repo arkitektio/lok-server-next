@@ -6,6 +6,7 @@ from strawberry_django.filters import FilterLookup
 import strawberry_django
 from allauth.socialaccount import models as smodels
 
+
 @strawberry_django.filter(models.User)
 class UserFilter:
     search: str | None
@@ -26,7 +27,8 @@ class UserFilter:
 
 @strawberry_django.filter(models.Group, description="__doc__")
 class GroupFilter:
-    """ A Filterset to Filter Groups """
+    """A Filterset to Filter Groups"""
+
     search: str | None
     name: Optional[FilterLookup[str]] | None
     ids: list[strawberry.ID] | None
@@ -40,13 +42,12 @@ class GroupFilter:
         if self.search is None:
             return queryset
         return queryset.filter(name__contains=self.search)
-    
+
 
 @strawberry_django.filter(models.Profile)
 class ProfileFilter:
     search: str | None
     ids: list[strawberry.ID] | None
-
 
     def filter_ids(self, queryset, info):
         if self.ids is None:
@@ -57,6 +58,7 @@ class ProfileFilter:
         if self.search is None:
             return queryset
         return queryset.filter(bio__contains=self.search)
+
 
 @strawberry_django.filter(smodels.SocialAccount)
 class SocialAccountFilter:

@@ -25,15 +25,3 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):
 
         scan()
-        
-
-
-
-                     
-
-
-                
-                 
-
-
-       

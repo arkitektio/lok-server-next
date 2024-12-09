@@ -33,7 +33,6 @@ class Room(models.Model):
     @property
     def messages(self):
         return Message.objects.filter(agent__room=self).all()
-    
 
     @property
     def streamlit_room_id(self):
@@ -68,11 +67,6 @@ class Stream(models.Model):
                 fields=["agent", "title"], name="Unique stream for agent"
             )
         ]
-        
-
-
-
-
 
 
 class Message(models.Model):
@@ -115,9 +109,6 @@ class Message(models.Model):
         related_name="addressed_in",
         help_text="The users that got mentioned in this comment",
     )
-
-
-
 
 
 from .signals import *

@@ -15,6 +15,7 @@ from livekit import api
 from livekit.protocol.room import ListRoomsRequest
 from django.conf import settings
 
+
 @strawberry.input
 class CreateStreamInput:
     room: strawberry.ID
@@ -24,8 +25,7 @@ class CreateStreamInput:
 
 async def create_video_stream(info: Info, input: CreateStreamInput) -> types.Stream:
 
-    room = await models.Room.objects.aget(id=input.room)    
-
+    room = await models.Room.objects.aget(id=input.room)
 
     agent, _ = await models.Agent.objects.aget_or_create(
         user=info.context.request.user,
@@ -33,7 +33,6 @@ async def create_video_stream(info: Info, input: CreateStreamInput) -> types.Str
         room=room,
         name=input.agent_id,
     )
-
 
     # Check if room exists.
 
@@ -45,7 +44,9 @@ async def create_video_stream(info: Info, input: CreateStreamInput) -> types.Str
         api_secret=settings.LIVEKIT["API_SECRET"],
     )
 
-    reponse = await lkapi.room.list_rooms(ListRoomsRequest(names=[room.streamlit_room_id]))
+    reponse = await lkapi.room.list_rooms(
+        ListRoomsRequest(names=[room.streamlit_room_id])
+    )
 
     if reponse.rooms:
         room_info = reponse.rooms[0]
@@ -56,27 +57,27 @@ async def create_video_stream(info: Info, input: CreateStreamInput) -> types.Str
             api.CreateRoomRequest(name=room.streamlit_room_id),
         )
 
-
-
-
-    token = api.AccessToken(api_key=settings.LIVEKIT["API_KEY"],
-        api_secret=settings.LIVEKIT["API_SECRET"]) \
-    .with_identity("agent-" + str(agent.id)) \
-    .with_name("agent-" + agent.name) \
-    .with_grants(api.VideoGrants(
-        room_join=True,
-        room=room.streamlit_room_id,
-    )).to_jwt()
+    token = (
+        api.AccessToken(
+            api_key=settings.LIVEKIT["API_KEY"],
+            api_secret=settings.LIVEKIT["API_SECRET"],
+        )
+        .with_identity("agent-" + str(agent.id))
+        .with_name("agent-" + agent.name)
+        .with_grants(
+            api.VideoGrants(
+                room_join=True,
+                room=room.streamlit_room_id,
+            )
+        )
+        .to_jwt()
+    )
 
     print(token)
 
     exp, _ = await models.Stream.objects.aupdate_or_create(
-        title=input.title or "default",
-        agent=agent,
-        defaults=dict(token=token)
+        title=input.title or "default", agent=agent, defaults=dict(token=token)
     )
-
-
 
     return exp
 
@@ -89,8 +90,7 @@ class JoinStreamInput:
 async def join_video_stream(info: Info, input: JoinStreamInput) -> types.Stream:
     creator = info.context.request.user
 
-    room = await models.Room.objects.aget(id=input.room)    
-
+    room = await models.Room.objects.aget(id=input.room)
 
     agent, _ = await models.Agent.objects.get_or_create(
         user=info.context.request.user,
@@ -99,21 +99,22 @@ async def join_video_stream(info: Info, input: JoinStreamInput) -> types.Stream:
         name=input.agent_id,
     )
 
-    token = api.AccessToken() \
-    .with_identity(agent.id) \
-    .with_name(agent.name) \
-    .with_grants(api.VideoGrants(
-        room_join=True,
-        room=room.streamlit_room_id,
-    )).to_jwt()
-
-    exp = await models.Stream.objects.acreate(
-        title=input.title or "Untitled",
-        agent=agent,
-        token=token
+    token = (
+        api.AccessToken()
+        .with_identity(agent.id)
+        .with_name(agent.name)
+        .with_grants(
+            api.VideoGrants(
+                room_join=True,
+                room=room.streamlit_room_id,
+            )
+        )
+        .to_jwt()
     )
 
-
+    exp = await models.Stream.objects.acreate(
+        title=input.title or "Untitled", agent=agent, token=token
+    )
 
     return exp
 
@@ -125,10 +126,9 @@ class LeaveStreamInput:
 
 async def leave_video_stream(info: Info, input: LeaveStreamInput) -> types.Stream:
 
-    exp = await models.Stream.objects.aget(id=input.id)    
+    exp = await models.Stream.objects.aget(id=input.id)
 
     i
-
 
     await exp.delete()
 

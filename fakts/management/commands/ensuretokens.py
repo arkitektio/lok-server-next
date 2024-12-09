@@ -34,20 +34,7 @@ class Command(BaseCommand):
                 token=token["token"],
                 defaults={
                     "user": user,
-                }
+                },
             )
 
             print(f"Token {token} created for user {user}")
-
-        
-
-
-
-                     
-
-
-                
-                 
-
-
-       

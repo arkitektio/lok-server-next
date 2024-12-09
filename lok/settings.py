@@ -38,7 +38,6 @@ DEPLOYMENT_NAME = conf.deployment.name
 USER_DEFINED_BACKEND_NAME = "user_defined"
 
 
-
 INSTALLED_APPS = [
     "daphne",
     "corsheaders",
@@ -114,7 +113,6 @@ SECURE_PROXY_SSL_HEADER = (
     "HTTP_X_FORWARDED_PROTO",
     "https",
 )  # because we my be behind a proxy
-
 
 
 LIVEKIT = {
@@ -300,7 +298,9 @@ STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-CSRF_TRUSTED_ORIGINS = conf.get("csrf_trusted_origins", ["http://localhost", "https://localhost"])
+CSRF_TRUSTED_ORIGINS = conf.get(
+    "csrf_trusted_origins", ["http://localhost", "https://localhost"]
+)
 MY_SCRIPT_NAME = conf.get("force_script_name", "lok")
 
 LOGGING = {
@@ -351,10 +351,15 @@ ENSURED_APPS = OmegaConf.to_object(conf.apps)
 
 ENSURED_USERS = OmegaConf.to_object(conf.users)
 
-SYSTEM_MESSAGES = conf.get("system_messages", [{
-    "title": "Welcome to Lok",
-    "message": "Now that you are here, you can start creating your own compositions",
-}])
+SYSTEM_MESSAGES = conf.get(
+    "system_messages",
+    [
+        {
+            "title": "Welcome to Lok",
+            "message": "Now that you are here, you can start creating your own compositions",
+        }
+    ],
+)
 
 
 SOCIALACCOUNT_PROVIDERS = {

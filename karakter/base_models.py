@@ -3,7 +3,8 @@ from typing import Optional
 
 
 class UserConfig(BaseModel):
-    """ A Config Item to serialize yaml users"""
+    """A Config Item to serialize yaml users"""
+
     username: str
     password: str
     email: Optional[str] = None

@@ -9,7 +9,8 @@ from typing import Awaitable
 
 
 class CorsMiddleware:
-    """ A simple middleware to add CORS headers to all requests."""
+    """A simple middleware to add CORS headers to all requests."""
+
     def __init__(self, app: ASGIApplication):
         self.app = app
 

@@ -6,7 +6,7 @@ from django.core.files.temp import NamedTemporaryFile
 
 
 def update_nested(d, u):
-    """ Update a nested dictionary or similar mapping."""
+    """Update a nested dictionary or similar mapping."""
     for k, v in u.items():
         if isinstance(v, collections.abc.Mapping):
             d[k] = update_nested(d.get(k, {}), v)
@@ -16,7 +16,7 @@ def update_nested(d, u):
 
 
 def download_logo(url: str) -> File:
-    """ Download a logo from a URL and return a Django File object, that can be
+    """Download a logo from a URL and return a Django File object, that can be
     used directly in a model."""
     img_tmp = NamedTemporaryFile(delete=True)
     with urlopen(url) as uo:
@@ -27,7 +27,7 @@ def download_logo(url: str) -> File:
 
 
 def download_placeholder(identifier: str, version: str) -> File:
-    """ Download a placeholder logo from a URL and return a Django File object, that can be
+    """Download a placeholder logo from a URL and return a Django File object, that can be
     uses directly in a model."""
     return download_logo(
         f"https://eu.ui-avatars.com/api/?name={identifier}&background=random"

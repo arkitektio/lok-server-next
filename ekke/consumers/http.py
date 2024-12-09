@@ -8,10 +8,8 @@ from ekke.context import (
 from asgiref.sync import sync_to_async
 import logging
 from ekke.utils import authenticate_header_or_none
+
 logger = logging.getLogger(__name__)
-
-
-
 
 
 class EkkeHTTPConsumer(GraphQLHTTPConsumer):
@@ -22,9 +20,6 @@ class EkkeHTTPConsumer(GraphQLHTTPConsumer):
     ) -> ChannelsContext:
         try:
             logger.error(request.headers)
-
-
-
 
             auth = await sync_to_async(authenticate_header_or_none)(request.headers)
             if auth:

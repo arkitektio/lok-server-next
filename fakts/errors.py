@@ -6,9 +6,6 @@ class ConfigurationError(Exception):
     pass
 
 
-
-
-
 class ConfigurationRequestMalformed(ConfigurationError):
     """
     Raised when a configuration request is malformed
@@ -23,7 +20,6 @@ class NoConfigurationFound(Exception):
 
 class BackendNotAvailable(ConfigurationError):
     pass
-
 
 
 class BackendError(ConfigurationError):

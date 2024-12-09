@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, Optional
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.http import  HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
@@ -22,9 +22,8 @@ from fakts import base_models, enums, models, builders, logic
 from django.conf import settings
 
 import uuid
+
 logger = logging.getLogger(__name__)
-
-
 
 
 @method_decorator(csrf_exempt, name="dispatch")
@@ -34,21 +33,21 @@ class WellKnownFakts(View):
     endpoints for "Claim" and "Configure" as well as the name and version.
     Of the Fakts Protocol"""
 
-
-
-
     def get(self, request, format=None):
 
         with open(settings.CA_FILE, "r") as f:
             ca = f.read()
 
-
-
-
-        return JsonResponse(data={"name": settings.DEPLOYMENT_NAME, "version": "0.0.1", "description": "This is the best servesssr", "claim": request.build_absolute_uri(reverse("fakts:claim")) , "base_url": request.build_absolute_uri(reverse("fakts:index")), "ca_crt" : ca})
-
-
-
+        return JsonResponse(
+            data={
+                "name": settings.DEPLOYMENT_NAME,
+                "version": "0.0.1",
+                "description": "This is the best servesssr",
+                "claim": request.build_absolute_uri(reverse("fakts:claim")),
+                "base_url": request.build_absolute_uri(reverse("fakts:index")),
+                "ca_crt": ca,
+            }
+        )
 
 
 class ConfigureView(LoginRequiredMixin, FormView):
@@ -75,7 +74,6 @@ class ConfigureView(LoginRequiredMixin, FormView):
     template_name = "fakts/configure.html"
     form_class = ConfigureForm
 
-
     def validate_configure_request(self, request) -> base_models.ConfigurationRequest:
         """
         Validate the configure request.
@@ -87,7 +85,9 @@ class ConfigureView(LoginRequiredMixin, FormView):
         grant = request.GET.get("grant", None)
         device_code = request.GET.get("device_code", None)
 
-        return base_models.ConfigurationRequest(claim=claim, grant=grant, device_code=device_code)
+        return base_models.ConfigurationRequest(
+            claim=claim, grant=grant, device_code=device_code
+        )
 
     def get_initial(self):
         # TODO: move this scopes conversion from and to string into a utils function
@@ -96,23 +96,19 @@ class ConfigureView(LoginRequiredMixin, FormView):
             "device_code": self.request.GET.get("device_code", None),
         }
 
-
         return initial_data
-    
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        the_code =  self.request.GET.get("device_code", None)
+        the_code = self.request.GET.get("device_code", None)
         if the_code:
 
             logger.info(f"Received Context for {the_code}")
 
-
             x = models.DeviceCode.objects.get(code=the_code)
 
-
             manifest = base_models.Manifest(**x.staging_manifest)
-
 
             composition_errors, composition_warnings = logic.check_compability(manifest)
             if len(composition_errors) > 0:
@@ -120,10 +116,11 @@ class ConfigureView(LoginRequiredMixin, FormView):
             else:
                 context["composition_valid"] = True
 
-
             print(manifest.requirements)
 
-            context["composition_requirements"] = {req.key: req.service for req in manifest.requirements}
+            context["composition_requirements"] = {
+                req.key: req.service for req in manifest.requirements
+            }
             context["composition_errors"] = composition_errors
             context["composition_warnings"] = composition_warnings
             context["staging_identifier"] = x.staging_manifest["identifier"]
@@ -135,27 +132,27 @@ class ConfigureView(LoginRequiredMixin, FormView):
 
             context["code"] = x
 
-
-
-
-
-
-
-            app = models.App.objects.filter(identifier=x.staging_manifest["identifier"]).first()
+            app = models.App.objects.filter(
+                identifier=x.staging_manifest["identifier"]
+            ).first()
             if app:
                 context["app"] = app
-                release = models.Release.objects.filter(app=app, version=x.staging_manifest["version"]).first()
+                release = models.Release.objects.filter(
+                    app=app, version=x.staging_manifest["version"]
+                ).first()
                 if release:
                     context["release"] = release
-                    client = models.Client.objects.filter(release=release, kind=x.staging_kind, tenant=self.request.user, redirect_uris=" ".join(x.staging_redirect_uris)).first()
+                    client = models.Client.objects.filter(
+                        release=release,
+                        kind=x.staging_kind,
+                        tenant=self.request.user,
+                        redirect_uris=" ".join(x.staging_redirect_uris),
+                    ).first()
                     if client:
                         context["client"] = client
 
-
-            
-
         return context
-    
+
     def form_invalid(self, form: Any) -> HttpResponse:
         print("form invalid")
         return super().form_invalid(form)
@@ -164,9 +161,7 @@ class ConfigureView(LoginRequiredMixin, FormView):
 
         action = self.request.POST.get("action", None)
 
-
         device_code = form.cleaned_data["device_code"]
-
 
         if action == "allow":
 
@@ -176,13 +171,15 @@ class ConfigureView(LoginRequiredMixin, FormView):
 
             manifest = base_models.Manifest(**device_code.staging_manifest)
 
+            redirect_uris = (" ".join(device_code.staging_redirect_uris),)
 
-            redirect_uris = " ".join(device_code.staging_redirect_uris),
-
-
-
-            client = models.Client.objects.filter(release__app__identifier=device_code.staging_manifest["identifier"], release__version=device_code.staging_manifest["version"], kind=device_code.staging_kind, tenant=self.request.user, redirect_uris=redirect_uris).first()
-                
+            client = models.Client.objects.filter(
+                release__app__identifier=device_code.staging_manifest["identifier"],
+                release__version=device_code.staging_manifest["version"],
+                kind=device_code.staging_kind,
+                tenant=self.request.user,
+                redirect_uris=redirect_uris,
+            ).first()
 
             if not client:
 
@@ -191,7 +188,10 @@ class ConfigureView(LoginRequiredMixin, FormView):
                 manifest = base_models.Manifest(**device_code.staging_manifest)
                 config = None
 
-                if device_code.staging_kind == enums.ClientKindVanilla.DEVELOPMENT.value:
+                if (
+                    device_code.staging_kind
+                    == enums.ClientKindVanilla.DEVELOPMENT.value
+                ):
                     config = base_models.DevelopmentClientConfig(
                         kind=enums.ClientKindVanilla.DEVELOPMENT.value,
                         token=token,
@@ -218,7 +218,6 @@ class ConfigureView(LoginRequiredMixin, FormView):
                 else:
                     raise Exception("Unknown client kind")
 
-            
                 client = builders.create_client(
                     manifest=manifest,
                     config=config,
@@ -239,9 +238,6 @@ class ConfigureView(LoginRequiredMixin, FormView):
 
             return redirect(reverse("fakts:failure"))
 
-        
-
-
     def get(self, request, *args, **kwargs):
         try:
             configuration = self.validate_configure_request(request)
@@ -260,7 +256,6 @@ class ConfigureView(LoginRequiredMixin, FormView):
                 code=configuration.device_code,
             )
 
-
             kwargs["staging_public"] = challenge.staging_public
             kwargs["created_at"] = timesince.timesince(challenge.created_at)
 
@@ -268,7 +263,6 @@ class ConfigureView(LoginRequiredMixin, FormView):
         form = self.get_form(self.get_form_class())
         kwargs["form"] = form
         kwargs["grant"] = configuration.grant
-
 
         # Check to see if the user has already granted access and return
         # a successful response depending on "approval_prompt" url parameter
@@ -303,7 +297,7 @@ class DeviceView(LoginRequiredMixin, FormView):
         kwargs["form"] = form
 
         return self.render_to_response(self.get_context_data(**kwargs))
-    
+
 
 class SuccessView(LoginRequiredMixin, TemplateView):
     """
@@ -313,10 +307,10 @@ class SuccessView(LoginRequiredMixin, TemplateView):
 
     template_name = "fakts/success.html"
 
-
     def get(self, request, *args, **kwargs):
 
         return self.render_to_response(self.get_context_data(**kwargs))
+
 
 class FailureView(LoginRequiredMixin, TemplateView):
     """
@@ -326,10 +320,8 @@ class FailureView(LoginRequiredMixin, TemplateView):
 
     template_name = "fakts/denied.html"
 
-
     def get(self, request, *args, **kwargs):
         return self.render_to_response(self.get_context_data(**kwargs))
-
 
 
 @method_decorator(csrf_exempt, name="dispatch")
@@ -337,7 +329,6 @@ class StartChallengeView(View):
     """
     An endpoint that is challenged in the course of a device code flow.
     """
-
 
     def post(self, request, *args, **kwargs):
         json_data = json.loads(request.body)
@@ -351,10 +342,8 @@ class StartChallengeView(View):
                     "error": f"Malformed request: {str(e)}",
                 }
             )
-        
 
         manifest = start_grant.manifest
-
 
         try:
             logo = download_logo(manifest.logo) if manifest.logo else None
@@ -366,13 +355,16 @@ class StartChallengeView(View):
                     "error": "Error downloading logo",
                 }
             )
-        
-        logger.info(f"Received start challenge for {manifest.identifier}:{manifest.version} {start_grant.request_public}")
-        
+
+        logger.info(
+            f"Received start challenge for {manifest.identifier}:{manifest.version} {start_grant.request_public}"
+        )
+
         device_code = models.DeviceCode.objects.create(
             code=logic.create_device_code(),
             staging_manifest=manifest.dict(),
-            expires_at=datetime.datetime.now(timezone.utc) + datetime.timedelta(seconds=start_grant.expiration_time_seconds),
+            expires_at=datetime.datetime.now(timezone.utc)
+            + datetime.timedelta(seconds=start_grant.expiration_time_seconds),
             staging_kind=start_grant.requested_client_kind.value,
             staging_redirect_uris=start_grant.redirect_uris,
             staging_logo=logo,
@@ -415,7 +407,6 @@ class ChallengeView(View):
                     "error": "Challenge does not exist",
                 }
             )
-        
 
         if datetime.datetime.now(timezone.utc) > device_code.expires_at:
             device_code.delete()
@@ -425,7 +416,7 @@ class ChallengeView(View):
                     "message": "The user has not given an answer in enough time",
                 }
             )
-        
+
         if device_code.denied:
             device_code.delete()
             return JsonResponse(
@@ -437,8 +428,6 @@ class ChallengeView(View):
 
         # scopes will only be set if the user has verified the challenge
         if device_code.client:
-            
-
 
             return JsonResponse(
                 data={
@@ -447,18 +436,12 @@ class ChallengeView(View):
                 }
             )
 
-
-        
         return JsonResponse(
             data={
                 "status": "pending",
                 "message": "User  has not verfied the challenge",
             }
         )
-    
-
-
-
 
 
 @method_decorator(csrf_exempt, name="dispatch")
@@ -487,7 +470,9 @@ class RetrieveView(View):
 
         try:
             app = models.App.objects.get(identifier=retrieve.manifest.identifier)
-            release = models.Release.objects.get(app=app, version=retrieve.manifest.version)
+            release = models.Release.objects.get(
+                app=app, version=retrieve.manifest.version
+            )
         except models.Release.DoesNotExist:
             return JsonResponse(
                 data={
@@ -541,7 +526,6 @@ class RedeemView(View):
                     "error": f"Malformed request: {str(e)}",
                 }
             )
-        
 
         manifest = redeem_request.manifest
         token = redeem_request.token
@@ -563,7 +547,7 @@ class RedeemView(View):
                         "message": "Redeem token expired",
                     }
                 )
-        
+
         if valid_token.client:
             return JsonResponse(
                 data={
@@ -571,7 +555,7 @@ class RedeemView(View):
                     "token": valid_token.client.token,
                 }
             )
-        
+
         else:
             try:
                 token = logic.create_api_token()
@@ -585,7 +569,6 @@ class RedeemView(View):
                     tenant=valid_token.user.username,
                 )
 
-                
                 client = builders.create_client(
                     manifest=manifest,
                     config=config,
@@ -642,7 +625,7 @@ class ClaimView(View):
                     return JsonResponse(
                         data={
                             "status": "error",
-                            "message": f'Template {claim.composition} does not exist',
+                            "message": f"Template {claim.composition} does not exist",
                         }
                     )
             else:
@@ -664,7 +647,7 @@ class ClaimView(View):
                 }
             )
         except Exception as e:
-            logger.error(e , exc_info=True)
+            logger.error(e, exc_info=True)
             return JsonResponse(
                 data={
                     "status": "error",

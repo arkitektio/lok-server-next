@@ -11,22 +11,19 @@ import namegenerator
 logger = logging.getLogger(__name__)
 
 
-
-
 def create_stash(info: Info, input: inputs.CreateStashInput) -> types.Stash:
 
     user = info.context.request.user
 
     stash = models.Stash.objects.create(
-        name=input.name or namegenerator.gen(),
-        owner=user
+        name=input.name or namegenerator.gen(), owner=user
     )
 
     return stash
 
 
 def update_stash(info: Info, input: inputs.UpdateStashInput) -> types.Stash:
-    
+
     user = info.context.request.user
 
     stash = models.Stash.objects.get(id=input.stash)
@@ -38,7 +35,7 @@ def update_stash(info: Info, input: inputs.UpdateStashInput) -> types.Stash:
 
 
 def delete_stash(info: Info, input: inputs.DeleteStashInput) -> strawberry.ID:
-        
+
     user = info.context.request.user
 
     stash = models.Stash.objects.get(id=input.stash)
@@ -46,8 +43,11 @@ def delete_stash(info: Info, input: inputs.DeleteStashInput) -> strawberry.ID:
 
     return stash
 
-def add_items_to_stash(info: Info, input: inputs.AddItemToStashInput) -> list[types.StashItem]:
-    
+
+def add_items_to_stash(
+    info: Info, input: inputs.AddItemToStashInput
+) -> list[types.StashItem]:
+
     user = info.context.request.user
 
     stash = models.Stash.objects.get(id=input.stash)
@@ -57,14 +57,17 @@ def add_items_to_stash(info: Info, input: inputs.AddItemToStashInput) -> list[ty
             identifier=item_input.identifier,
             object=item_input.object,
             stash=stash,
-            defaults=dict(added_by=user)
+            defaults=dict(added_by=user),
         )
         created.append(item)
 
     return created
 
-def delete_stash_items(info: Info, input: inputs.DeleteStashItems) -> list[strawberry.ID]:
-    
+
+def delete_stash_items(
+    info: Info, input: inputs.DeleteStashItems
+) -> list[strawberry.ID]:
+
     user = info.context.request.user
     deleted = []
     for item_input in input.items:
@@ -72,10 +75,4 @@ def delete_stash_items(info: Info, input: inputs.DeleteStashItems) -> list[straw
         item.delete()
         deleted.append(item_input)
 
-
     return deleted
-
-
-
-
-
