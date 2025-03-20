@@ -21,7 +21,9 @@ from django.urls import include, path
 from fakts.views import WellKnownFakts
 from django.shortcuts import render
 from django.conf import settings
-from .basepath import basepath
+from .basepath import basepath, re_basepath
+from django.conf import settings
+from django.conf.urls.static import static
 
 from django.urls import path, include, re_path
 
@@ -31,6 +33,7 @@ def index(request):
     # Render that in the index template
     return render(request, "index.html")
 
+hallo ="hallssos"
 
 urlpatterns = [
     basepath("", index, name="index"),
@@ -41,4 +44,7 @@ urlpatterns = [
     basepath(".well-known/fakts", WellKnownFakts.as_view()),
     basepath("accounts/", include("allauth.urls")),
     basepath("accounts/", include("karakter.urls")),
-]
+    
+    
+] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+

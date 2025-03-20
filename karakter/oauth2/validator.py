@@ -17,6 +17,7 @@ class CustomOAuth2Validator(OAuth2Validator):
 
     def get_additional_claims(self, request):
         logging.error("INASODINAOSDINAOSINDOASND")
+        
         return {
             "given_name": request.user.first_name,
             "family_name": request.user.last_name,
@@ -27,6 +28,7 @@ class CustomOAuth2Validator(OAuth2Validator):
         }
 
     def get_userinfo_claims(self, request):
+        print("INASODINAOSDINAOSINDOASND", request)
         claims = super().get_userinfo_claims(request)
         logging.error("ffff")
         return {**claims, **self.get_additional_claims(request)}

@@ -5,6 +5,7 @@ from . import views
 
 app_name = "fakts"
 
+hallo="hallsssos"
 
 def index(request):
     # Render that in the index template

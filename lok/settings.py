@@ -31,7 +31,9 @@ DEBUG = True
 ALLOWED_HOSTS = ["*"]
 
 COMPOSITIONS_DIR = os.path.join(BASE_DIR, "compositions")
+FAKTS_PROTOCOL_VERSION = "0.1.0"
 DEPLOYMENT_NAME = conf.deployment.name
+DEPLOYMENT_DESCRIPTION = conf.deployment.get("description", "A Basic Arkitekt Deployment")
 # Application definition
 
 
@@ -64,6 +66,23 @@ INSTALLED_APPS = [
     "fakts",
     "karakter",
     "kammer",
+]
+
+FAKTS_LAYERS = [
+    {
+        "NAME": "Web Layer",
+        "DESCRIPTION": "The default web layer",
+        "KIND": "WEB",
+        "IDENTIFIER": "web",
+        "GET_PROBE": "https://google.com",
+    },
+    {
+        "NAME": "Johannes Tailscale",
+        "DESCRIPTION": "The Johannes tailscale",
+        "KIND": "TAILSCALE",
+        "IDENTIFIER": "tailscale",
+        "DNS_PROBE": "jhnnsrs-lab",
+    }
 ]
 
 
@@ -133,6 +152,26 @@ MIDDLEWARE = [
     # Add the account middleware:
     "allauth.account.middleware.AccountMiddleware",
 ]
+
+
+# S3_PUBLIC_DOMAIN = f"{conf.s3.public.host}:{conf.s3.public.port}"  # TODO: FIx
+AWS_ACCESS_KEY_ID = conf.s3.access_key
+AWS_SECRET_ACCESS_KEY = conf.s3.secret_key
+AWS_S3_ENDPOINT_URL = f"{conf.s3.protocol}://{conf.s3.host}:{conf.s3.port}"
+# AWS_S3_PUBLIC_ENDPOINT_URL = (
+#    f"{conf.minio.public.protocol}://{conf.minio.public.host}:{conf.minio.public.port}"
+# )
+AWS_S3_URL_PROTOCOL = f"{conf.s3.protocol}:"
+AWS_S3_FILE_OVERWRITE = False
+AWS_QUERYSTRING_EXPIRE = 3600
+AWS_S3_REGION_NAME = conf.s3.get("region", "us-east-1")
+
+MEDIA_BUCKET = conf.s3.buckets.media
+
+AWS_STORAGE_BUCKET_NAME = conf.s3.buckets.media
+AWS_DEFAULT_ACL = "private"
+AWS_S3_USE_SSL = True
+AWS_S3_SECURE_URLS = False
 
 CHANNEL_LAYERS = {
     "default": {
@@ -291,7 +330,7 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
-STATIC_URL = "static/"
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
@@ -302,6 +341,8 @@ CSRF_TRUSTED_ORIGINS = conf.get(
     "csrf_trusted_origins", ["http://localhost", "https://localhost"]
 )
 MY_SCRIPT_NAME = conf.get("force_script_name", "lok")
+STATIC_URL = MY_SCRIPT_NAME.lstrip("/") + "/" + "static/"
+
 
 LOGGING = {
     "version": 1,
@@ -361,6 +402,7 @@ SYSTEM_MESSAGES = conf.get(
     ],
 )
 
+STATIC_ROOT = os.path.join(BASE_DIR, "static")
 
 SOCIALACCOUNT_PROVIDERS = {
     "github": {

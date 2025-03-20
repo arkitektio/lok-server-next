@@ -1,5 +1,6 @@
 from django.urls import path, include, re_path
 from django.conf import settings
+from django.conf.urls.static import static
 
 
 def basepath(rel_path, *args, **kwargs):
@@ -18,3 +19,5 @@ def re_basepath(rel_path, *args, **kwargs):
         )
     else:
         return re_path(rel_path, *args, **kwargs)
+    
+    

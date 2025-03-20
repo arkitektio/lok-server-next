@@ -9,6 +9,8 @@ from fakts import models
 
 def scan():
     registry.rescan()
+    
+    
 
     for service_description in registry.get_service_descriptors():
 
@@ -35,7 +37,9 @@ def scan():
         instance, created = models.ServiceInstance.objects.update_or_create(
             identifier=instance_description.instance_identifier,
             backend=instance_description.backend_identifier,
-            defaults=dict(service=service),
+            defaults=dict(service=service, layer=models.Layer.objects.get(identifier="web")),
+        
+            
         )
 
         print("Ensured instance", instance_description.instance_identifier)

@@ -11,10 +11,14 @@ python manage.py ensureadmin
 echo "=> Ensuring Users..."
 python manage.py ensureusers
 
+echo "=> Ensuring Groups..."
+python manage.py ensuregroups
+
+echo "=> Ensuring Layers..."
+python manage.py ensurelayers
 
 echo "=> Ensuring Compositions..."
 python manage.py ensurecompositions
-
 
 echo "=> Ensuring Apps..."
 python manage.py ensureapps

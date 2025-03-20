@@ -19,3 +19,7 @@ class CreateUserInput:
 def create_user(info: Info, input: CreateUserInput) -> types.User:
     trace = models.User(name=input.user)
     return trace
+
+
+
+

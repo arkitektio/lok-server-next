@@ -1,9 +1,27 @@
 from pydantic import BaseModel, Field, validator
-from typing import List, Optional
+from typing import List, Optional, Literal, Union
 from django.conf import settings
 from enum import Enum
 from fakts import enums, validators
 from typing import Literal
+
+
+class Layer(BaseModel):
+    identifier: str
+    kind: Union[Literal["WEB"], Literal["TAILSCALE"]]
+    dns_probe: str | None = None
+    get_probe: str | None = None
+
+
+
+class WellKnownFakts(BaseModel):
+    name: str =  settings.DEPLOYMENT_NAME
+    version: str
+    description: str | None = None
+    claim: str
+    base_url: str
+    ca_crt: str | None = None
+    layers: List[Layer] = Field(default_factory=list)
 
 
 class Requirement(BaseModel):
@@ -57,6 +75,7 @@ class DeviceCodeStartRequest(BaseModel):
     redirect_uris: list[str] = Field(default_factory=list)
     requested_client_kind: enums.ClientKindVanilla = enums.ClientKindVanilla.DEVELOPMENT
     request_public: bool = False
+    supported_layers: List[str] = Field(default_factory=lambda: ["web"])
 
 
 class ReedeemTokenRequest(BaseModel):
@@ -64,6 +83,8 @@ class ReedeemTokenRequest(BaseModel):
 
     token: str
     manifest: Manifest
+    supported_layers: List[str] = Field(default_factory=lambda: ["web"])
+
 
 
 class DeviceCodeChallengeRequest(BaseModel):

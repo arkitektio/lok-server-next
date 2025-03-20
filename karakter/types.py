@@ -1,7 +1,7 @@
 import datetime
 from enum import Enum
 from typing import Any, Dict, ForwardRef, List, Optional, cast
-
+from karakter.datalayer import get_current_datalayer
 import strawberry
 import strawberry_django
 from allauth.socialaccount import models as smodels
@@ -22,7 +22,30 @@ Groups are propagated to the respecting subservices. Permissions are not. Each s
 class Group:
     id: strawberry.ID
     name: str
-    users: list["User"]
+    profile: Optional["GroupProfile"] 
+    
+    @strawberry_django.field(description="The users that are in the group")
+    def users(self, info: Info) -> List["User"]:
+        return models.User.objects.filter(groups=self)
+    
+    
+  
+  
+
+@strawberry_django.type(models.MediaStore)
+class MediaStore:
+    id: strawberry.ID
+    path: str
+    bucket: str
+    key: str
+
+    @strawberry_django.field()
+    def presigned_url(self, info: Info, host: str | None = None) -> str:
+        datalayer = get_current_datalayer()
+        return cast(models.MediaStore, self).get_presigned_url(
+            info, datalayer=datalayer, host=host
+        )
+  
 
 
 def cast_to_model(model: smodels.SocialAccount):
@@ -65,10 +88,27 @@ class User:
     def social_accounts(self, info) -> list["SocialAccount"]:
         return list(smodels.SocialAccount.objects.filter(user=self))
 
+    
 
 @strawberry_django.type(
     models.Profile,
     filters=filters.ProfileFilter,
+    pagination=True,
+    description="""
+A Profile of a User. A Profile can be used to display personalied information about a user.
+
+""",
+)
+class Profile:
+    id: strawberry.ID
+    bio: str | None = strawberry.field(description="A short bio of the user")
+    name: str | None  = strawberry.field(description="The name of the user")
+    avatar: MediaStore | None = strawberry.field(description="The avatar of the user")
+
+
+@strawberry_django.type(
+    models.GroupProfile,
+    filters=filters.GroupProfileFilter,
     pagination=True,
     description="""
 A Profile of a User. A Profile can be used to display personalied information about a user.
@@ -78,10 +118,12 @@ A Profile of a User. A Profile can be used to display personalied information ab
 
 """,
 )
-class Profile:
-    bio: str = strawberry.field(description="A short bio of the user")
-    name: str = strawberry.field(description="The name of the user")
-
+class GroupProfile:
+    id: strawberry.ID
+    bio: str | None  = strawberry.field(description="A short bio of the group")
+    name: str | None  = strawberry.field(description="The name of the group")
+    avatar: MediaStore | None = strawberry.field(description="The avatar of the group")
+    
 
 @strawberry_django.interface(
     smodels.SocialAccount,

@@ -34,6 +34,7 @@ class DevelopmentClientInputModel(BaseModel):
     manifest: Manifest
     composition: str | None = None
     requirements: list[RequirementModel] = Field(default_factory=list)
+    layers: list[str] = Field(default_factory=lambda : ["web"])
 
 
 @pydantic.input(DevelopmentClientInputModel)
@@ -41,6 +42,7 @@ class DevelopmentClientInput:
     manifest: ManifestInput
     composition: strawberry.ID | None = None
     requirements: list[Requirement]
+    layers: list[str] | None = None
 
 
 class ScanBackendInputModel(BaseModel):
@@ -102,3 +104,15 @@ class KeyValueInput:
 class UserDefinedServiceInstanceInput:
     identifier: str
     values: list[KeyValueInput] = strawberry.field(default_factory=list)
+
+
+class UpdateServiceInstanceInputModel(BaseModel):
+    id: str
+
+@pydantic.input(UpdateServiceInstanceInputModel)
+class UpdateServiceInstanceInput:
+    id: strawberry.ID
+    allowed_users: list[strawberry.ID] | None = None
+    allowed_groups: list[strawberry.ID] | None = None
+    denied_groups: list[strawberry.ID] | None = None
+    denied_users: list[strawberry.ID] | None = None

@@ -13,6 +13,25 @@ import datetime
 from fakts import models, scalars, enums, filters, enums
 from oauth2_provider.models import Application
 from fakts.backends import enums as fb_enums
+from karakter.datalayer import get_current_datalayer
+
+
+@strawberry.type(
+    description="Temporary Credentials for a file upload that can be used by a Client (e.g. in a python datalayer)"
+)
+class PresignedPostCredentials:
+    """Temporary Credentials for a a file upload."""
+
+    key: str
+    x_amz_algorithm: str
+    x_amz_credential: str
+    x_amz_date: str
+    x_amz_signature: str
+    policy: str
+    datalayer: str
+    bucket: str
+    store: str
+
 
 
 @strawberry.type(
@@ -29,6 +48,30 @@ class Scope:
         description="The value of the scope. This is the value that is used in the OAuth2 flow."
     )
 
+@strawberry_django.type(
+    models.Layer,
+    description="A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself.",
+    pagination=True,
+    filters=filters.LayerFilter,
+)
+class Layer:
+    id: strawberry.ID
+    name: str = strawberry.field(description="The name of the layer")
+    identifier: scalars.ServiceIdentifier = strawberry.field(
+        description="The identifier of the service. This should be a globally unique string that identifies the service. We encourage you to use the reverse domain name notation. E.g. `com.example.myservice`"
+    )
+    logo: types.MediaStore | None = strawberry.field(
+        description="The logo of the service. This should be a url to a logo that can be used to represent the service."
+    )
+    description: str | None = strawberry.field(
+        description="The description of the service. This should be a human readable description of the service."
+    )
+    instances: list["ServiceInstance"] = strawberry_django.field(
+        description="The instances of the service. A service instance is a configured instance of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."
+    )  
+    
+
+
 
 @strawberry_django.type(
     models.Service,
@@ -42,14 +85,14 @@ class Service:
     identifier: scalars.ServiceIdentifier = strawberry.field(
         description="The identifier of the service. This should be a globally unique string that identifies the service. We encourage you to use the reverse domain name notation. E.g. `com.example.myservice`"
     )
-    logo: str | None = strawberry.field(
-        description="The logo of the service. This should be a url to a logo that can be used to represent the service."
-    )
     description: str | None = strawberry.field(
         description="The description of the service. This should be a human readable description of the service."
     )
     instances: list["ServiceInstance"] = strawberry_django.field(
         description="The instances of the service. A service instance is a configured instance of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."
+    )
+    logo: types.MediaStore | None = strawberry.field(
+        description="The logo of the app. This should be a url to a logo that can be used to represent the app."
     )
 
 
@@ -67,9 +110,6 @@ class ServiceInstance:
     backend: fb_enums.BackendType = strawberry.field(
         description="The backend that this instance belongs to."
     )
-    composition: "Composition" = strawberry.field(
-        description="The composition that this instance belongs to."
-    )
     name: str = strawberry.field(
         description="The name of the instance. This is a human readable name of the instance."
     )
@@ -78,6 +118,27 @@ class ServiceInstance:
     )
     user_definitions: list["UserDefinedServiceInstance"] = strawberry_django.field(
         description="The user defined instances of the service instance. These instances are used to configure the service instance with user defined values."
+    )
+    allowed_users: list[types.User] = strawberry_django.field(
+        description="The users that are allowed to use this instance."
+    )
+    denied_users: list[types.User] = strawberry_django.field(
+        description="The users that are denied to use this instance."
+    )
+    allowed_groups: list[types.Group] = strawberry_django.field(
+        description="The groups that are allowed to use this instance."
+    )
+    denied_groups: list[types.Group] = strawberry_django.field(
+        description="The groups that are denied to use this instance."
+    )
+    layer: Layer = strawberry_django.field(
+        description="The layer that this instance belongs to."
+    )
+    mappings: list["ServiceInstanceMapping"] = strawberry_django.field(
+        description="The mappings of the composition. A mapping is a mapping of a service to a service instance. This is used to configure the composition."
+    )
+    logo: types.MediaStore | None = strawberry.field(
+        description="The logo of the app. This should be a url to a logo that can be used to represent the app."
     )
 
 
@@ -90,12 +151,18 @@ class ServiceInstanceMapping:
     instance: ServiceInstance = strawberry.field(
         description="The service that this instance belongs to."
     )
-    composition: "Composition" = strawberry.field(
-        description="The composition that this instance belongs to."
+    client: "Client" = strawberry.field(
+        description="The client that this instance belongs to."
     )
     key: str = strawberry.field(
         description="The key of the instance. This is a unique string that identifies the instance. It is used to identify the instance in the code and in the database."
     )
+    optional: bool = strawberry.field(
+        description="Is this mapping optional? If a mapping is optional, you can configure the client without this mapping."
+    )
+    
+    
+    
 
 
 @strawberry.type
@@ -131,35 +198,26 @@ class UserDefinedServiceInstance:
         return self.values
 
 
-@strawberry_django.type(models.Composition)
-class Composition:
-    id: strawberry.ID
-    name: str = strawberry.field(description="The name of the composition")
-    template: str = strawberry.field(
-        description="The template of the composition. This is a Jinja2 YAML template that will be rendered with the LinkingContext as context. The result of the rendering will be used to send to the client as a configuration. It should never contain sensitive information."
-    )
-    mappings: list[ServiceInstanceMapping] = strawberry.field(
-        description="The mappings of the composition. A mapping is a mapping of a service to a service instance. This is used to configure the composition."
-    )
-
-
 @strawberry_django.type(
     models.App,
+    filters=filters.AppFilter,
     description="An App is the Arkitekt equivalent of a Software Application. It is a collection of `Releases` that can be all part of the same application. E.g the App `Napari` could have the releases `0.1.0` and `0.2.0`.",
-)
+    pagination=True,
+)   
 class App:
     id: strawberry.ID
     name: str = strawberry.field(description="The name of the app")
     identifier: scalars.AppIdentifier = strawberry.field(
         description="The identifier of the app. This should be a globally unique string that identifies the app. We encourage you to use the reverse domain name notation. E.g. `com.example.myapp`"
     )
-    logo: str | None = strawberry.field(
-        description="The logo of the app. This should be a url to a logo that can be used to represent the app."
-    )
+    
     releases: list["Release"] = strawberry.field(
         description="The releases of the app. A release is a version of the app that can be installed by a user."
     )
-
+    
+    logo: types.MediaStore | None = strawberry.field(
+        description="The logo of the app. This should be a url to a logo that can be used to represent the app."
+    )
 
 @strawberry_django.type(
     models.Release,
@@ -174,7 +232,7 @@ class Release:
     name: str = strawberry.field(
         description="The name of the release. This should be a string that identifies the release beyond the version number. E.g. `canary`."
     )
-    logo: str | None = strawberry.field(
+    logo: types.MediaStore | None = strawberry.field(
         description="The logo of the release. This should be a url to a logo that can be used to represent the release."
     )
     scopes: list[str] = strawberry.field(
@@ -224,11 +282,14 @@ class Client:
     public: bool = strawberry.field(
         description="Is this client public? If a client is public "
     )
-    composition: Composition = strawberry.field(
-        description="The composition of the client. "
-    )
     user: types.User | None = strawberry.field(
         description="If the client is a DEVELOPMENT client, which requires no further authentication, this is the user that is authenticated with the client."
+    )
+    logo: types.MediaStore | None = strawberry.field(
+        description="The logo of the release. This should be a url to a logo that can be used to represent the release."
+    )
+    name: str = strawberry.field(
+        description="The name of the client. This is a human readable name of the client."
     )
 
     @strawberry.field(
@@ -248,6 +309,11 @@ class Client:
     def token(self, info) -> str:
         # TODO: Implement only tenant should be able to see the token
         return self.token
+    
+    
+    mappings: list["ServiceInstanceMapping"] = strawberry_django.field(
+        description="The mappings of the client. A mapping is a mapping of a service to a service instance. This is used to configure the composition."
+    )
 
 
 @strawberry_django.type(

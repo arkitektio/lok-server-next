@@ -47,7 +47,7 @@ def render_user_defined(
 
 
 def render_composition(
-    composition: models.Composition, context: base_models.LinkingContext
+    client: models.Client, context: base_models.LinkingContext
 ) -> dict:
 
     config_dict = {}
@@ -55,7 +55,7 @@ def render_composition(
     config_dict["self"] = {}
     config_dict["self"]["deployment_name"] = context.deployment_name
 
-    for mapping in composition.mappings.all():
+    for mapping in client.mappings.all():
 
         instance = mapping.instance
 
@@ -89,16 +89,22 @@ def render_composition(
 
 
 def find_instance_for_requirement(
-    service: models.Service, requirement: base_models.Requirement
+    service: models.Service, requirement: base_models.Requirement, supported_layers: list[models.Layer], user: models.AbstractUser
 ) -> models.ServiceInstance:
 
     instance = models.ServiceInstance.objects.filter(
         service=service,
+        layer__in=supported_layers,
+    ).filter(
+        models.Q(allowed_users__isnull=True) | models.Q(allowed_users=user)
+        & (models.Q(denied_users__isnull=True) | ~models.Q(denied_users=user))
+        & (models.Q(allowed_groups__isnull=True) | models.Q(allowed_groups__in=user.groups.all()))
+        & (models.Q(denied_groups__isnull=True) | ~models.Q(denied_groups__in=user.groups.all()))
     ).first()
 
     if instance is None:
         raise errors.InstanceNotFound(
-            f"Instance {requirement.instance} not found for service {service.identifier}"
+            f"Instance {requirement.service} not acccessible for {user.username} through these layers: {','.join(map(str, supported_layers.all()))}. Please contact the administrator."
         )
 
     return instance
@@ -111,51 +117,47 @@ def hash_requirements(requirements: list[base_models.Requirement]) -> str:
     ).hexdigest()
 
 
-def auto_create_composition(manifest: base_models.Manifest) -> models.Composition:
+def auto_compose(client: models.Client, manifest: base_models.Manifest, supported_layers: list[models.Layer], user: models.AbstractUser) -> models.Client:
 
-    composition, _ = models.Composition.objects.get_or_create(
-        requirements_hash=hash_requirements(manifest.requirements),
-        defaults=dict(
-            name=f"Auto created composition for {manifest.identifier}/{manifest.version}",
-            type="auto",
-        ),
-    )
+    requirements = manifest.requirements
+    
+    if hash_requirements(requirements) != client.requirements_hash:
+        
+        errors = []
+        warnings = []
+        
+        for old_mapping in client.mappings.all():
+            old_mapping.delete()
 
-    errors = []
-    warnings = []
+        for req in manifest.requirements:
 
-    for req in manifest.requirements:
+            try:
+                service = models.Service.objects.get(identifier=req.service)
 
-        try:
-            service = models.Service.objects.get(identifier=req.service)
+                instance = find_instance_for_requirement(service, req, supported_layers, user)
 
-            instance = find_instance_for_requirement(service, req)
+                models.ServiceInstanceMapping.objects.get_or_create(
+                    client=client,
+                    instance=instance,
+                    key=req.key,
+                )
 
-            models.ServiceInstanceMapping.objects.create(
-                composition=composition,
-                instance=instance,
-                key=req.key,
-            )
-
-        except Exception as e:
-            if req.optional:
-                warnings.append(str(e))
-            else:
-                errors.append(str(e))
-
-    if len(errors) > 0:
-        composition.valid = False
-    else:
-        composition.valid = True
-
-    composition.errors = errors
-    composition.warnings = warnings
-    composition.save()
-
-    return composition
+            except Exception as e:
+                
+                if req.optional:
+                    warnings.append(str(e))
+                else:
+                    raise Exception(f"Unable to find instance for requirement {req.service}") from e
+            
+    
+        client.requirements_hash = hash_requirements(requirements)
+        client.save()
 
 
-def check_compability(manifest: base_models.Manifest) -> list[str] | list[str]:
+    return client
+
+
+def check_compability(manifest: base_models.Manifest, supported_layers: list[models.Layer], user: models.AbstractUser) -> list[str] | list[str]:
 
     errors = []
     warnings = []
@@ -167,10 +169,10 @@ def check_compability(manifest: base_models.Manifest) -> list[str] | list[str]:
                 service = models.Service.objects.get(identifier=req.service)
             except models.Service.DoesNotExist:
                 raise Exception(
-                    f"Service {req.service} not found on this server. Please contact the administrator."
+                    f"Service {req.service} is not registered on this server. Please contact the administrator to add this feature."
                 )
 
-            instance = find_instance_for_requirement(service, req)
+            instance = find_instance_for_requirement(service, req, supported_layers, user)
 
         except Exception as e:
             if req.optional:

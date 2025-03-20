@@ -29,3 +29,7 @@ class BackendError(ConfigurationError):
     happen when a backend is not available or when an error occurs
     while rendering a backend.
     """
+
+
+class InstanceNotFound(ConfigurationError):
+    pass

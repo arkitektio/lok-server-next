@@ -5,7 +5,6 @@ from fakts import logic
 
 def create_website_client(
     release: models.Release,
-    composition: models.Composition,
     config: base_models.WebsiteClientConfig,
 ):
     """This function creates a website client. This type of client is used for
@@ -21,7 +20,6 @@ def create_website_client(
         if client.token != config.token:
             client.token = config.token
         client.tenant = tenant
-        client.composition = composition
         client.public = config.public
         client.save()
 
@@ -62,13 +60,11 @@ def create_website_client(
             oauth2_client=oauth2_client,
             redirect_uris=" ".join(config.redirect_uris),
             public=config.public,
-            composition=composition,
         )
 
 
 def create_desktop_client(
     release: models.Release,
-    composition: models.Composition,
     config: base_models.WebsiteClientConfig,
 ):
 
@@ -82,7 +78,6 @@ def create_desktop_client(
         if client.token != config.token:
             client.token = config.token
         client.tenant = tenant
-        client.composition = composition
         client.save()
 
         client.oauth2_client.name = f"@{release.app.identifier}:{release.version}"
@@ -123,19 +118,16 @@ def create_desktop_client(
             client_secret=client_secret,
             oauth2_client=oauth2_client,
             redirect_uris=" ".join(["http://127.0.0.1/", "http://127.0.0.1/callback"]),
-            composition=composition,
         )
 
 
 def create_development_client(
     release: models.Release,
-    composition: models.Composition,
     config: base_models.DevelopmentClientConfig,
 ):
 
     tenant = config.get_tenant()
     user = config.get_user()
-    print(tenant, user, composition)
 
     try:
         client = models.Client.objects.get(
@@ -144,7 +136,6 @@ def create_development_client(
         if client.token != config.token:
             client.token = config.token
         client.tenant = tenant
-        client.composition = composition
         client.save()
 
         client.oauth2_client.name = f"@{release.app.identifier}:{release.version}"
@@ -157,6 +148,7 @@ def create_development_client(
         client.oauth2_client.redirect_uris = " "
         client.oauth2_client.client_id = client.client_id
         client.oauth2_client.client_secret = client.client_secret
+        client.logo = release.logo
         client.oauth2_client.save()
         return client
 
@@ -187,13 +179,15 @@ def create_development_client(
             oauth2_client=oauth2_client,
             redirect_uris="",
             public=False,
-            composition=composition,
+            logo=release.logo,
         )
 
 
 def create_client(
     manifest: base_models.Manifest,
     config: base_models.ClientConfig,
+    layers: list[models.Layer],
+    user
 ):
     from .utils import download_logo
 
@@ -203,6 +197,12 @@ def create_client(
         raise ValueError(f"Could not download logo {e}")
 
     app, _ = models.App.objects.get_or_create(identifier=manifest.identifier)
+    if logo:
+        app.logo = logo
+        app.save()
+    
+    
+    
     release, _ = models.Release.objects.update_or_create(
         app=app,
         version=manifest.version,
@@ -213,17 +213,19 @@ def create_client(
         },
     )
 
-    composition = logic.auto_create_composition(manifest)
 
     print(config)
 
     if config.kind == enums.ClientKindVanilla.WEBSITE.value:
-        return create_website_client(release, composition, config)
+        raise Exception("Not supported anymore")  
 
     if config.kind == enums.ClientKindVanilla.DEVELOPMENT.value:
-        return create_development_client(release, composition, config)
+        client =  create_development_client(release, config)
 
     if config.kind == enums.ClientKindVanilla.DESKTOP.value:
-        return create_desktop_client(release, composition, config)
-
-    raise NotImplementedError(f"No such client kind {config.kind} exists")
+        raise Exception("Not supported anymore")
+    
+    
+    
+    client = logic.auto_compose(client, manifest, layers, user)
+    return client

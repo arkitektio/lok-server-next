@@ -4,8 +4,41 @@ import requests
 from allauth.socialaccount.models import SocialAccount
 from django.contrib.auth.models import AbstractUser, Group
 from django.db import models
-
 logger = logging.getLogger(__name__)
+from karakter import fields, datalayer
+
+class S3Store(models.Model):
+    path = fields.S3Field(
+        null=True, blank=True, help_text="The stodre of the image", unique=True
+    )
+    key = models.CharField(max_length=1000)
+    bucket = models.CharField(max_length=1000)
+    populated = models.BooleanField(default=False)
+
+class MediaStore(S3Store):
+
+    def get_presigned_url(
+        self, info, datalayer: datalayer.Datalayer, host: str | None = None
+    ) -> str:
+        s3 = datalayer.s3
+        url: str = s3.generate_presigned_url(
+            ClientMethod="get_object",
+            Params={
+                "Bucket": self.bucket,
+                "Key": self.key,
+            },
+            ExpiresIn=3600,
+        )
+        return url.replace(settings.AWS_S3_ENDPOINT_URL, host or "")
+
+    def fill_info(self) -> None:
+        pass
+
+    def put_file(self, datalayer:  datalayer.Datalayer, file) -> None:
+        s3 = datalayer.s3
+        s3.upload_fileobj(file, self.bucket, self.key)
+        self.save()
+
 
 
 class User(AbstractUser):
@@ -15,10 +48,7 @@ class User(AbstractUser):
     Each user is identifier by a unique username, and can have an email address associated with them.
 
 
-
-
     """
-
     email = models.EmailField(null=True, blank=True)
 
     @property
@@ -27,8 +57,7 @@ class User(AbstractUser):
 
     @property
     def avatar(self):
-        if self.profile:
-            return self.profile.avatar.url if self.profile.avatar else None
+        return None
 
     def notify(self, title, message):
         for channel in self.channels.all():
@@ -41,8 +70,7 @@ class Profile(models.Model):
     name = models.CharField(max_length=1000, null=True, blank=True)
     bio = models.CharField(max_length=4000, null=True, blank=True)
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
-    avatar = models.ImageField(null=True, blank=True)
-
+    avatar = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
 
 class GroupProfile(models.Model):
     """A Profile of a Group"""
@@ -51,6 +79,8 @@ class GroupProfile(models.Model):
     group = models.OneToOneField(
         Group, on_delete=models.CASCADE, related_name="profile"
     )
+    bio = models.CharField(max_length=4000, null=True, blank=True)
+    avatar = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
 
 
 class ComChannel(models.Model):

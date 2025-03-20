@@ -13,12 +13,38 @@ import uuid
 import _json
 from typing import Optional
 from fakts import fields, enums
+from django.contrib.auth.models import AbstractUser, Group
+from karakter.models import MediaStore
+from django.conf import settings
+
+
+class Layer(models.Model):
+    name = models.CharField(max_length=1000)
+    identifier = fields.IdentifierField(unique=True)
+    logo = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
+    description = models.TextField(
+        default="No description available", null=True, blank=True
+    )
+    dns_probe = models.TextField(
+        default="No probe available", null=True, blank=True
+    )
+    get_probe = models.TextField(
+        default="No probe available", null=True, blank=True
+    )
+    kind = TextChoicesField(
+        choices_enum=enums.LayerKindChoices,
+        default=enums.LayerKindChoices.WEB.value,
+        help_text="The kind of layer",
+    )
+
+    def __str__(self):
+        return f"{self.identifier}"
 
 
 class Service(models.Model):
     name = models.CharField(max_length=1000)
     identifier = fields.IdentifierField()
-    logo = fields.S3ImageField()
+    logo = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
     description = models.TextField(
         default="No description available", null=True, blank=True
     )
@@ -38,11 +64,27 @@ class Service(models.Model):
 
 class ServiceInstance(models.Model):
     backend = models.CharField(max_length=1000)
+    layer = models.ForeignKey(
+        Layer, on_delete=models.CASCADE, related_name="instances"
+    )
     service = models.ForeignKey(
         Service, on_delete=models.CASCADE, related_name="instances"
     )
+    logo = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
     identifier = models.CharField(max_length=1000)
     template = models.TextField()
+    denied_users = models.ManyToManyField(
+        get_user_model(), related_name="denied_instances"
+    )
+    denied_groups = models.ManyToManyField(
+        Group, related_name="denied_instances"
+    )
+    allowed_users = models.ManyToManyField(
+        get_user_model(), related_name="allowed_instances"
+    )
+    allowed_groups = models.ManyToManyField(
+        Group, related_name="allowed_instances"
+    )
 
     class Meta:
         constraints = [
@@ -85,40 +127,6 @@ class InstanceConfig(models.Model):
         return f"{self.key}:{self.instance}"
 
 
-class Composition(models.Model):
-    """A template for a configuration"""
-
-    name = models.CharField(max_length=1000)
-    description = models.TextField(max_length=1000, null=True, blank=True)
-    errors = models.JSONField(default=list)
-    warnings = models.JSONField(default=list)
-    type = models.CharField(max_length=1000, default="arkitekt")
-    requirements_hash = models.CharField(max_length=1000, unique=True)
-
-    def __str__(self) -> str:
-        return self.name
-
-
-class ServiceInstanceMapping(models.Model):
-    composition = models.ForeignKey(
-        Composition, on_delete=models.CASCADE, related_name="mappings"
-    )
-    instance = models.ForeignKey(
-        ServiceInstance, on_delete=models.CASCADE, related_name="mappings"
-    )
-    key = models.CharField(max_length=1000)
-    description = models.TextField(max_length=1000, null=True, blank=True)
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["key", "composition"],
-                name="Only one instance per key and composition",
-            )
-        ]
-
-    def __str__(self):
-        return f"{self.key}:{self.instance}@{self.composition}"
 
 
 class RedeemToken(models.Model):
@@ -153,17 +161,18 @@ class DeviceCode(models.Model):
         help_text="The kind of staging client",
     )
     staging_manifest = models.JSONField(default=dict)
-    staging_logo = fields.S3ImageField()
+    staging_logo = models.CharField(max_length=1000, null=True)
     staging_public = models.BooleanField(default=False)
     staging_redirect_uris = models.JSONField(default=list)
     expires_at = models.DateTimeField()
     denied = models.BooleanField(default=False)
+    supported_layers = models.ManyToManyField(Layer, related_name="staging_device_codes")
 
 
 class App(models.Model):
     name = models.CharField(max_length=1000)
     identifier = fields.IdentifierField()
-    logo = fields.S3ImageField()
+    logo = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
 
     def __str__(self):
         return f"{self.identifier}"
@@ -175,7 +184,7 @@ class Release(models.Model):
     is_latest = models.BooleanField(default=False)
     is_dev = models.BooleanField(default=False)
     name = models.CharField(max_length=1000)
-    logo = fields.S3ImageField()
+    logo = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
     scopes = models.JSONField(default=list)
     requirements = models.JSONField(default=dict)
 
@@ -198,9 +207,7 @@ class Release(models.Model):
 
 
 class Client(models.Model):
-    composition = models.ForeignKey(
-        Composition, on_delete=models.CASCADE, related_name="clients"
-    )
+    name = models.CharField(max_length=1000, default="No name")
     release = models.ForeignKey(
         Release, on_delete=models.CASCADE, related_name="clients", null=True
     )
@@ -211,6 +218,9 @@ class Client(models.Model):
         choices_enum=enums.ClientKindChoices,
         default=enums.ClientKindChoices.DEVELOPMENT.value,
         help_text="The kind of transformation",
+    )
+    user = models.ForeignKey(
+        get_user_model(), on_delete=models.CASCADE, related_name="clients"
     )
     redirect_uris = models.CharField(max_length=1000, default=" ")
     public = models.BooleanField(default=False)
@@ -225,18 +235,42 @@ class Client(models.Model):
     tenant = models.ForeignKey(
         get_user_model(), on_delete=models.CASCADE, related_name="managed_clients"
     )
-    user = models.ForeignKey(
-        get_user_model(), on_delete=models.CASCADE, related_name="clients", null=True
-    )
     created_at = models.DateTimeField(auto_now_add=True)
+    requirements_hash = models.CharField(max_length=1000, unique=False)
+    logo = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
 
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["release", "user", "kind"],
+                fields=["release", "user"],
                 name="Only one per releast, tenankt and kind",
             )
         ]
 
     def __str__(self) -> str:
         return f"{self.kind} Client for {self.release}"
+
+
+
+
+class ServiceInstanceMapping(models.Model):
+    client = models.ForeignKey(
+        Client, on_delete=models.CASCADE, related_name="mappings"
+    )
+    instance = models.ForeignKey(
+        ServiceInstance, on_delete=models.CASCADE, related_name="mappings"
+    )
+    key = models.CharField(max_length=1000)
+    description = models.TextField(max_length=1000, null=True, blank=True)
+    optional = models.BooleanField(default=False)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["key", "client"],
+                name="Only one instance per key and composition",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.key}:{self.instance}@{self.client}"

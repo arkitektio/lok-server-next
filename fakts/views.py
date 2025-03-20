@@ -37,16 +37,20 @@ class WellKnownFakts(View):
 
         with open(settings.CA_FILE, "r") as f:
             ca = f.read()
+            
+            
+        layers = [
+            base_models.Layer(identifier=i.identifier, kind=i.kind, dns_probe=i.dns_probe, get_probe=i.get_probe) for i in models.Layer.objects.all()
+        ]
 
         return JsonResponse(
-            data={
-                "name": settings.DEPLOYMENT_NAME,
-                "version": "0.0.1",
-                "description": "This is the best servesssr",
-                "claim": request.build_absolute_uri(reverse("fakts:claim")),
-                "base_url": request.build_absolute_uri(reverse("fakts:index")),
-                "ca_crt": ca,
-            }
+            data=base_models.WellKnownFakts(name= settings.DEPLOYMENT_NAME,
+                                            version=settings.FAKTS_PROTOCOL_VERSION,
+                                            description=settings.DEPLOYMENT_DESCRIPTION,
+                                            claim=request.build_absolute_uri(reverse("fakts:claim")),
+                                            base_url=request.build_absolute_uri(reverse("fakts:index")),
+                                            ca_crt=ca,
+                                            layers=layers).dict()
         )
 
 
@@ -109,8 +113,11 @@ class ConfigureView(LoginRequiredMixin, FormView):
             x = models.DeviceCode.objects.get(code=the_code)
 
             manifest = base_models.Manifest(**x.staging_manifest)
+            
+            
+            layers = x.supported_layers.all()
 
-            composition_errors, composition_warnings = logic.check_compability(manifest)
+            composition_errors, composition_warnings = logic.check_compability(manifest, layers, self.request.user)
             if len(composition_errors) > 0:
                 context["composition_valid"] = False
             else:
@@ -199,28 +206,14 @@ class ConfigureView(LoginRequiredMixin, FormView):
                         tenant=self.request.user.username,
                     )
 
-                elif device_code.staging_kind == enums.ClientKindVanilla.DESKTOP.value:
-                    config = base_models.DesktopClientConfig(
-                        kind=enums.ClientKindVanilla.DESKTOP.value,
-                        token=token,
-                        user=self.request.user.username,
-                        tenant=self.request.user.username,
-                    )
-
-                elif device_code.staging_kind == enums.ClientKindVanilla.WEBSITE.value:
-                    config = base_models.WebsiteClientConfig(
-                        kind=enums.ClientKindVanilla.WEBSITE.value,
-                        token=token,
-                        tenant=self.request.user.username,
-                        redirect_uris=device_code.staging_redirect_uris,
-                        public=device_code.staging_public,
-                    )
                 else:
-                    raise Exception("Unknown client kind")
+                    raise Exception("Unknown client kind or no longer supported")
 
                 client = builders.create_client(
                     manifest=manifest,
                     config=config,
+                    layers=device_code.supported_layers.all(),
+                    user=self.request.user,
                 )
 
             device_code.client = client
@@ -370,6 +363,10 @@ class StartChallengeView(View):
             staging_logo=logo,
             staging_public=start_grant.request_public,
         )
+        
+        if start_grant.supported_layers:
+            for layer in start_grant.supported_layers:
+                device_code.supported_layers.add(models.Layer.objects.get(identifier=layer))
 
         return JsonResponse(
             data={
@@ -529,6 +526,7 @@ class RedeemView(View):
 
         manifest = redeem_request.manifest
         token = redeem_request.token
+        layers = models.Layer.objects.filter(identifier__in=redeem_request.supported_layers)
 
         try:
             valid_token = models.RedeemToken.objects.get(token=token)
@@ -572,6 +570,8 @@ class RedeemView(View):
                 client = builders.create_client(
                     manifest=manifest,
                     config=config,
+                    layers=layers,
+                    user=valid_token.user,
                 )
 
                 valid_token.client = client
@@ -618,20 +618,8 @@ class ClaimView(View):
 
             context = logic.create_linking_context(request, client, claim)
 
-            if claim.composition:
-                try:
-                    composition = models.Composition.objects.get(name=claim.composition)
-                except models.Composition.DoesNotExist:
-                    return JsonResponse(
-                        data={
-                            "status": "error",
-                            "message": f"Template {claim.composition} does not exist",
-                        }
-                    )
-            else:
-                composition = client.composition
 
-            config = logic.render_composition(composition, context)
+            config = logic.render_composition(client, context)
 
             return JsonResponse(
                 data={

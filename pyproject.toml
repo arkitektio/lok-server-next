@@ -31,6 +31,7 @@ django-health-check = "^3.18.1"
 docker = ">6,<7"
 django-probes = "^1.7.0"
 livekit-api = "^0.5.1"
+boto3 = "^1.37.13"
 
 
 [tool.poetry.group.dev.dependencies]

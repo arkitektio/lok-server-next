@@ -2,6 +2,12 @@ from enum import Enum
 import strawberry
 from django.db.models import TextChoices
 
+class LayerKindChoices(TextChoices):
+    """Event Type for the Event Operator"""
+    WEB = "WEB", "WEB (Value represent WEB)"
+    TAILSCALE = "TAILSCALE", "TAILSCALE (Value represent TAILSCALE)"
+    VPN = "VPN", "VPN (Value represent VPN)"
+
 
 class ClientKindChoices(TextChoices):
     """Event Type for the Event Operator"""

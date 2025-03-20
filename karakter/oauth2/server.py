@@ -12,6 +12,9 @@ from requests import request
 def custom_token_generator(request, refresh_token=False):
     app = request.client
     user: User = request.user or app.user
+    
+    if not user:
+        raise ValueError("User is required to generate a token")
 
     request.claims = {
         "type": app.authorization_grant_type,

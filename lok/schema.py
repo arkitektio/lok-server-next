@@ -25,6 +25,7 @@ from pak import types as pak_types
 from pak.graphql import mutations as pak_mutations
 from pak.graphql import queries as pak_queries
 from pak.graphql import subscriptions as pak_subscriptions
+from karakter.datalayer import DatalayerExtension
 from strawberry_django.optimizer import DjangoOptimizerExtension
 
 
@@ -37,13 +38,13 @@ class Query:
     apps: list[fakts_types.App] = strawberry_django.field()
     releases: list[fakts_types.Release] = strawberry_django.field()
     clients: list[fakts_types.Client] = strawberry_django.field()
-    compositions: list[fakts_types.Composition] = strawberry_django.field()
     users: list[karakter_types.User] = strawberry_django.field()
     groups: list[karakter_types.Group] = strawberry_django.field()
     comments: list[komment_types.Comment] = strawberry_django.field()
     rooms: list[kammer_types.Room] = strawberry_django.field()
     services: list[fakts_types.Service] = strawberry_django.field()
     service_instances: list[fakts_types.ServiceInstance] = strawberry_django.field()
+    
 
     user = strawberry_django.field(resolver=karakter_queries.user)
     me = strawberry_django.field(resolver=karakter_queries.me)
@@ -59,6 +60,11 @@ class Query:
     my_managed_clients = strawberry_django.field(
         resolver=fakts_queries.my_managed_clients
     )
+    layers: list[fakts_types.Layer] = strawberry_django.field()
+    
+    
+    
+    
     scopes = strawberry_django.field(resolver=fakts_queries.scopes)
 
     comment = strawberry_django.field(resolver=komment_queries.comment)
@@ -83,6 +89,10 @@ class Query:
     @strawberry_django.field()
     def service(self, info: Info, id: strawberry.ID) -> fakts_types.Service:
         return fakts_models.Service.objects.get(id=id)
+    
+    @strawberry_django.field()
+    def layer(self, info: Info, id: strawberry.ID) -> fakts_types.Layer:
+        return fakts_models.Layer.objects.get(id=id)
 
     @strawberry_django.field()
     def service_instance(
@@ -154,6 +164,29 @@ class Mutation:
     create_user_defined_service_instance = strawberry_django.mutation(
         resolver=fakts_mutations.create_user_defined_service_instance,
     )
+    
+    update_service_instance = strawberry_django.mutation(
+        resolver=fakts_mutations.update_service_instance,
+    )
+    
+    request_media_upload = strawberry_django.mutation(
+        resolver=karakter_mutations.request_media_upload,
+    )
+    
+    update_profile = strawberry_django.mutation(
+        resolver=karakter_mutations.update_profile,
+    )
+    create_profile = strawberry_django.mutation(
+        resolver=karakter_mutations.create_profile,
+    )
+    
+    
+    update_group_profile = strawberry_django.mutation(
+        resolver=karakter_mutations.update_group_profile,
+    )
+    create_group_profile = strawberry_django.mutation(
+        resolver=karakter_mutations.create_group_profile,
+    )
 
 
 @strawberry.type
@@ -172,6 +205,8 @@ schema = strawberry.Schema(
     directives=[upper, replace, relation],
     extensions=[
         DjangoOptimizerExtension,
+        
+        DatalayerExtension
     ],
     types=[
         komment_types.Descendant,
