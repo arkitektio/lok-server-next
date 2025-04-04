@@ -34,10 +34,12 @@ class WellKnownFakts(View):
     Of the Fakts Protocol"""
 
     def get(self, request, format=None):
-
-        with open(settings.CA_FILE, "r") as f:
-            ca = f.read()
-            
+        try:
+            with open(settings.CA_FILE, "r") as f:
+                ca = f.read()
+        except Exception as e:
+            ca = None
+                
             
         layers = [
             base_models.Layer(identifier=i.identifier, kind=i.kind, dns_probe=i.dns_probe, get_probe=i.get_probe) for i in models.Layer.objects.all()
