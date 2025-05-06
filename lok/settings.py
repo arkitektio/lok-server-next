@@ -431,3 +431,6 @@ SOCIALACCOUNT_PROVIDERS = {
         },
     },
 }
+
+
+MY_SCRIPT_NAME = conf.get("force_script_name", "lok")

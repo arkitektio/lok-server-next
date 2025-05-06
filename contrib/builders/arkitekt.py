@@ -60,7 +60,7 @@ def lok(
 
     base_url = _create_base_url(self, context, descriptor)
 
-    return {
+    return generic(self, context, descriptor) | {
         "base_url": base_url + "/o",
         "userinfo_url": f"{base_url}/o/userinfo",
         "token_url": f"{base_url}/o/token",
@@ -72,7 +72,7 @@ def lok(
         "name": context.client.name,
         "scopes": context.manifest.scopes,
         "__service": "live.arkitekt.lok",
-    } | generic(self, context, descriptor)
+    } 
 
 
 def generic(
@@ -85,6 +85,7 @@ def generic(
     ws_base_url = _create_base_wsurl(self, context, descriptor)
 
     return {
+        "base_url": base_url,
         "endpoint_url": base_url + "/graphql",
         "healthtz ": f"{base_url}/ht",
         "ws_endpoint_url": ws_base_url + "/graphql",
