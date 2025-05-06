@@ -7,7 +7,7 @@ import random
 import logging
 from oauthlib.common import Request
 from requests import request
-
+import datetime
 
 def custom_token_generator(request, refresh_token=False):
     app = request.client
@@ -17,20 +17,15 @@ def custom_token_generator(request, refresh_token=False):
         raise ValueError("User is required to generate a token")
 
     request.claims = {
-        "type": app.authorization_grant_type,
         "sub": str(user.id) if user else None,
         "preferred_username": user.username if user else None,
         "roles": [group.name for group in user.groups.all()] if user else [],
         "scope": " ".join(request.scopes),
         "iss": "herre",
+        "iat": datetime.datetime.now().timestamp(),
         "client_id": app.client_id,
     }
 
-    if app.client and app.client.release:
-        # This is to support old services that want to use the version and identifier
-        # TODO: Remove this when all services are updated to authentikate
-        request.claims["version"] = app.client.release.version
-        request.claims["identifier"] = app.client.release.app.identifier
 
     return common.generate_signed_token(settings.OAUTH2_JWT["PRIVATE_KEY"], request)
 
