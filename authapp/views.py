@@ -28,7 +28,9 @@ class CustomLoginView(LoginView):
     success_url = reverse_lazy('home')  # Replace 'home' with your view name
 
     def get_success_url(self):
-        return self.request.GET.get('next') or self.success_url
+        # This uses ?next=... if present; otherwise falls back to success_url
+        return self.get_redirect_url() or self.success_url
+
 
 
 def logout_view(request):
