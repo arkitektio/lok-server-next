@@ -1,4 +1,4 @@
-from ekke.types import Info
+from kante.types import Info
 import strawberry_django
 import strawberry
 from pak import types, models, inputs, enums, scalars

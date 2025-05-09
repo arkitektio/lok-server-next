@@ -1,149 +1,164 @@
+apps: []
+csrf_trusted_origins:
+  - http://jhnnsrs-lab.hyena-sole.ts.net
+  - https://jhnnsrs-lab.hyena-sole.ts.net
+  - http://jhnnsrs-server
+  - https://jhnnsrs-server
+  - http://localhost
+  - https://localhost
 db:
   db_name: lok_db
+  dependency: db
   engine: django.db.backends.postgresql
   host: db
   password: postgres
   port: 5432
   username: fostgres
-apps:
-  - identifier: github.io.jhnnsrs.mikrojss
-    version: 0.0.3
-    scopes:
-      - read
-      - write
-    clients:
-      - kind: website
-        token: ddoinoinoinsoineoinoeine
-        redirect_uris:
-          - http://localhost:8090
-        tenant: johannes
-        composition: generic
-      - kind: development
-        token: dsodinsoinsoidnosi
-        user: frank
-        tenant: frank
-        composition: generic
-  - identifier: github.io.jhnnsrs.orkestrator
-    version: 0.0.3
-    scopes:
-      - read
-      - write
-    clients:
-      - kind: website
-        token: 5oinoin2oin3oinoi33n2
-        redirect_uris:
-          - http://127.0.0.1/
-          - http://127.0.0.1/callback
-        tenant: johannes
-        composition: generic
-        public: true
-
-linkers:
-  - name: TemplateLinker
-    function: fakts
-
 deployment:
-  name: Fakts
-
+  name: default
 django:
   admin:
     email: admin@admin.com
     password: admin
     username: admin
-  debug: false
+  debug: true
   hosts:
     - "*"
-  secret_key: t!7qh%)_#&k_6px&n(xm4bes@t3nrmgh=h2k#8f@rbgz=&y9f21
+  secret_key: c5d84589433e1d0b4198072c54ee0dd1
+groups:
+  - description: admin_group
+    name: admin
+  - description: The linz anatomy group
+    name: linz-iac
+  - description: The UC2 group
+    name: uc2
+livekit:
+  api_key: devkey
+  api_secret: secret
+  api_url: http://livekit:7880
 lok:
   issuer: lok
   key_type: RS256
-  public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDGFj0zB7j6KrTRFEP+a2Z7toLEwJ0ROF3qSkq6vo2aK5TGRv+D3V/6VhvM2NgtUIO1iqwvf4XETamhHt2xlVzJyoyMAnAGkwkMyQJpI6wG5g7NtrRc1kkeefWbLBVW+aEI++3ec3eD9PUhnjXbQXJwju8l2ldKg2skw2fZWrjfWo0S0CuvB05nXJ8BmmAo65BBv29gGVywzZEApv/Zu16l6ftCZSEKi/zMbK6YxCekl/h3sfK7uGj6uaab7XSqqANHDZDTSotD5ws8UdMb3IP4/qoJiJm0Lsw5XpmFTt9M+ekiv/9HsWjXtzOd0BpqxynlvF1fWDr0HVnrUCh1XMzn
-redis:
-  host: redis
-  port: 6379
+  public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDXx/g7dyiwmfIQvkBKvUAM+KBuL1KdvZfZMlYhbyrz9Auk2xao1gLYiQJ183joiXadUreL4BugUrasQVdR9JvBWXOBeqm2FD5Ehf9VvqXdzCOQ7/fUXkb9N8sqmz5YitQuheKGDh0weNmVcfdsCGU38sACEvFQg+5dv1tqLbm7EllT+vogntDVX16DmvpvFEX4HYHpT8qM/xuqSB6yQ8+wBuQd3K7WTFgUrUqQx6zFrSMUbSArPrrY5Z0GJAeDAHKp4+V+um4mSHpYM2nBJ5pn80wYpsf97KIL9P+UJzjb/indB8dCqpPkAk3HogBhj67Tp5JoqCMoaXHFU3tiYQCp
 private_key: "-----BEGIN PRIVATE KEY-----
 
-  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
+  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
 
-  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
+  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
 
-  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
+  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
 
-  njXbQXJwju8l2ldKg2skw2fZWrjfWo0S0CuvB05nXJ8BmmAo65BBv29gGVywzZEA
+  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
 
-  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
+  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
 
-  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
+  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
 
-  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
+  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
 
-  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
+  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
 
-  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
+  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
 
-  bb6/e2zf4WQ+6slUW4N1djZW2q5JtZR4a4v6nW9K4laC0UgOAzlKcfgfNuym3dcL
+  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
 
-  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
+  IwUyCz3XFOdC84taz2+xT0umJeG4RGDdiL0ZM1BC89BqFtQiOJntqaV6FgczKRTH
 
-  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
+  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
 
-  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
+  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
 
-  IWjPp+9tGIY3uo4gZNYPQt1Vbpndkrh+uo5arTEG2YW5AW7/q/ujw50L3SfE3AMs
+  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
 
-  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
+  BQIlbMz0ImGnU3QQRg7kesAf/wKBgQDq4E11mR4gqKxmW4RWT9cJ+DM285APaGXf
 
-  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
+  85fyjaVs1eVvZ5krY5vmemAOLk9v8F73Sn64zEtJVCQzD5YwihjmQ4dS+hn7f3j1
 
-  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
+  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
 
-  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
+  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
 
-  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
+  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
 
-  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
+  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
 
-  +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
+  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
 
-  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
+  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
 
-  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
+  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
 
-  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
+  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
 
-  T8Xz5BnVAhN5QjOvielXW79b87jLun3i7CaMnsA1SGgnDdkBPpJvOe1tyCmZiN3A
+  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
 
-  X95jwe+hRAc3nA1/yc55ais=
+  qv9UsZQ7iutdI3MsfEU9PWEL
 
   -----END PRIVATE KEY-----
 
   "
-public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDGFj0zB7j6KrTRFEP+a2Z7toLEwJ0ROF3qSkq6vo2aK5TGRv+D3V/6VhvM2NgtUIO1iqwvf4XETamhHt2xlVzJyoyMAnAGkwkMyQJpI6wG5g7NtrRc1kkeefWbLBVW+aEI++3ec3eD9PUhnjXbQXJwju8l2ldKg2skw2fZWrjfWo0S0CuvB05nXJ8BmmAo65BBv29gGVywzZEApv/Zu16l6ftCZSEKi/zMbK6YxCekl/h3sfK7uGj6uaab7XSqqANHDZDTSotD5ws8UdMb3IP4/qoJiJm0Lsw5XpmFTt9M+ekiv/9HsWjXtzOd0BpqxynlvF1fWDr0HVnrUCh1XMzn
+public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDXx/g7dyiwmfIQvkBKvUAM+KBuL1KdvZfZMlYhbyrz9Auk2xao1gLYiQJ183joiXadUreL4BugUrasQVdR9JvBWXOBeqm2FD5Ehf9VvqXdzCOQ7/fUXkb9N8sqmz5YitQuheKGDh0weNmVcfdsCGU38sACEvFQg+5dv1tqLbm7EllT+vogntDVX16DmvpvFEX4HYHpT8qM/xuqSB6yQ8+wBuQd3K7WTFgUrUqQx6zFrSMUbSArPrrY5Z0GJAeDAHKp4+V+um4mSHpYM2nBJ5pn80wYpsf97KIL9P+UJzjb/indB8dCqpPkAk3HogBhj67Tp5JoqCMoaXHFU3tiYQCp
+redeem_tokens:
+  - token: Y22joLbkjm4vtXMj_T4FD3U99Mb71pTFnUe-8KToAQI
+    user: admin
+redis:
+  dependency: redis
+  host: redis
+  port: 6379
 scopes:
-  can_assign: Can Assign Nodes
-  can_create: Can Create Nodes
-  can_create_identifier: Can create new identifier for the platform
-  can_forward_bounce:
-    Can reserve and assign to Nodes mimicking other Users (only
-    backend and admin)
-  can_provide: Can Provide Nodes
-  can_template: Can Template Nodes
-  introspection: Introspect the Token scope
-  provider: Can act as a provider
-  read: Reading all of your Data
-  write: Writing to all of your Data
-  read_starred: Reading all of your shared Data
-token_expire_seconds: 604800
+  kabinet_add_repo: Add repositories to the database
+  kabinet_deploy: Deploy containers
+  mikro_read: Read image from the database
+  mikro_write: Write image to the database
+  openid: The open id connect scope
+  read: A generic read access
+  read_image: Read image from the database
+  rekuest_agent: Act as an agent
+  rekuest_call: Call other apps with rekuest
+  write: A generic write access
+token_expire_seconds: 700000
 users:
-  - email: johannes@gmail.com
-    groups:
-      - My Perfect Team
-    password: johannes
-    username: johannes
-  - email: thierno@gmail.com
-    groups:
-      - My Perfect Team
-    password: thierno
-    username: thierno
-  - username: frank
-    password: frank
+  - name: Johannes Roos
+    username: jhnnsrs
+    password: mysecret-name
+    groups: [iac-linz, uc2]
+  - name: Benedict Diederich
+    username: beniroquai
+    password: my-other-name
+    groups: [uc2]
+ensured_layers:
+  - kind: tailscale
+    identifier: jhnnsrs-tailscale
+ensured_instances:
+  mikro_base:
+    builder: arkitekt.relpath
+    service: arkitekt.live.mikro
+    limited_to_groups:
+      - uc2
+    layer: web
+    params:
+      path: "mikro"
+  fluss_base:
+    builder: arkitekt.relpath
+    service: arkitekt.live.fluss
+    limited_to_users:
+      - jhnnsrs
+    layer: web
+    params:
+      path: "fluss"
+  kraph_base:
+    builder: arkitekt.relpath
+    service: arkitekt.live.mikro
+    layer: web
+    params:
+      path: "kraph"
+s3:
+  access_key: ZvBLOQAApECKXISSJyiox192s6RNhVgmN9LZhWFYbdA
+  buckets:
+    media: sleazy-tan-seahorse
+  dependency: minio
+  host: minio
+  name: lanky-green-dalmatian
+  port: 9000
+  protocol: http
+  secret_key: rqh27SKddiMciJ2RPSpQF3l_SYtlXNKCA9Fp3NgrYBQ

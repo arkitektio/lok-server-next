@@ -6,7 +6,10 @@ from typing import Dict, Any
 from pydantic import BaseModel
 from typing import Optional
 from fakts.base_models import LinkingContext
+import logging
 
+
+logger = logging.getLogger(__name__)
 
 class ServiceDescriptor(BaseModel):
     """A service descriptor
@@ -97,11 +100,16 @@ class BackendRegistry:
             assert "NAME" in i, "Backend configuration must have a NAME"
             try:
                 backend = import_string(i["NAME"])(i)
+                self.register(backend)
+
             except Exception as e:
-                raise Exception(f"Could not import backend {i['NAME']}") from e
+                logger.error(
+                    f"Could not load backend {i['NAME']}: {e}",
+                    exc_info=True,
+                )
+                
 
-            self.register(backend)
-
+          
         pass
 
     def get_backend_identifiers(self):

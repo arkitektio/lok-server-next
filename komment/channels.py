@@ -1,3 +1,7 @@
-from ekke.channel import build_channel
+from kante.channel import build_channel
+from pydantic import BaseModel
 
-mention_broadcast, mention_listen = build_channel("mention_broadcast")
+class MentionSignal(BaseModel):
+    id: str
+
+mention_channel = build_channel(MentionSignal)

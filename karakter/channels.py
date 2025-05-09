@@ -1,3 +1,8 @@
-from ekke.channel import build_channel
+from kante.channel import build_channel
+from pydantic import BaseModel
 
-communication_broadcast, communicatoin_listen = build_channel("communication_broadcast")
+class Communication(BaseModel):
+    id: str
+
+
+communication_channel = build_channel(Communication)

@@ -1,3 +1,8 @@
-from ekke.channel import build_channel
+from kante.channel import build_channel
+from pydantic import BaseModel
 
-stash_changed, stash_changed_listen = build_channel("item_added")
+class StashSignal(BaseModel):
+    id: str
+
+
+stash_channel = build_channel(StashSignal)

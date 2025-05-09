@@ -11,9 +11,9 @@ from typing import Literal, Union
 from karakter import types
 import datetime
 from fakts import models, scalars, enums, filters, enums
-from oauth2_provider.models import Application
 from fakts.backends import enums as fb_enums
 from karakter.datalayer import get_current_datalayer
+from authapp import types as atypes
 
 
 @strawberry.type(
@@ -244,17 +244,6 @@ class Release:
     clients: list["Client"] = strawberry.field(description="The clients of the release")
 
 
-@strawberry_django.type(Application)
-class Oauth2Client:
-    id: strawberry.ID
-    name: str
-    user: types.User
-    client_type: str
-    client_id: str
-    algorithm: str
-    authorization_grant_type: str
-    redirect_uris: str
-
 
 @strawberry_django.type(
     models.Client,
@@ -276,7 +265,7 @@ class Client:
     kind: enums.ClientKind = strawberry.field(
         description="The kind of the client. The kind defines the authentication flow that is used to authenticate users with this client."
     )
-    oauth2_client: Oauth2Client = strawberry.field(
+    oauth2_client: atypes.Oauth2Client = strawberry.field(
         description="The real oauth2 client that is used to authenticate users with this client."
     )
     public: bool = strawberry.field(

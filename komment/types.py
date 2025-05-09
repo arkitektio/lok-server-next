@@ -11,7 +11,7 @@ import datetime
 from strawberry.experimental import pydantic
 from pydantic import BaseModel, Field
 from karakter import types
-from ekke.types import Info
+from kante.types import Info
 import json
 
 

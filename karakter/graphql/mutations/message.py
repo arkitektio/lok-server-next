@@ -5,7 +5,7 @@ import logging
 import namegenerator
 import strawberry
 import strawberry_django
-from ekke.types import Info
+from kante.types import Info
 from karakter import enums, inputs, models, scalars, types
 from karakter.hashers import hash_graph
 
