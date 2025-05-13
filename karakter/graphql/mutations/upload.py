@@ -1,4 +1,4 @@
-from ekke.types import Info
+from kante.types import Info
 import strawberry
 
 from fakts import types, models, scalars

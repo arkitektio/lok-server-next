@@ -6,7 +6,7 @@ import uuid
 import namegenerator
 import strawberry
 import strawberry_django
-from ekke.types import Info
+from kante.types import Info
 from django.contrib.auth import get_user_model
 
 from fakts import enums, inputs, models, scalars, types

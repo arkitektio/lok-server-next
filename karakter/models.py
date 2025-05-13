@@ -1,7 +1,4 @@
 import logging
-
-import requests
-from allauth.socialaccount.models import SocialAccount
 from django.contrib.auth.models import AbstractUser, Group
 from django.db import models
 logger = logging.getLogger(__name__)

@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field, validator
 from typing import List, Optional, Literal, Union
 from django.conf import settings
 from enum import Enum
-from fakts import enums, validators
+from fakts import enums
 from typing import Literal
 
 
@@ -60,9 +60,7 @@ class CompositionInputModel(BaseModel):
     name: str
     template: str
 
-    @validator("template")
-    def validate_template(cls, v):
-        return validators.jinja2_yaml_template_validator(v)
+
 
 
 class DeviceCodeStartRequest(BaseModel):

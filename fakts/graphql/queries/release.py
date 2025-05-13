@@ -1,6 +1,6 @@
 import strawberry
 import strawberry_django
-from ekke.types import Info
+from kante.types import Info
 from fakts import enums, inputs, models, scalars, types
 
 

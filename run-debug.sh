@@ -1,34 +1,36 @@
 #!/bin/bash
 echo "=> Waiting for DB to be online"
-python manage.py wait_for_database -s 2
+uv run python manage.py wait_for_database -s 2
 
 echo "=> Performing database migrations..."
-python manage.py migrate
+uv run python manage.py migrate
 
 echo "=> Ensuring Superusers..."
-python manage.py ensureadmin
+uv run python manage.py ensureadmin
 
 echo "=> Ensuring Users..."
-python manage.py ensureusers
+uv run python manage.py ensureusers
 
 echo "=> Ensuring Groups..."
-python manage.py ensuregroups
+uv run python manage.py ensuregroups
 
 echo "=> Ensuring Layers..."
-python manage.py ensurelayers
+uv run python manage.py ensurelayers
 
 echo "=> Ensuring Compositions..."
-python manage.py ensurecompositions
+uv run python manage.py ensurecompositions
 
 echo "=> Ensuring Apps..."
-python manage.py ensureapps
+uv run python manage.py ensureapps
 
 echo "=> Ensuring Token..."
-python manage.py ensuretokens
+uv run python manage.py ensuretokens
 
 echo "=> Collecting Static.."
-python manage.py collectstatic --noinput
+uv run python manage.py collectstatic --noinput
 
+
+export AUTHLIB_INSECURE_TRANSPORT=1
 # Start the first process
 echo "=> Starting Server"
-python manage.py runserver 0.0.0.0:80
+uv run python manage.py runserver 0.0.0.0:80

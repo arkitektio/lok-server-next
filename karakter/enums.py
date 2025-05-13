@@ -1,10 +1,8 @@
 from enum import Enum
 import strawberry
 from django.db.models import TextChoices
-from allauth.socialaccount.providers import registry
 
-params = dict(map(lambda x: (x[0].upper(), x[0]), registry.as_choices()))
-ProviderType = strawberry.enum(Enum("ProviderType", params))
+
 
 
 class RunEventKindChoices(TextChoices):

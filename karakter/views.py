@@ -1,5 +1,4 @@
 from django.shortcuts import render, redirect
-from allauth.socialaccount.models import SocialAccount
 from .forms import ProfileForm
 from django.contrib.auth.decorators import login_required
 
@@ -15,12 +14,10 @@ def profile(request):
             profile_form.save()
             return redirect("profile")
 
-    # Get the social accounts linked to the user
-    social_accounts = SocialAccount.objects.filter(user=request.user)
 
     context = {
         "profile_form": profile_form,
-        "social_accounts": social_accounts,
+        "social_accounts": [],
     }
 
     return render(request, "karakter/profile.html", context)

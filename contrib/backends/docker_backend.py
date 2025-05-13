@@ -109,7 +109,7 @@ class DockerConfig(BaseModel):
     NAME: str
     BUILDERS: list[str]
     DEFAULT_BUILDER: str | None = None
-    BUILDERS_PATH = "contrib.builders"
+    BUILDERS_PATH: str = "contrib.builders"
 
 
 class DockerBackend(BackendBase):

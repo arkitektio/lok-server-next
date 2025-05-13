@@ -4,8 +4,7 @@ from typing import Any, Dict, ForwardRef, List, Optional, cast
 from karakter.datalayer import get_current_datalayer
 import strawberry
 import strawberry_django
-from allauth.socialaccount import models as smodels
-from ekke.types import Info
+from kante.types import Info
 from karakter import enums, filters, models, scalars
 from strawberry import LazyType
 
@@ -48,14 +47,6 @@ class MediaStore:
   
 
 
-def cast_to_model(model: smodels.SocialAccount):
-    print(model.provider)
-    if model.provider == "orcid":
-        print("Matching?")
-        return cast(OrcidAccount, model)
-    else:
-        return cast(GenericAccount, model)
-
 
 @strawberry_django.type(
     models.User,
@@ -84,9 +75,6 @@ class User:
     profile: "Profile"
     managed_clients: strawberry.auto
 
-    @strawberry_django.field()
-    def social_accounts(self, info) -> list["SocialAccount"]:
-        return list(smodels.SocialAccount.objects.filter(user=self))
 
     
 
@@ -125,25 +113,6 @@ class GroupProfile:
     avatar: MediaStore | None = strawberry.field(description="The avatar of the group")
     
 
-@strawberry_django.interface(
-    smodels.SocialAccount,
-    description="""
-A Social Account is an account that is associated with a user. It can be used to authenticate the user with external services. It
-can be used to store extra data about the user that is specific to the provider. We provide typed access to the extra data for
-some providers. For others we provide a generic json field that can be used to store arbitrary data. Generic accounts are
-always available, but typed accounts are only available for some providers.
-""",
-)
-class SocialAccount:
-    provider: enums.ProviderType = strawberry.field(
-        description="The provider of the account. This can be used to determine the type of the account."
-    )
-    uid: str = strawberry.field(
-        description="The unique identifier of the account. This is unique for the provider."
-    )
-    extra_data: scalars.ExtraData = strawberry.field(
-        description="Extra data that is specific to the provider. This is a json field and can be used to store arbitrary data."
-    )
 
 
 @strawberry.type(
@@ -187,84 +156,7 @@ class OrcidActivities:
     educations: list[str]
 
 
-@strawberry_django.type(
-    smodels.SocialAccount,
-    filters=filters.SocialAccountFilter,
-    pagination=True,
-    description="""
-An ORCID Account is a Social Account that maps to an ORCID Account. It provides information about the
-user that is specific to the ORCID service. This includes the ORCID Identifier, the ORCID Preferences and
-the ORCID Person. The ORCID Person contains information about the user that is specific to the ORCID service.
-This includes the ORCID Activities, the ORCID Researcher URLs and the ORCID Addresses.
 
-""",
-)
-class OrcidAccount(SocialAccount):
-
-    @strawberry_django.field(
-        description="The ORCID Identifier of the user. The UID of the account is the same as the path of the identifier."
-    )
-    def identifier(self) -> OrcidIdentifier:
-        return OrcidIdentifier(**self.extra_data["orcid-identifier"])
-
-    @strawberry_django.field(
-        description="Information about the person that is specific to the ORCID service."
-    )
-    def person(self) -> Optional[OrcidPerson]:
-
-        person = self.extra_data.get("person", None)
-        if not person:
-            return None
-
-        researcher_urls = self.extra_data.get("researcher-urls", {}).get(
-            "researcher-urls", []
-        )
-        addresses = self.extra_data.get("addresses", {}).get("addresses", [])
-
-        return OrcidPerson(researcher_urls=researcher_urls, addresses=addresses)
-
-    @staticmethod
-    def is_type_of(ob, info):
-        return ob.provider == "orcid"
-
-
-@strawberry_django.type(
-    smodels.SocialAccount,
-    filters=filters.SocialAccountFilter,
-    pagination=True,
-    description="""
-The Github Account is a Social Account that maps to a Github Account. It provides information about the
-user that is specific to the Github service. This includes the Github Identifier.
-
-""",
-)
-class GithubAccount(SocialAccount):
-
-    @strawberry_django.field()
-    def identifier(self) -> OrcidIdentifier:
-        raise NotImplementedError()
-
-    @staticmethod
-    def is_type_of(ob, info):
-        return ob.provider == "github"
-
-
-@strawberry_django.type(
-    smodels.SocialAccount,
-    filters=filters.SocialAccountFilter,
-    pagination=True,
-    description="""
-The Generic Account is a Social Account that maps to a generic account. It provides information about the
-user that is specific to the provider. This includes untyped extra data.
-
-""",
-)
-class GenericAccount(SocialAccount):
-    extra_data: scalars.ExtraData
-
-    @staticmethod
-    def is_type_of(ob, info):
-        return ob.provider != "orcid"
 
 
 @strawberry.type(description="""A Communication""")

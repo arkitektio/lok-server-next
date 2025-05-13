@@ -8,7 +8,7 @@ from typing import ForwardRef
 from strawberry import LazyType
 import datetime
 from karakter.types import User
-from ekke.types import Info
+from kante.types import Info
 
 
 @strawberry_django.type(

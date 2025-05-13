@@ -39,20 +39,13 @@ class WellKnownFakts(View):
                 ca = f.read()
         except Exception as e:
             ca = None
-                
-            
-        layers = [
-            base_models.Layer(identifier=i.identifier, kind=i.kind, dns_probe=i.dns_probe, get_probe=i.get_probe) for i in models.Layer.objects.all()
-        ]
+
+        layers = [base_models.Layer(identifier=i.identifier, kind=i.kind, dns_probe=i.dns_probe, get_probe=i.get_probe) for i in models.Layer.objects.all()]
 
         return JsonResponse(
-            data=base_models.WellKnownFakts(name= settings.DEPLOYMENT_NAME,
-                                            version=settings.FAKTS_PROTOCOL_VERSION,
-                                            description=settings.DEPLOYMENT_DESCRIPTION,
-                                            claim=request.build_absolute_uri(reverse("fakts:claim")),
-                                            base_url=request.build_absolute_uri(reverse("fakts:index")),
-                                            ca_crt=ca,
-                                            layers=layers).dict()
+            data=base_models.WellKnownFakts(
+                name=settings.DEPLOYMENT_NAME, version=settings.FAKTS_PROTOCOL_VERSION, description=settings.DEPLOYMENT_DESCRIPTION, claim=request.build_absolute_uri(reverse("fakts:claim")), base_url=request.build_absolute_uri(reverse("fakts:index")), ca_crt=ca, layers=layers
+            ).dict()
         )
 
 
@@ -91,9 +84,7 @@ class ConfigureView(LoginRequiredMixin, FormView):
         grant = request.GET.get("grant", None)
         device_code = request.GET.get("device_code", None)
 
-        return base_models.ConfigurationRequest(
-            claim=claim, grant=grant, device_code=device_code
-        )
+        return base_models.ConfigurationRequest(claim=claim, grant=grant, device_code=device_code)
 
     def get_initial(self):
         # TODO: move this scopes conversion from and to string into a utils function
@@ -109,14 +100,12 @@ class ConfigureView(LoginRequiredMixin, FormView):
 
         the_code = self.request.GET.get("device_code", None)
         if the_code:
-
             logger.info(f"Received Context for {the_code}")
 
             x = models.DeviceCode.objects.get(code=the_code)
 
             manifest = base_models.Manifest(**x.staging_manifest)
-            
-            
+
             layers = x.supported_layers.all()
 
             composition_errors, composition_warnings = logic.check_compability(manifest, layers, self.request.user)
@@ -127,9 +116,7 @@ class ConfigureView(LoginRequiredMixin, FormView):
 
             print(manifest.requirements)
 
-            context["composition_requirements"] = {
-                req.key: req.service for req in manifest.requirements
-            }
+            context["composition_requirements"] = {req.key: req.service for req in manifest.requirements}
             context["composition_errors"] = composition_errors
             context["composition_warnings"] = composition_warnings
             context["staging_identifier"] = x.staging_manifest["identifier"]
@@ -141,14 +128,10 @@ class ConfigureView(LoginRequiredMixin, FormView):
 
             context["code"] = x
 
-            app = models.App.objects.filter(
-                identifier=x.staging_manifest["identifier"]
-            ).first()
+            app = models.App.objects.filter(identifier=x.staging_manifest["identifier"]).first()
             if app:
                 context["app"] = app
-                release = models.Release.objects.filter(
-                    app=app, version=x.staging_manifest["version"]
-                ).first()
+                release = models.Release.objects.filter(app=app, version=x.staging_manifest["version"]).first()
                 if release:
                     context["release"] = release
                     client = models.Client.objects.filter(
@@ -167,13 +150,11 @@ class ConfigureView(LoginRequiredMixin, FormView):
         return super().form_invalid(form)
 
     def form_valid(self, form):
-
         action = self.request.POST.get("action", None)
 
         device_code = form.cleaned_data["device_code"]
 
         if action == "allow":
-
             device_code = models.DeviceCode.objects.get(
                 code=device_code,
             )
@@ -191,16 +172,12 @@ class ConfigureView(LoginRequiredMixin, FormView):
             ).first()
 
             if not client:
-
                 token = logic.create_api_token()
 
                 manifest = base_models.Manifest(**device_code.staging_manifest)
                 config = None
 
-                if (
-                    device_code.staging_kind
-                    == enums.ClientKindVanilla.DEVELOPMENT.value
-                ):
+                if device_code.staging_kind == enums.ClientKindVanilla.DEVELOPMENT.value:
                     config = base_models.DevelopmentClientConfig(
                         kind=enums.ClientKindVanilla.DEVELOPMENT.value,
                         token=token,
@@ -303,7 +280,6 @@ class SuccessView(LoginRequiredMixin, TemplateView):
     template_name = "fakts/success.html"
 
     def get(self, request, *args, **kwargs):
-
         return self.render_to_response(self.get_context_data(**kwargs))
 
 
@@ -351,21 +327,18 @@ class StartChallengeView(View):
                 }
             )
 
-        logger.info(
-            f"Received start challenge for {manifest.identifier}:{manifest.version} {start_grant.request_public}"
-        )
+        logger.info(f"Received start challenge for {manifest.identifier}:{manifest.version} {start_grant.request_public}")
 
         device_code = models.DeviceCode.objects.create(
             code=logic.create_device_code(),
             staging_manifest=manifest.dict(),
-            expires_at=datetime.datetime.now(timezone.utc)
-            + datetime.timedelta(seconds=start_grant.expiration_time_seconds),
+            expires_at=datetime.datetime.now() + datetime.timedelta(seconds=start_grant.expiration_time_seconds),
             staging_kind=start_grant.requested_client_kind.value,
             staging_redirect_uris=start_grant.redirect_uris,
             staging_logo=logo,
             staging_public=start_grant.request_public,
         )
-        
+
         if start_grant.supported_layers:
             for layer in start_grant.supported_layers:
                 device_code.supported_layers.add(models.Layer.objects.get(identifier=layer))
@@ -386,7 +359,6 @@ class ChallengeView(View):
 
     def post(self, request, *args, **kwargs):
         try:
-
             json_data = json.loads(request.body)
             challenge = base_models.DeviceCodeChallengeRequest(**json_data)
         except Exception as e:
@@ -407,7 +379,7 @@ class ChallengeView(View):
                 }
             )
 
-        if datetime.datetime.now(timezone.utc) > device_code.expires_at:
+        if datetime.datetime.now(datetime.timezone.utc) > device_code.expires_at:
             device_code.delete()
             return JsonResponse(
                 data={
@@ -427,7 +399,6 @@ class ChallengeView(View):
 
         # scopes will only be set if the user has verified the challenge
         if device_code.client:
-
             return JsonResponse(
                 data={
                     "status": "granted",
@@ -453,9 +424,7 @@ class RetrieveView(View):
     """
 
     def post(self, request, *args, **kwargs):
-
         try:
-
             json_data = json.loads(request.body)
             retrieve = base_models.RetrieveRequest(**json_data)
         except Exception as e:
@@ -469,9 +438,7 @@ class RetrieveView(View):
 
         try:
             app = models.App.objects.get(identifier=retrieve.manifest.identifier)
-            release = models.Release.objects.get(
-                app=app, version=retrieve.manifest.version
-            )
+            release = models.Release.objects.get(app=app, version=retrieve.manifest.version)
         except models.Release.DoesNotExist:
             return JsonResponse(
                 data={
@@ -540,7 +507,8 @@ class RedeemView(View):
                 }
             )
         if valid_token.expires_at:
-            if valid_token.expires_at < datetime.datetime.now(timezone.utc):
+            if valid_token.expires_at < datetime.datetime.now():
+                valid_token.delete()
                 return JsonResponse(
                     data={
                         "status": "error",
@@ -619,7 +587,6 @@ class ClaimView(View):
             client = models.Client.objects.get(token=claim.token)
 
             context = logic.create_linking_context(request, client, claim)
-
 
             config = logic.render_composition(client, context)
 
