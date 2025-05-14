@@ -10,7 +10,7 @@ def client(
     if id:
         return models.Client.objects.get(id=id)
     if client_id:
-        return models.Client.objects.get(client_id=client_id)
+        return models.Client.objects.get(oauth2_client__client_id=client_id)
 
     raise ValueError("id or client_id must be provided")
 

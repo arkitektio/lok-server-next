@@ -256,32 +256,32 @@ class Release:
 )
 class Client:
     id: strawberry.ID
-    release: Release = strawberry.field(
+    release: Release = strawberry_django.field(
         description="The release that this client belongs to."
     )
-    tenant: types.User = strawberry.field(
+    tenant: types.User = strawberry_django.field(
         description="The user that manages this release."
     )
-    kind: enums.ClientKind = strawberry.field(
+    kind: enums.ClientKind = strawberry_django.field(
         description="The kind of the client. The kind defines the authentication flow that is used to authenticate users with this client."
     )
-    oauth2_client: atypes.Oauth2Client = strawberry.field(
+    oauth2_client: atypes.Oauth2Client = strawberry_django.field(
         description="The real oauth2 client that is used to authenticate users with this client."
     )
-    public: bool = strawberry.field(
+    public: bool = strawberry_django.field(
         description="Is this client public? If a client is public "
     )
-    user: types.User | None = strawberry.field(
+    user: types.User | None = strawberry_django.field(
         description="If the client is a DEVELOPMENT client, which requires no further authentication, this is the user that is authenticated with the client."
     )
-    logo: types.MediaStore | None = strawberry.field(
+    logo: types.MediaStore | None = strawberry_django.field(
         description="The logo of the release. This should be a url to a logo that can be used to represent the release."
     )
-    name: str = strawberry.field(
+    name: str = strawberry_django.field(
         description="The name of the client. This is a human readable name of the client."
     )
 
-    @strawberry.field(
+    @strawberry_django.field(
         description="The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information."
     )
     def kind(self, info) -> enums.ClientKind:
