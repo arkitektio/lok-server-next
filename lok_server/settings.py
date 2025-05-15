@@ -118,7 +118,7 @@ SUPERUSERS = [
 SECURE_PROXY_SSL_HEADER = (
     "HTTP_X_FORWARDED_PROTO",
     "https",
-)  # because we my be behind a proxy
+)  # because we are going to be run behind a reverse proxy
 
 
 MIDDLEWARE = [
