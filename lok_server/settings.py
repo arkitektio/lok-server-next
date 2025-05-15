@@ -236,14 +236,15 @@ OAUTH2_PROVIDER_ID_TOKEN_MODEL = "oauth2_provider.IDtoken"
 PRIVATE_KEY = conf.private_key
 
 AUTHENTIKATE = {
-    "ISSUERS": [{
-        "iss": "lok",
-        "kind": "rsa",
-        "public_key": conf.lok.get("public_key", None),
-    }],
+    "ISSUERS": [
+        {
+            "iss": "lok",
+            "kind": "rsa",
+            "public_key": conf.lok.get("public_key", None),
+        }
+    ],
     "STATIC_TOKENS": conf.lok.get("static_tokens", {}),
 }
-
 
 
 OAUTH2_PROVIDER = {
@@ -376,7 +377,7 @@ LOGIN_URL = "login"
 LOGOUT_URL = "logout"
 
 
-ENSURED_APPS = OmegaConf.to_object(conf.apps)
+ENSURED_APPS = []
 
 ENSURED_USERS = OmegaConf.to_object(conf.users)
 
@@ -400,17 +401,6 @@ SOCIALACCOUNT_PROVIDERS = {
         "VERIFIED_EMAIL": True
     },
     "orcid": {
-        # For each OAuth based provider, either add a ``SocialApp``
-        # (``socialaccount`` app) containing the required client
-        # credentials, or list them here:
-        "APPS": [
-            {
-                "client_id": "APP-AGTOUJHZGVNFR157",
-                "secret": "e135b12b-fe4f-4c7a-a9ee-1c283ad41013",
-            },
-        ],
-        # These are provider-specific settings that can only be
-        # listed here:
         "SCOPE": [
             "openid",
         ],
