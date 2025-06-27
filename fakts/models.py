@@ -15,6 +15,7 @@ from django.contrib.auth.models import AbstractUser, Group
 from karakter.models import MediaStore
 from django.conf import settings
 from authapp.models import OAuth2Client
+from fakts import base_models, errors
 
 
 class Layer(models.Model):
@@ -54,54 +55,118 @@ class Service(models.Model):
 
 
 class ServiceInstance(models.Model):
-    backend = models.CharField(max_length=1000)
-    layer = models.ForeignKey(Layer, on_delete=models.CASCADE, related_name="instances")
     service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name="instances")
     logo = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
-    identifier = models.CharField(max_length=1000)
+    identifier = models.CharField(max_length=1000, unique=True, help_text="The identifier of the instance. This is used to identify the instance in the configuration.")
+    steward = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.CASCADE,
+        related_name="stewarded_instances",
+        null=True,
+        blank=True,
+        help_text="The user who is responsible for this instance. If null the admin is stewared by admin user.",
+    )
     template = models.TextField()
     denied_users = models.ManyToManyField(get_user_model(), related_name="denied_instances")
     denied_groups = models.ManyToManyField(Group, related_name="denied_instances")
     allowed_users = models.ManyToManyField(get_user_model(), related_name="allowed_instances")
     allowed_groups = models.ManyToManyField(Group, related_name="allowed_instances")
 
+    def __str__(self):
+        return f"{self.service}:{self.identifier}"
+
+    def render(self, context: base_models.LinkingContext) -> base_models.InstanceClaim:
+        """Render all aliases of the instance into a list of URLs."""
+        urls = []
+        for alias in self.aliases.all():
+            try:
+                url = alias.to_url(context)
+                urls.append(url)
+            except AssertionError as e:
+                raise errors.InstanceAliasNotFound(f"Error rendering alias {alias}: {str(e)}")
+            
+            
+            
+            
+            
+            
+        return base_models.InstanceClaim(
+            service=self.service.identifier,
+            identifier=self.identifier,
+            aliases=urls,
+        )
+
+
+class InstanceAlias(models.Model):
+    """An alias for a service instance. This is used to provide a more user-friendly name for the instance."""
+
+    layer = models.ForeignKey(Layer, on_delete=models.CASCADE, related_name="aliases")
+    instance = models.ForeignKey(ServiceInstance, on_delete=models.CASCADE, related_name="aliases")
+    name = models.CharField(max_length=1000, null=True, blank=True, help_text="The name of the alias")
+    host = models.CharField(
+        max_length=1000,
+        null=True,
+        blank=True,
+        help_text="The host of the alias, if its a ABSOLUTE alias (e.g. 'example.com'). If not set, the alias is relative to the layer's domain.",
+    )
+    port = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="The port of the alias",
+    )
+    kind = TextChoicesField(
+        choices_enum=enums.AliasKindChoices,
+        default=enums.AliasKindChoices.RELATIVE.value,
+        help_text="The kind of alias. If relative, the alias is relative to the layer's domain. If absolute, the alias is an absolute URL.",
+    )
+    ssl = models.BooleanField(
+        default=True,
+        help_text="If the alias is available over SSL or not. If not set, the alias is assumed to be available over SSL.",
+    )
+    challenge = models.TextField(
+        default="ht",
+        help_text=""""A challenge URL to verify the alias on the client. If it returns a 200 OK, the alias is valid. It can additionally return a JSON object with a `challenge
+        key that contains the challenge to be solved by the client.""",
+    )
+    path = models.CharField(max_length=1000, null=True, blank=True, help_text="The path of the alias,")
+
     class Meta:
+        """Meta class for InstanceAlias model."""
+
         constraints = [
             models.UniqueConstraint(
-                fields=["backend", "identifier"],
-                name="Only one instance per backend and identifier",
+                fields=["layer", "instance"],
+                name="Only one alias per instance and name",
             )
         ]
 
-    def __str__(self):
-        return f"{self.service}:{self.backend}:{self.identifier}"
-
-
-class UserDefinedServiceInstance(models.Model):
-    instance = models.ForeignKey(ServiceInstance, on_delete=models.CASCADE, related_name="user_definitions")
-    creator = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="services")
-    values = models.JSONField(default=list)
-
-
-class InstanceConfig(models.Model):
-    instance = models.ForeignKey(ServiceInstance, on_delete=models.CASCADE, related_name="configs")
-    key = models.CharField(max_length=1000)
-    value = models.JSONField(default=dict)
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["instance", "key"],
-                name="Only one config per instance and key",
+    def to_url(self, linking: base_models.LinkingContext) -> base_models.Alias:
+        """Convert the alias to a URL based on the linking context."""
+        if self.kind == enums.AliasKindChoices.RELATIVE.value:
+            # Relative alias, use the layer's domain
+            return base_models.Alias(
+                ssl=linking.request.is_secure,
+                host=linking.request.host,
+                port=linking.request.port,
+                path=self.path,
+                challenge=self.challenge,
             )
-        ]
+        else:
+            return base_models.Alias(
+                ssl = self.ssl, 
+                host=self.host,
+                port=self.port,
+                path=self.path,
+                challenge=self.challenge,
+            )
 
-    def __str__(self):
-        return f"{self.key}:{self.instance}"
+    def __str__(self) -> str:
+        """String representation of the InstanceAlias model."""
+        return f"{self.instance}@{self.layer}:{self.name}"
 
 
 class RedeemToken(models.Model):
-    """A redeem token is a token that can be used to redeed the rights to create
+    """A redeem token is a token that can be used to redeem the rights to create
     a client. It is used to give the recipient the right to create a client.
 
     If the token is not redeemed within the expires_at time, it will be invalid.

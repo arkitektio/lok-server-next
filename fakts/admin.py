@@ -1,12 +1,13 @@
 from django.contrib import admin
-from fakts.models import *
+from fakts import models
 
 # Register your models here.
-admin.site.register(App)
-admin.site.register(Release)
-admin.site.register(Service)
-admin.site.register(ServiceInstance)
-admin.site.register(Client)
-admin.site.register(DeviceCode)
-admin.site.register(ServiceInstanceMapping)
-admin.site.register(RedeemToken)
+admin.site.register(models.App)
+admin.site.register(models.Release)
+admin.site.register(models.Service)
+admin.site.register(models.ServiceInstance)
+admin.site.register(models.Client)
+admin.site.register(models.DeviceCode)
+admin.site.register(models.ServiceInstanceMapping)
+admin.site.register(models.RedeemToken)
+admin.site.register(models.InstanceAlias)

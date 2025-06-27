@@ -9,73 +9,56 @@ from typing import Optional
 from fakts import fields, errors
 from django.http import HttpRequest
 from uuid import uuid4
-from fakts.backends.instances import registry as backend_registry
-from fakts.base_models import Manifest
+from fakts.base_models import Manifest, ClaimAnswer, InstanceClaim, SelfClaim, AuthClaim
 from hashlib import sha256
 from django.conf import settings
-
-
-def render_user_defined(instance: models.ServiceInstanceMapping, context: base_models.LinkingContext) -> dict:
-    user_defined = models.UserDefinedServiceInstance.objects.filter(instance=instance).first()
-
-    if user_defined is None:
-        raise errors.ConfigurationError(f"No user defined instance found for {instance}")
-
-    values = {}
-
-    for value in user_defined.values:
-        x = inputs.KeyValueInput(**value)
-
-        value = Template(x.value).safe_substitute(context.dict())
-        if x.as_type == enums.FaktValueType.STRING:
-            values[x.key] = value
-        elif x.as_type == enums.FaktValueType.INT:
-            values[x.key] = int(value)
-        elif x.as_type == enums.FaktValueType.FLOAT:
-            values[x.key] = float(value)
-        elif x.as_type == enums.FaktValueType.BOOL:
-            values[x.key] = bool(value)
-
-    return values
+from typing import Dict
 
 
 def render_composition(client: models.Client, context: base_models.LinkingContext) -> dict:
     config_dict = {}
+    
+    
+    self_claim = SelfClaim(
+        deployment_name=context.deployment_name,
+    )
+    
+    auth_claim = AuthClaim(
+        client_id=client.oauth2_client.client_id,
+        client_secret=client.oauth2_client.client_secret,
+        scopes=client.release.scopes,
+        token_url=f"{context.request.base_url}/o/token/",
+    )
+    
 
-    config_dict["self"] = {}
-    config_dict["self"]["deployment_name"] = context.deployment_name
+     
+    instances_map: Dict[str, InstanceClaim] = {}
 
     for mapping in client.mappings.all():
-        instance = mapping.instance
+        instance: models.ServiceInstance = mapping.instance
 
-        if instance.backend == settings.USER_DEFINED_BACKEND_NAME:
-            value = render_user_defined(instance, context)
-
-            config_dict[mapping.key] = value
-        else:
-            if instance.backend not in backend_registry.backends:
-                raise errors.BackendNotAvailable(f"The backend {instance.backend} for this instance is not available")
-
-            backend = backend_registry.backends[instance.backend]
-
-            try:
-                value = backend.render(instance.identifier, context)
-            except Exception as e:
-                raise errors.BackendError(f"An error occurred while rendering the backend instance {instance}: {str(e)}") from e
-
-            if not isinstance(value, dict):
-                raise errors.ConfigurationError(f"The backend {instance.backend} for this instance did not return a dictionary")
-
-            config_dict[mapping.key] = value
-
-    return config_dict
+        value = instance.render(context)
+        instances_map[mapping.key] = value
 
 
-def find_instance_for_requirement(service: models.Service, requirement: base_models.Requirement, supported_layers: list[models.Layer], user: models.AbstractUser) -> models.ServiceInstance:
+
+
+
+    claim = ClaimAnswer(
+        self=self_claim,
+        auth=auth_claim,
+        instances=instances_map,
+    )
+
+
+
+    return claim.model_dump()
+
+
+def find_instance_for_requirement(service: models.Service, requirement: base_models.Requirement, user: models.AbstractUser) -> models.ServiceInstance:
     instance = (
         models.ServiceInstance.objects.filter(
             service=service,
-            layer__in=supported_layers,
         )
         .filter(
             models.Q(allowed_users__isnull=True)
@@ -85,7 +68,7 @@ def find_instance_for_requirement(service: models.Service, requirement: base_mod
     )
 
     if instance is None:
-        raise errors.InstanceNotFound(f"Instance {requirement.service} not acccessible for {user.username} through these layers: {','.join(map(str, supported_layers.all()))}. Please contact the administrator.")
+        raise errors.InstanceNotFound(f"Instance {requirement.service} not acccessible for {user.username}. Please contact the administrator.")
 
     return instance
 
@@ -95,8 +78,11 @@ def hash_requirements(requirements: list[base_models.Requirement]) -> str:
     return sha256(".".join(sorted([req.service + req.key for req in requirements])).encode()).hexdigest()
 
 
-def auto_compose(client: models.Client, manifest: base_models.Manifest, supported_layers: list[models.Layer], user: models.AbstractUser) -> models.Client:
+def auto_compose(client: models.Client, manifest: base_models.Manifest, user: models.AbstractUser) -> models.Client:
     requirements = manifest.requirements
+
+    if not requirements:
+        return client
 
     if hash_requirements(requirements) != client.requirements_hash:
         errors = []
@@ -105,11 +91,11 @@ def auto_compose(client: models.Client, manifest: base_models.Manifest, supporte
         for old_mapping in client.mappings.all():
             old_mapping.delete()
 
-        for req in manifest.requirements:
+        for req in requirements:
             try:
                 service = models.Service.objects.get(identifier=req.service)
 
-                instance = find_instance_for_requirement(service, req, supported_layers, user)
+                instance = find_instance_for_requirement(service, req, user)
 
                 models.ServiceInstanceMapping.objects.get_or_create(
                     client=client,
@@ -129,9 +115,12 @@ def auto_compose(client: models.Client, manifest: base_models.Manifest, supporte
     return client
 
 
-def check_compability(manifest: base_models.Manifest, supported_layers: list[models.Layer], user: models.AbstractUser) -> list[str] | list[str]:
-    errors = []
-    warnings = []
+def check_compability(manifest: base_models.Manifest, user: models.AbstractUser) -> tuple[list[str], list[str]]:
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    if not manifest.requirements:
+        return errors, warnings
 
     for req in manifest.requirements:
         try:
@@ -140,7 +129,7 @@ def check_compability(manifest: base_models.Manifest, supported_layers: list[mod
             except models.Service.DoesNotExist:
                 raise Exception(f"Service {req.service} is not registered on this server. Please contact the administrator to add this feature.")
 
-            instance = find_instance_for_requirement(service, req, supported_layers, user)
+            instance = find_instance_for_requirement(service, req, user)
 
         except Exception as e:
             if req.optional:
@@ -168,10 +157,13 @@ def create_linking_context(request: HttpRequest, client: models.Client, claim: b
         host = host_string[0]
         port = None
 
+    base_url = request.build_absolute_uri("/") + settings.MY_SCRIPT_NAME
+
     return base_models.LinkingContext(
         request=base_models.LinkingRequest(
             host=host,
             port=port,
+            base_url=base_url,
             is_secure=request.is_secure(),
         ),
         secure=claim.secure,

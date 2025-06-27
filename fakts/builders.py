@@ -149,7 +149,7 @@ def create_development_client(
         )
 
 
-def create_client(manifest: base_models.Manifest, config: base_models.ClientConfig, layers: list[models.Layer], user):
+def create_client(manifest: base_models.Manifest, config: base_models.ClientConfig, user):
     from .utils import download_logo
 
     try:
@@ -183,5 +183,5 @@ def create_client(manifest: base_models.Manifest, config: base_models.ClientConf
     if config.kind == enums.ClientKindVanilla.DESKTOP.value:
         raise Exception("Not supported anymore")
 
-    client = logic.auto_compose(client, manifest, layers, user)
+    client = logic.auto_compose(client, manifest, user)
     return client

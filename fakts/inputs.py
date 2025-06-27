@@ -34,7 +34,7 @@ class DevelopmentClientInputModel(BaseModel):
     manifest: Manifest
     composition: str | None = None
     requirements: list[RequirementModel] = Field(default_factory=list)
-    layers: list[str] = Field(default_factory=lambda : ["web"])
+    layers: list[str] = Field(default_factory=lambda: ["web"])
 
 
 @pydantic.input(DevelopmentClientInputModel)
@@ -109,9 +109,29 @@ class UserDefinedServiceInstanceInput:
 class UpdateServiceInstanceInputModel(BaseModel):
     id: str
 
+
 @pydantic.input(UpdateServiceInstanceInputModel)
 class UpdateServiceInstanceInput:
     id: strawberry.ID
+    allowed_users: list[strawberry.ID] | None = None
+    allowed_groups: list[strawberry.ID] | None = None
+    denied_groups: list[strawberry.ID] | None = None
+    denied_users: list[strawberry.ID] | None = None
+
+
+class CreateServiceInstanceInputModel(BaseModel):
+    identifier: str
+    service: str
+    allowed_users: list[str] | None = None
+    allowed_groups: list[str] | None = None
+    denied_groups: list[str] | None = None
+    denied_users: list[str] | None = None
+
+
+@pydantic.input(CreateServiceInstanceInputModel)
+class CreateServiceInstanceInput:
+    identifier: str
+    service: strawberry.ID
     allowed_users: list[strawberry.ID] | None = None
     allowed_groups: list[strawberry.ID] | None = None
     denied_groups: list[strawberry.ID] | None = None

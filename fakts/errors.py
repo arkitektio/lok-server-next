@@ -14,11 +14,14 @@ class ConfigurationRequestMalformed(ConfigurationError):
     pass
 
 
-class NoConfigurationFound(Exception):
-    pass
+class InstanceAliasNotFound(ConfigurationError):
+    """Raised when an instance alias is not found
 
+    This error is raised when an instance alias is not found. This can
+    happen when the alias does not exist or when the alias is not
+    associated with a server.
+    """
 
-class BackendNotAvailable(ConfigurationError):
     pass
 
 
@@ -32,4 +35,6 @@ class BackendError(ConfigurationError):
 
 
 class InstanceNotFound(ConfigurationError):
+    """Raised when an no instance for a server is found"""
+
     pass

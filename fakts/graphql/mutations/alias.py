@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
-def update_service_instance(info: Info, input: inputs.UpdateServiceInstanceInput) -> types.ServiceInstance:
+def update_instance_alias(info: Info, input: inputs.UpdateServiceInstanceInput) -> types.InstanceAlias:
     instance = models.ServiceInstance.objects.get(
         id=input.id,
     )
@@ -39,7 +39,7 @@ def update_service_instance(info: Info, input: inputs.UpdateServiceInstanceInput
     return instance
 
 
-def create_service_instance(info: Info, input: inputs.CreateServiceInstanceInput) -> types.ServiceInstance:
+def create_instance_alias(info: Info, input: inputs.CreateServiceInstanceInput) -> types.InstanceAlias:
     """
     Create a new service instance.
     """

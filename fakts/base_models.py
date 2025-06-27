@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, validator
-from typing import List, Optional, Literal, Union
+from typing import Dict, List, Optional, Literal, Union
 from django.conf import settings
 from enum import Enum
 from fakts import enums
@@ -13,15 +13,13 @@ class Layer(BaseModel):
     get_probe: str | None = None
 
 
-
 class WellKnownFakts(BaseModel):
-    name: str =  settings.DEPLOYMENT_NAME
+    name: str = settings.DEPLOYMENT_NAME
     version: str
     description: str | None = None
     claim: str
     base_url: str
     ca_crt: str | None = None
-    layers: List[Layer] = Field(default_factory=list)
 
 
 class Requirement(BaseModel):
@@ -61,8 +59,6 @@ class CompositionInputModel(BaseModel):
     template: str
 
 
-
-
 class DeviceCodeStartRequest(BaseModel):
     """A DeviceCodeStartRequest is used to start the device code flow. It contains
     the manifest of the client that wants to start the flow and the redirect uris
@@ -82,7 +78,6 @@ class ReedeemTokenRequest(BaseModel):
     token: str
     manifest: Manifest
     supported_layers: List[str] = Field(default_factory=lambda: ["web"])
-
 
 
 class DeviceCodeChallengeRequest(BaseModel):
@@ -112,6 +107,7 @@ class RetrieveRequest(BaseModel):
 class LinkingRequest(BaseModel):
     host: str
     port: Optional[str] = None
+    base_url: Optional[str] = None
     is_secure: bool = False
 
 
@@ -143,9 +139,7 @@ class ClientConfig(BaseModel):
         try:
             return get_user_model().objects.get(username=self.tenant)
         except get_user_model().DoesNotExist:
-            raise ValueError(
-                f"Tenant {self.tenant} does not exist. Please create them first"
-            )
+            raise ValueError(f"Tenant {self.tenant} does not exist. Please create them first")
 
 
 class DevelopmentClientConfig(ClientConfig):
@@ -158,9 +152,7 @@ class DevelopmentClientConfig(ClientConfig):
         try:
             return get_user_model().objects.get(username=self.user)
         except get_user_model().DoesNotExist:
-            raise ValueError(
-                f"User {self.user} does not exist. Please create them first"
-            )
+            raise ValueError(f"User {self.user} does not exist. Please create them first")
 
 
 class DesktopClientConfig(ClientConfig):
@@ -179,3 +171,53 @@ ClientUnion = WebsiteClientConfig | DesktopClientConfig | DevelopmentClientConfi
 
 class AppConfig(Manifest):
     clients: list[ClientUnion]
+
+
+
+class SelfClaim(BaseModel):
+    deployment_name: str = Field(default=settings.DEPLOYMENT_NAME)
+
+
+class AuthClaim(BaseModel):
+    client_id: str
+    client_secret: str
+    scopes: List[str] = Field(default_factory=list)
+    token_url: str
+    
+    
+    
+class Alias(BaseModel):
+    ssl: bool = True
+    """The ssl flag indicates if the alias is available over SSL or not."""
+    host: str
+    """The host is the host of the alias, it is used to create the URL."""
+    port: Optional[str] = None
+    """The port is the port of the alias, it is used to create the URL."""
+    path: Optional[str] = None
+    """The path is the path of the alias, it is used to create the URL."""
+    challenge: str = Field(
+        description="A challenge url to verify the alias on the client. If it returns a 200 OK, the alias is valid. It can additionally return a JSON object with a `challenge` key that contains the challenge to be solved by the client.",
+    )
+    
+    
+class InstanceClaim(BaseModel):
+    """InstancesClaim is a claim that contains the instances that are available
+    for the client. It is used to link the client to the server and to provide
+    the client with the necessary information to connect to the server.
+    """
+    service: str 
+    """The service is the service that will be used to fill the key, it will be used to find the correct instance. It needs to fullfill"""
+    identifier: str
+    """The identifier is a unique string that identifies the instance."""
+    aliases: List[Alias] = Field(default_factory=list)
+
+
+class ClaimAnswer(BaseModel):
+    """A ClaimAnswer is the answer to a claim request. It contains the
+    linking context that should be used to link the client to the server.
+    """
+    self: SelfClaim
+    auth: AuthClaim
+    instances: Dict[str, InstanceClaim] = Field(default_factory=dict)
+    
+    

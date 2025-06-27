@@ -37,9 +37,6 @@ DEPLOYMENT_DESCRIPTION = conf.deployment.get("description", "A Basic Arkitekt De
 # Application definition
 
 
-USER_DEFINED_BACKEND_NAME = "user_defined"
-
-
 INSTALLED_APPS = [
     "daphne",
     "django.contrib.admin",
@@ -56,43 +53,13 @@ INSTALLED_APPS = [
     "channels",
     "fakts",
     "karakter",
+    "health_check",
+    "health_check.db",
 ]
 
-FAKTS_LAYERS = [
-    {
-        "NAME": "Web Layer",
-        "DESCRIPTION": "The default web layer",
-        "KIND": "WEB",
-        "IDENTIFIER": "web",
-        "GET_PROBE": "https://google.com",
-    },
-    {
-        "NAME": "Johannes Tailscale",
-        "DESCRIPTION": "The Johannes tailscale",
-        "KIND": "TAILSCALE",
-        "IDENTIFIER": "tailscale",
-        "DNS_PROBE": "jhnnsrs-lab",
-    },
-]
+FAKTS_LAYERS = conf.get("layers", [])
 
-
-FAKTS_BACKENDS = [
-    {
-        "NAME": "contrib.backends.docker_backend.DockerBackend",
-        "BUILDERS": [
-            "arkitekt.lok",
-            "arkitekt.generic",
-            "arkitekt.rekuest",
-            "arkitekt.s3",
-            "livekitio.livekit",
-            "ollama.ollama",
-        ],
-        "DEFAULT_BUILDER": "arkitekt.generic",
-    },
-    {
-        "NAME": "contrib.backends.config_backend.ConfigBackend",
-    },
-]
+FAKTS_INSTANCES = conf.get("instances", [])
 
 
 ACCOUNT_EMAIL_VERIFICATION = "none"  # we don't have an smpt server by default

@@ -12,10 +12,11 @@ def scope_to_list(scope):
         return []
     return [s.strip() for s in scope.split(" ")]
 
+
 def list_to_scope(scope_list):
     """Convert a list of scopes to a space-separated string."""
     if not scope_list:
-        return ''
+        return ""
     return " ".join(scope_list)
 
 
@@ -38,6 +39,7 @@ def generate_client_secret() -> str:
 def now_timestamp():
     return int(time.time())
 
+
 class OAuth2Client(models.Model, ClientMixin):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     client_id = models.CharField(max_length=48, unique=True)
@@ -56,7 +58,7 @@ class OAuth2Client(models.Model, ClientMixin):
 
     def get_allowed_scope(self, scope):
         if not scope:
-            return ''
+            return ""
         allowed = set(scope_to_list(self.scope))
         return list_to_scope([s for s in scope.split() if s in allowed])
 
@@ -69,20 +71,16 @@ class OAuth2Client(models.Model, ClientMixin):
         return self.client_secret == client_secret
 
     def check_endpoint_auth_method(self, method, endpoint):
-        if endpoint == 'token':
-            if method == "client_secret_basic":  
+        if endpoint == "token":
+            if method == "client_secret_basic":
                 return True
             if method == "client_secret_post":
                 return True
-            
+
             raise ValueError(f"Invalid endpoint for {method}")
-        
-        
+
         return self.token_endpoint_auth_method == method
-      
-      
-      
-      
+
         # TODO: developers can update this check method
         return True
 
@@ -93,25 +91,26 @@ class OAuth2Client(models.Model, ClientMixin):
     def check_grant_type(self, grant_type):
         if grant_type == "client_credentials":
             return True
-        
-        
+
         raise ValueError(f"Invalid grant type: {grant_type}")
-        
+
         allowed = self.grant_type.split()
         return grant_type in allowed
 
 
 class OAuth2Token(models.Model, TokenMixin):
+    """Model representing an OAuth2 token."""
+
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     client_id = models.CharField(max_length=48, db_index=True)
     token_type = models.CharField(max_length=40)
     access_token = models.CharField(max_length=10000, unique=True, null=False)
     refresh_token = models.CharField(max_length=10000, db_index=True)
-    scope = models.TextField(default='')
+    scope = models.TextField(default="")
     revoked = models.BooleanField(default=False)
     issued_at = models.IntegerField(null=False, default=now_timestamp)
     expires_in = models.IntegerField(null=False, default=0)
-    
+
     def get_client_id(self):
         return self.client_id
 

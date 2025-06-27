@@ -15,11 +15,7 @@ from fakts.builders import create_client
 logger = logging.getLogger(__name__)
 
 
-def create_developmental_client(
-    info: Info, input: inputs.DevelopmentClientInput
-) -> types.Client:
-
-
+def create_developmental_client(info: Info, input: inputs.DevelopmentClientInput) -> types.Client:
     token = uuid.uuid4().hex
 
     config = DevelopmentClientConfig(
@@ -36,10 +32,6 @@ def create_developmental_client(
         scopes=input.manifest.scopes or [],
         requirements=[strawberry.asdict(x) for x in input.requirements],
     )
-    
-    layers = models.Layer.objects.filter(identifier__in=input.layers)
-    
-    
 
     client = create_client(
         manifest,

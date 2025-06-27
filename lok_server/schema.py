@@ -39,7 +39,6 @@ class Query:
     comments: list[komment_types.Comment] = strawberry_django.field()
     services: list[fakts_types.Service] = strawberry_django.field()
     service_instances: list[fakts_types.ServiceInstance] = strawberry_django.field()
-    
 
     user = strawberry_django.field(resolver=karakter_queries.user)
     me = strawberry_django.field(resolver=karakter_queries.me)
@@ -49,14 +48,9 @@ class Query:
     app = strawberry_django.field(resolver=fakts_queries.app)
     release = strawberry_django.field(resolver=fakts_queries.release)
     client = strawberry_django.field(resolver=fakts_queries.client)
-    my_managed_clients = strawberry_django.field(
-        resolver=fakts_queries.my_managed_clients
-    )
+    my_managed_clients = strawberry_django.field(resolver=fakts_queries.my_managed_clients)
     layers: list[fakts_types.Layer] = strawberry_django.field()
-    
-    
-    
-    
+
     scopes = strawberry_django.field(resolver=fakts_queries.scopes)
 
     comment = strawberry_django.field(resolver=komment_queries.comment)
@@ -65,12 +59,8 @@ class Query:
     redeem_tokens: list[fakts_types.RedeemToken] = strawberry_django.field()
 
     stash: pak_types.Stash = strawberry_django.field(resolver=pak_queries.stash)
-    stash_item: pak_types.StashItem = strawberry_django.field(
-        resolver=pak_queries.stash_item
-    )
-    my_active_messages = strawberry_django.field(
-        resolver=karakter_queries.my_active_messages
-    )
+    stash_item: pak_types.StashItem = strawberry_django.field(resolver=pak_queries.stash_item)
+    my_active_messages = strawberry_django.field(resolver=karakter_queries.my_active_messages)
     message = strawberry_django.field(resolver=karakter_queries.message)
 
     @strawberry_django.field()
@@ -81,15 +71,13 @@ class Query:
     @strawberry_django.field()
     def service(self, info: Info, id: strawberry.ID) -> fakts_types.Service:
         return fakts_models.Service.objects.get(id=id)
-    
+
     @strawberry_django.field()
     def layer(self, info: Info, id: strawberry.ID) -> fakts_types.Layer:
         return fakts_models.Layer.objects.get(id=id)
 
     @strawberry_django.field()
-    def service_instance(
-        self, info: Info, id: strawberry.ID
-    ) -> fakts_types.ServiceInstance:
+    def service_instance(self, info: Info, id: strawberry.ID) -> fakts_types.ServiceInstance:
         return fakts_models.ServiceInstance.objects.get(id=id)
 
 
@@ -111,26 +99,17 @@ class Mutation:
     create_developmental_client = strawberry_django.mutation(
         resolver=fakts_mutations.create_developmental_client,
     )
-    scan = strawberry_django.mutation(
-        resolver=fakts_mutations.scan_backend,
-    )
     render = strawberry_django.mutation(
         resolver=fakts_mutations.render_composition,
     )
-    acknowledge_message = strawberry_django.mutation(
-        resolver=karakter_mutations.acknowledge_message
-    )
+    acknowledge_message = strawberry_django.mutation(resolver=karakter_mutations.acknowledge_message)
 
     create_stash = strawberry_django.mutation(
         resolver=pak_mutations.create_stash,
         description="Create a new stash",
     )
-    update_stash = strawberry_django.mutation(
-        resolver=pak_mutations.update_stash, description="Update a stash"
-    )
-    add_items_to_stash = strawberry_django.mutation(
-        resolver=pak_mutations.add_items_to_stash, description="Add items to a stash"
-    )
+    update_stash = strawberry_django.mutation(resolver=pak_mutations.update_stash, description="Update a stash")
+    add_items_to_stash = strawberry_django.mutation(resolver=pak_mutations.add_items_to_stash, description="Add items to a stash")
     delete_stash_items = strawberry_django.mutation(
         resolver=pak_mutations.delete_stash_items,
         description="Delete items from a stash",
@@ -138,26 +117,32 @@ class Mutation:
     delete_stash = strawberry_django.mutation(
         resolver=pak_mutations.delete_stash,
     )
-    create_user_defined_service_instance = strawberry_django.mutation(
-        resolver=fakts_mutations.create_user_defined_service_instance,
+    create_service_instance = strawberry_django.mutation(
+        resolver=fakts_mutations.create_service_instance,
     )
-    
+
     update_service_instance = strawberry_django.mutation(
         resolver=fakts_mutations.update_service_instance,
     )
-    
+
+    create_instance_alias = strawberry_django.mutation(
+        resolver=fakts_mutations.create_instance_alias,
+    )
+    update_instance_alias = strawberry_django.mutation(
+        resolver=fakts_mutations.update_instance_alias,
+    )
+
     request_media_upload = strawberry_django.mutation(
         resolver=karakter_mutations.request_media_upload,
     )
-    
+
     update_profile = strawberry_django.mutation(
         resolver=karakter_mutations.update_profile,
     )
     create_profile = strawberry_django.mutation(
         resolver=karakter_mutations.create_profile,
     )
-    
-    
+
     update_group_profile = strawberry_django.mutation(
         resolver=karakter_mutations.update_group_profile,
     )
@@ -168,9 +153,7 @@ class Mutation:
 
 @strawberry.type
 class Subscription:
-    communications = strawberry.subscription(
-        resolver=karakter_subscriptions.communications
-    )
+    communications = strawberry.subscription(resolver=karakter_subscriptions.communications)
     mentions = strawberry.subscription(resolver=komment_subscriptions.mentions)
 
 
@@ -178,11 +161,7 @@ schema = strawberry.Schema(
     query=Query,
     subscription=Subscription,
     mutation=Mutation,
-    extensions=[
-        DjangoOptimizerExtension,
-        AuthAppExtension,
-        DatalayerExtension
-    ],
+    extensions=[DjangoOptimizerExtension, AuthAppExtension, DatalayerExtension],
     types=[
         komment_types.Descendant,
         komment_types.MentionDescendant,

@@ -29,6 +29,7 @@ dependencies = [
     "docker>=7.1.0",
     "authlib>=1.5.2",
     "joserfc>=1.0.4",
+    "django-health-check>=3.20.0",
 ]
 
 [dependency-groups]

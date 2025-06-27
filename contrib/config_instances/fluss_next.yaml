@@ -1,6 +1,0 @@
-endpoint_url: "{{"https" if request.is_secure else "http" }}://{{"fluss" if request.host == "lok" else request.host + ":11090"}}/graphql"
-healthz: "{{"https" if request.is_secure else "http" }}://{{"fluss" if request.host == "lok" else request.host + ":11090"}}/ht"
-ws_endpoint_url: "{{"wss" if request.is_secure else "ws" }}://{{"fluss" if request.host == "lok" else request.host + ":11090"}}/graphql"  
-__service:
-  identifier: fluss
-  description: "The Next generation fluss"

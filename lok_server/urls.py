@@ -24,6 +24,17 @@ from django.conf import settings
 from kante.path import dynamicpath
 from django.conf import settings
 from django.conf.urls.static import static
+from health_check.views import MainView
+from django.views.decorators.csrf import csrf_exempt
+from django.http import HttpResponse
+
+def fakts_challenge(request):
+    """
+    Placeholder view for the .well-known/fakts-challenge endpoint.
+    This should be replaced with the actual logic to handle the challenge.
+    """
+    return HttpResponse("Fakts Challenge Endpoint", status=200)
+
 
 from django.urls import path, include, re_path
 
@@ -42,6 +53,8 @@ urlpatterns = [
     dynamicpath(".well-known/fakts", WellKnownFakts.as_view()),
     dynamicpath("accounts/", include("karakter.urls")),
     dynamicpath('o/', include('authapp.urls')),  # /auth/login/, /auth/logout/
+    dynamicpath("ht",  csrf_exempt(MainView.as_view()), name="health_check"),
+    dynamicpath(".well-known/fakts-challenge", fakts_challenge, name="fakts-challenge"),
     
 
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

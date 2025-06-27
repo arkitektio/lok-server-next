@@ -40,11 +40,14 @@ class WellKnownFakts(View):
         except Exception as e:
             ca = None
 
-        layers = [base_models.Layer(identifier=i.identifier, kind=i.kind, dns_probe=i.dns_probe, get_probe=i.get_probe) for i in models.Layer.objects.all()]
-
         return JsonResponse(
             data=base_models.WellKnownFakts(
-                name=settings.DEPLOYMENT_NAME, version=settings.FAKTS_PROTOCOL_VERSION, description=settings.DEPLOYMENT_DESCRIPTION, claim=request.build_absolute_uri(reverse("fakts:claim")), base_url=request.build_absolute_uri(reverse("fakts:index")), ca_crt=ca, layers=layers
+                name=settings.DEPLOYMENT_NAME,
+                version=settings.FAKTS_PROTOCOL_VERSION,
+                description=settings.DEPLOYMENT_DESCRIPTION,
+                claim=request.build_absolute_uri(reverse("fakts:claim")),
+                base_url=request.build_absolute_uri(reverse("fakts:index")),
+                ca_crt=ca,
             ).dict()
         )
 
@@ -106,9 +109,7 @@ class ConfigureView(LoginRequiredMixin, FormView):
 
             manifest = base_models.Manifest(**x.staging_manifest)
 
-            layers = x.supported_layers.all()
-
-            composition_errors, composition_warnings = logic.check_compability(manifest, layers, self.request.user)
+            composition_errors, composition_warnings = logic.check_compability(manifest, self.request.user)
             if len(composition_errors) > 0:
                 context["composition_valid"] = False
             else:
@@ -191,7 +192,6 @@ class ConfigureView(LoginRequiredMixin, FormView):
                 client = builders.create_client(
                     manifest=manifest,
                     config=config,
-                    layers=device_code.supported_layers.all(),
                     user=self.request.user,
                 )
 
@@ -339,9 +339,6 @@ class StartChallengeView(View):
             staging_public=start_grant.request_public,
         )
 
-        if start_grant.supported_layers:
-            for layer in start_grant.supported_layers:
-                device_code.supported_layers.add(models.Layer.objects.get(identifier=layer))
 
         return JsonResponse(
             data={

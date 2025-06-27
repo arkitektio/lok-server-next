@@ -7,8 +7,10 @@ import strawberry_django
 from fakts import models as fakts_models
 
 
-@strawberry_django.filter(models.User)
+@strawberry_django.filter(models.User, description="Filter for User model.")
 class UserFilter:
+    """Filter for User model."""
+
     search: str | None
     name: Optional[FilterLookup[str]] | None
     ids: list[strawberry.ID] | None
@@ -24,7 +26,7 @@ class UserFilter:
         return queryset.filter(username__contains=self.search)
 
 
-@strawberry_django.filter(models.Group)
+@strawberry_django.filter(models.Group, description="Filter for Group model.")
 class GroupFilter:
     search: str | None
     name: Optional[FilterLookup[str]] | None
@@ -55,7 +57,6 @@ class ClientFilter:
         if self.search is None:
             return queryset
         return queryset.filter(name__contains=self.search)
-
 
 
 @strawberry_django.filter(fakts_models.App)
