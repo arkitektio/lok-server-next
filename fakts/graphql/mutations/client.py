@@ -36,7 +36,6 @@ def create_developmental_client(info: Info, input: inputs.DevelopmentClientInput
     client = create_client(
         manifest,
         config,
-        layers=layers,
         user=info.context.request.user,
     )
 
