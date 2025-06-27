@@ -492,7 +492,6 @@ class RedeemView(View):
 
         manifest = redeem_request.manifest
         token = redeem_request.token
-        layers = models.Layer.objects.filter(identifier__in=redeem_request.supported_layers)
 
         try:
             valid_token = models.RedeemToken.objects.get(token=token)
@@ -537,7 +536,6 @@ class RedeemView(View):
                 client = builders.create_client(
                     manifest=manifest,
                     config=config,
-                    layers=layers,
                     user=valid_token.user,
                 )
 
