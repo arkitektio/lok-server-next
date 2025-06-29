@@ -66,6 +66,8 @@ INSTALLED_APPS += [
     "allauth.socialaccount",
     # "allauth.socialaccount.providers.github",
     "allauth.socialaccount.providers.orcid",
+    # The MFA app:
+    "allauth.mfa",
 ]
 
 FAKTS_LAYERS = conf.get("layers", [])
@@ -207,6 +209,15 @@ DATABASES = {
         "PORT": conf.db.port,
     }
 }
+
+
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = conf.email.get("host", "NOTSET")  # Use your SMTP server
+EMAIL_PORT = conf.email.get("port", 587)  # Common SMTP port
+EMAIL_USE_TLS = conf.email.get("use_tls", True)  # Use TLS for security
+EMAIL_HOST_USER = conf.email.get("user", "NOTSET")  # Your email address or SMTP username
+EMAIL_HOST_PASSWORD = conf.email.get("password", "NOTSET")  # Your email password or SMTP password
+DEFAULT_FROM_EMAIL = conf.email.get("email", "NOTSET")  # Default sender email address
 
 
 # Unomment and re run
