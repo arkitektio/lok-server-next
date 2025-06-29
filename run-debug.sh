@@ -14,11 +14,9 @@ uv run python manage.py ensureusers
 echo "=> Ensuring Groups..."
 uv run python manage.py ensuregroups
 
-echo "=> Ensuring Layers..."
-uv run python manage.py ensurelayers
 
-echo "=> Ensuring Compositions..."
-uv run python manage.py ensurecompositions
+echo "=> Ensuring Composition..."
+uv run python manage.py ensurecomposition
 
 echo "=> Ensuring Apps..."
 uv run python manage.py ensureapps

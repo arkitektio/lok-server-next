@@ -7,6 +7,7 @@ import strawberry_django
 from kante.types import Info
 from karakter import enums, filters, models, scalars
 from strawberry import LazyType
+from allauth.socialaccount import models as smodels
 
 
 @strawberry_django.type(
@@ -21,15 +22,12 @@ Groups are propagated to the respecting subservices. Permissions are not. Each s
 class Group:
     id: strawberry.ID
     name: str
-    profile: Optional["GroupProfile"] 
-    
+    profile: Optional["GroupProfile"]
+
     @strawberry_django.field(description="The users that are in the group")
     def users(self, info: Info) -> List["User"]:
         return models.User.objects.filter(groups=self)
-    
-    
-  
-  
+
 
 @strawberry_django.type(models.MediaStore)
 class MediaStore:
@@ -41,11 +39,7 @@ class MediaStore:
     @strawberry_django.field()
     def presigned_url(self, info: Info, host: str | None = None) -> str:
         datalayer = get_current_datalayer()
-        return cast(models.MediaStore, self).get_presigned_url(
-            info, datalayer=datalayer, host=host
-        )
-  
-
+        return cast(models.MediaStore, self).get_presigned_url(info, datalayer=datalayer, host=host)
 
 
 @strawberry_django.type(
@@ -76,8 +70,6 @@ class User:
     managed_clients: strawberry.auto
 
 
-    
-
 @strawberry_django.type(
     models.Profile,
     filters=filters.ProfileFilter,
@@ -90,7 +82,7 @@ A Profile of a User. A Profile can be used to display personalied information ab
 class Profile:
     id: strawberry.ID
     bio: str | None = strawberry.field(description="A short bio of the user")
-    name: str | None  = strawberry.field(description="The name of the user")
+    name: str | None = strawberry.field(description="The name of the user")
     avatar: MediaStore | None = strawberry.field(description="The avatar of the user")
 
 
@@ -108,29 +100,36 @@ A Profile of a User. A Profile can be used to display personalied information ab
 )
 class GroupProfile:
     id: strawberry.ID
-    bio: str | None  = strawberry.field(description="A short bio of the group")
-    name: str | None  = strawberry.field(description="The name of the group")
+    bio: str | None = strawberry.field(description="A short bio of the group")
+    name: str | None = strawberry.field(description="The name of the group")
     avatar: MediaStore | None = strawberry.field(description="The avatar of the group")
-    
 
 
-
-@strawberry.type(
-    description="""The ORCID Identifier of a user. This is a unique identifier that is used to identify a user on the ORCID service. It is composed of a uri, a path and a host."""
+@strawberry_django.interface(
+    smodels.SocialAccount,
+    description="""
+A Social Account is an account that is associated with a user. It can be used to authenticate the user with external services. It
+can be used to store extra data about the user that is specific to the provider. We provide typed access to the extra data for
+some providers. For others we provide a generic json field that can be used to store arbitrary data. Generic accounts are
+always available, but typed accounts are only available for some providers.
+""",
 )
+class SocialAccount:
+    provider: enums.ProviderType = strawberry.field(description="The provider of the account. This can be used to determine the type of the account.")
+    uid: str = strawberry.field(description="The unique identifier of the account. This is unique for the provider.")
+    extra_data: scalars.ExtraData = strawberry.field(description="Extra data that is specific to the provider. This is a json field and can be used to store arbitrary data.")
+
+
+@strawberry.type(description="""The ORCID Identifier of a user. This is a unique identifier that is used to identify a user on the ORCID service. It is composed of a uri, a path and a host.""")
 class OrcidIdentifier:
     uri: str = strawberry.field(description="The uri of the identifier")
     path: str = strawberry.field(description="The path of the identifier")
     host: str = strawberry.field(description="The host of the identifier")
 
 
-@strawberry.type(
-    description="""The ORCID Preferences of a user. This is a set of preferences that are specific to the ORCID service. Currently only the locale is supported."""
-)
+@strawberry.type(description="""The ORCID Preferences of a user. This is a set of preferences that are specific to the ORCID service. Currently only the locale is supported.""")
 class OrcidPreferences:
-    locale: str = strawberry.field(
-        description="The locale of the user. This is used to determine the language of the ORCID service."
-    )
+    locale: str = strawberry.field(description="The locale of the user. This is used to determine the language of the ORCID service.")
 
 
 @strawberry.type(description="""Assoiated OridReseracher Result""")
@@ -156,7 +155,75 @@ class OrcidActivities:
     educations: list[str]
 
 
+@strawberry_django.type(
+    smodels.SocialAccount,
+    filters=filters.SocialAccountFilter,
+    pagination=True,
+    description="""
+An ORCID Account is a Social Account that maps to an ORCID Account. It provides information about the
+user that is specific to the ORCID service. This includes the ORCID Identifier, the ORCID Preferences and
+the ORCID Person. The ORCID Person contains information about the user that is specific to the ORCID service.
+This includes the ORCID Activities, the ORCID Researcher URLs and the ORCID Addresses.
 
+""",
+)
+class OrcidAccount(SocialAccount):
+    @strawberry_django.field(description="The ORCID Identifier of the user. The UID of the account is the same as the path of the identifier.")
+    def identifier(self) -> OrcidIdentifier:
+        return OrcidIdentifier(**self.extra_data["orcid-identifier"])
+
+    @strawberry_django.field(description="Information about the person that is specific to the ORCID service.")
+    def person(self) -> Optional[OrcidPerson]:
+        person = self.extra_data.get("person", None)
+        if not person:
+            return None
+
+        researcher_urls = self.extra_data.get("researcher-urls", {}).get("researcher-urls", [])
+        addresses = self.extra_data.get("addresses", {}).get("addresses", [])
+
+        return OrcidPerson(researcher_urls=researcher_urls, addresses=addresses)
+
+    @staticmethod
+    def is_type_of(ob, info):
+        return ob.provider == "orcid"
+
+
+@strawberry_django.type(
+    smodels.SocialAccount,
+    filters=filters.SocialAccountFilter,
+    pagination=True,
+    description="""
+The Github Account is a Social Account that maps to a Github Account. It provides information about the
+user that is specific to the Github service. This includes the Github Identifier.
+
+""",
+)
+class GithubAccount(SocialAccount):
+    @strawberry_django.field()
+    def identifier(self) -> OrcidIdentifier:
+        raise NotImplementedError()
+
+    @staticmethod
+    def is_type_of(ob, info):
+        return ob.provider == "github"
+
+
+@strawberry_django.type(
+    smodels.SocialAccount,
+    filters=filters.SocialAccountFilter,
+    pagination=True,
+    description="""
+The Generic Account is a Social Account that maps to a generic account. It provides information about the
+user that is specific to the provider. This includes untyped extra data.
+
+""",
+)
+class GenericAccount(SocialAccount):
+    extra_data: scalars.ExtraData
+
+    @staticmethod
+    def is_type_of(ob, info):
+        return ob.provider != "orcid"
 
 
 @strawberry.type(description="""A Communication""")

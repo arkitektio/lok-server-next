@@ -28,6 +28,7 @@ from health_check.views import MainView
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 
+
 def fakts_challenge(request):
     """
     Placeholder view for the .well-known/fakts-challenge endpoint.
@@ -44,18 +45,17 @@ def index(request):
     # Render that in the index template
     return render(request, "index.html")
 
-hallo ="hallsssoss"
+
+hallo = "hallsssoss"
 
 urlpatterns = [
-    dynamicpath("", index, name="index"),
+    dynamicpath("", index, name="home"),
     dynamicpath("admin/", admin.site.urls),
     dynamicpath("f/", include("fakts.urls", namespace="fakts")),
-    dynamicpath(".well-known/fakts", WellKnownFakts.as_view()),
+    dynamicpath("o/", include("authapp.urls")),  # /auth/login/, /auth/logout/
+    dynamicpath("ht", csrf_exempt(MainView.as_view()), name="health_check"),
+    dynamicpath("accounts/", include("allauth.urls")),
     dynamicpath("accounts/", include("karakter.urls")),
-    dynamicpath('o/', include('authapp.urls')),  # /auth/login/, /auth/logout/
-    dynamicpath("ht",  csrf_exempt(MainView.as_view()), name="health_check"),
     dynamicpath(".well-known/fakts-challenge", fakts_challenge, name="fakts-challenge"),
-    
-
+    dynamicpath(".well-known/fakts", WellKnownFakts.as_view()),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
-

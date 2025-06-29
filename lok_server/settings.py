@@ -55,6 +55,17 @@ INSTALLED_APPS = [
     "karakter",
     "health_check",
     "health_check.db",
+    "allauth_ui",
+    "widget_tweaks",
+    "slippers",
+]
+
+INSTALLED_APPS += [
+    "allauth",
+    "allauth.account",
+    "allauth.socialaccount",
+    # "allauth.socialaccount.providers.github",
+    "allauth.socialaccount.providers.orcid",
 ]
 
 FAKTS_LAYERS = conf.get("layers", [])
@@ -72,6 +83,8 @@ AUTH_USER_MODEL = "karakter.User"
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
     "guardian.backends.ObjectPermissionBackend",
+    # `allauth` specific authentication methods, such as login by email
+    "allauth.account.auth_backends.AuthenticationBackend",
 ]
 
 SUPERUSERS = [
@@ -96,6 +109,8 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # Add the account middleware:
+    "allauth.account.middleware.AccountMiddleware",
 ]
 
 
@@ -340,8 +355,11 @@ LOGGING = {
     },
 }
 
-LOGIN_URL = "login"
-LOGOUT_URL = "logout"
+LOGIN_URL = "account_login"  # Redirect to login page if not authenticated
+LOGOUT_URL = "account_logout"  # Redirect to logout page
+LOGIN_REDIRECT_URL = "home"  # Redirect to home after login
+LOGOUT_REDIRECT_URL = "home"  # Redirect to home after logout
+ACCOUNT_LOGOUT_REDIRECT_URL = "home"
 
 
 ENSURED_APPS = []
@@ -368,6 +386,17 @@ SOCIALACCOUNT_PROVIDERS = {
         "VERIFIED_EMAIL": True
     },
     "orcid": {
+        # For each OAuth based provider, either add a ``SocialApp``
+        # (``socialaccount`` app) containing the required client
+        # credentials, or list them here:
+        "APPS": [
+            {
+                "client_id": "APP-AGTOUJHZGVNFR157",
+                "secret": "e135b12b-fe4f-4c7a-a9ee-1c283ad41013",
+            },
+        ],
+        # These are provider-specific settings that can only be
+        # listed here:
         "SCOPE": [
             "openid",
         ],

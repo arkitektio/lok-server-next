@@ -385,6 +385,23 @@ wheels = [
 ]
 
 [[package]]
+name = "django-allauth"
+version = "65.9.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "asgiref" },
+    { name = "django" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9d/a3/00aa9d5bb5df4f7464495675074dc11107c08b3eea3462fb3edc059d71e1/django_allauth-65.9.0.tar.gz", hash = "sha256:a06bca9974df44321e94c33bcf770bb6f924d1a44b57defbce4d7ec54a55483e", size = 1710514, upload-time = "2025-06-01T19:21:07.771Z" }
+
+[package.optional-dependencies]
+socialaccount = [
+    { name = "pyjwt", extra = ["crypto"] },
+    { name = "requests" },
+    { name = "requests-oauthlib" },
+]
+
+[[package]]
 name = "django-choices-field"
 version = "2.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -494,6 +511,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/34/a6/f1beaf8f552fe90c153cc039316ebab942c23dfbc88588dde081fefca816/django_taggit-6.1.0.tar.gz", hash = "sha256:c4d1199e6df34125dd36db5eb0efe545b254dec3980ce5dd80e6bab3e78757c3", size = 38151, upload-time = "2024-09-29T08:07:39.477Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/6b/34/4185c345530b91d05cb82e05d07148f481a5eb5dc2ac44e092b3daa6f206/django_taggit-6.1.0-py3-none-any.whl", hash = "sha256:ab776264bbc76cb3d7e49e1bf9054962457831bd21c3a42db9138b41956e4cf0", size = 75749, upload-time = "2024-09-29T08:07:14.612Z" },
+]
+
+[[package]]
+name = "django-widget-tweaks"
+version = "1.5.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a5/fe/26eb92fba83844e71bbec0ced7fc2e843e5990020e3cc676925204031654/django-widget-tweaks-1.5.0.tar.gz", hash = "sha256:1c2180681ebb994e922c754804c7ffebbe1245014777ac47897a81f57cc629c7", size = 14767, upload-time = "2023-08-25T15:29:12.778Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/46/6a/6cb6deb5c38b785c77c3ba66f53051eada49205979c407323eb666930915/django_widget_tweaks-1.5.0-py3-none-any.whl", hash = "sha256:a41b7b2f05bd44d673d11ebd6c09a96f1d013ee98121cb98c384fe84e33b881e", size = 8960, upload-time = "2023-08-25T15:29:05.644Z" },
 ]
 
 [[package]]
@@ -696,11 +722,13 @@ dependencies = [
     { name = "channels-redis" },
     { name = "daphne" },
     { name = "django" },
+    { name = "django-allauth", extra = ["socialaccount"] },
     { name = "django-choices-field" },
     { name = "django-health-check" },
     { name = "django-probes" },
     { name = "django-redis" },
     { name = "django-taggit" },
+    { name = "django-widget-tweaks" },
     { name = "docker" },
     { name = "joserfc" },
     { name = "jsonpatch" },
@@ -711,6 +739,7 @@ dependencies = [
     { name = "psycopg", extra = ["binary"] },
     { name = "requests" },
     { name = "rich" },
+    { name = "slippers" },
     { name = "ujson" },
 ]
 
@@ -730,11 +759,13 @@ requires-dist = [
     { name = "channels-redis", specifier = ">=4.1.0,<5" },
     { name = "daphne", specifier = ">=4.0.0,<5" },
     { name = "django", specifier = ">=5.2" },
+    { name = "django-allauth", extras = ["socialaccount"], specifier = ">=65.9.0" },
     { name = "django-choices-field", specifier = ">=2.2.2,<3" },
     { name = "django-health-check", specifier = ">=3.20.0" },
     { name = "django-probes", specifier = ">=1.7.0,<2" },
     { name = "django-redis", specifier = ">=5.4.0" },
     { name = "django-taggit", specifier = ">=6.1.0" },
+    { name = "django-widget-tweaks", specifier = ">=1.5.0" },
     { name = "docker", specifier = ">=7.1.0" },
     { name = "joserfc", specifier = ">=1.0.4" },
     { name = "jsonpatch", specifier = "~=1.33" },
@@ -745,6 +776,7 @@ requires-dist = [
     { name = "psycopg", extras = ["binary"], specifier = ">=3" },
     { name = "requests", specifier = ">=2.32.3" },
     { name = "rich", specifier = ">=14.0.0" },
+    { name = "slippers", specifier = ">=0.6.2" },
     { name = "ujson", specifier = ">=5.8.0,<6" },
 ]
 
@@ -904,6 +936,15 @@ name = "namegenerator"
 version = "1.0.6"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/1b/2b/dd6d5b718c8fcefd30b9844a6c2386983c78ea37fa6094aea67d2e694719/namegenerator-1.0.6.tar.gz", hash = "sha256:144759c62d771e5b589514a0aa332d0b967818c0a24b7824e48a905357c58bfa", size = 4369, upload-time = "2018-08-01T11:14:31.877Z" }
+
+[[package]]
+name = "oauthlib"
+version = "3.3.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/0b/5f/19930f824ffeb0ad4372da4812c50edbd1434f678c90c2733e1188edfc63/oauthlib-3.3.1.tar.gz", hash = "sha256:0f0f8aa759826a193cf66c12ea1af1637f87b9b4622d46e866952bb022e538c9", size = 185918, upload-time = "2025-06-19T22:48:08.269Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/be/9c/92789c596b8df838baa98fa71844d84283302f7604ed565dafe5a6b5041a/oauthlib-3.3.1-py3-none-any.whl", hash = "sha256:88119c938d2b8fb88561af5f6ee0eec8cc8d552b7bb1f712743136eb7523b7a1", size = 160065, upload-time = "2025-06-19T22:48:06.508Z" },
+]
 
 [[package]]
 name = "omegaconf"
@@ -1128,6 +1169,20 @@ wheels = [
 ]
 
 [[package]]
+name = "pyjwt"
+version = "2.10.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e7/46/bd74733ff231675599650d3e47f361794b22ef3e3770998dda30d3b63726/pyjwt-2.10.1.tar.gz", hash = "sha256:3cc5772eb20009233caf06e9d8a0577824723b44e6648ee0a2aedb6cf9381953", size = 87785, upload-time = "2024-11-28T03:43:29.933Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/61/ad/689f02752eeec26aed679477e80e632ef1b682313be70793d798c1d5fc8f/PyJWT-2.10.1-py3-none-any.whl", hash = "sha256:dcdd193e30abefd5debf142f9adfcdd2b58004e644f25406ffaebd50bd98dacb", size = 22997, upload-time = "2024-11-28T03:43:27.893Z" },
+]
+
+[package.optional-dependencies]
+crypto = [
+    { name = "cryptography" },
+]
+
+[[package]]
 name = "pyopenssl"
 version = "25.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1216,6 +1271,19 @@ wheels = [
 ]
 
 [[package]]
+name = "requests-oauthlib"
+version = "2.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "oauthlib" },
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/42/f2/05f29bc3913aea15eb670be136045bf5c5bbf4b99ecb839da9b422bb2c85/requests-oauthlib-2.0.0.tar.gz", hash = "sha256:b3dffaebd884d8cd778494369603a9e7b58d29111bf6b41bdc2dcd87203af4e9", size = 55650, upload-time = "2024-03-22T20:32:29.939Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3b/5d/63d4ae3b9daea098d5d6f5da83984853c1bbacd5dc826764b249fe119d24/requests_oauthlib-2.0.0-py2.py3-none-any.whl", hash = "sha256:7dd8a5c40426b779b0868c404bdef9768deccf22749cde15852df527e6269b36", size = 24179, upload-time = "2024-03-22T20:32:28.055Z" },
+]
+
+[[package]]
 name = "rich"
 version = "14.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1271,6 +1339,21 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81", size = 34031, upload-time = "2024-12-04T17:35:28.174Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050, upload-time = "2024-12-04T17:35:26.475Z" },
+]
+
+[[package]]
+name = "slippers"
+version = "0.6.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "django" },
+    { name = "pyyaml" },
+    { name = "typeguard" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a7/c6/6af4500f31e53e9f782d264cb715f1a8cc9ac4248fba9fe2fe172822ea79/slippers-0.6.2.tar.gz", hash = "sha256:4cb555b8822ba0d404e5405723f5d723994022c29046008ee917081031bc0cf1", size = 59499, upload-time = "2023-08-01T05:04:18.964Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d5/8c/1fe2803870861f9a7f0cf502e4d1361dbb3685997118f4f76fd83ec9272f/slippers-0.6.2-py3-none-any.whl", hash = "sha256:739e05f85354becbf0a65daab831eea62557d89e7512042209ab629af4378bca", size = 61359, upload-time = "2023-08-01T05:04:17.378Z" },
 ]
 
 [[package]]
@@ -1349,6 +1432,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/51/91/bc9fd5aa84703f874dea27313b11fde505d343f3ef3ad702bddbe20bfd6e/txaio-23.1.1.tar.gz", hash = "sha256:f9a9216e976e5e3246dfd112ad7ad55ca915606b60b84a757ac769bd404ff704", size = 53704, upload-time = "2023-01-15T14:11:27.475Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7d/6c/a53cc9a97c2da76d9cd83c03f377468599a28f2d4ad9fc71c3b99640e71e/txaio-23.1.1-py2.py3-none-any.whl", hash = "sha256:aaea42f8aad50e0ecfb976130ada140797e9dcb85fad2cf72b0f37f8cefcb490", size = 30512, upload-time = "2023-01-15T14:11:24.999Z" },
+]
+
+[[package]]
+name = "typeguard"
+version = "2.13.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/3a/38/c61bfcf62a7b572b5e9363a802ff92559cb427ee963048e1442e3aef7490/typeguard-2.13.3.tar.gz", hash = "sha256:00edaa8da3a133674796cf5ea87d9f4b4c367d77476e185e80251cc13dfbb8c4", size = 40604, upload-time = "2021-12-10T21:09:39.158Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9a/bb/d43e5c75054e53efce310e79d63df0ac3f25e34c926be5dffb7d283fb2a8/typeguard-2.13.3-py3-none-any.whl", hash = "sha256:5e3e3be01e887e7eafae5af63d1f36c849aaa94e3a0112097312aabfa16284f1", size = 17605, upload-time = "2021-12-10T21:09:37.844Z" },
 ]
 
 [[package]]
