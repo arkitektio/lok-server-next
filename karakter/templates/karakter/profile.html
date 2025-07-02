@@ -9,19 +9,20 @@
         </p>
     </div>
 
-    {% endif %}
 
-        <div class="mb-4">
-            <form method="POST">
-                {% csrf_token %}
-                {% for field in profile_form %}
-                    {% include "./field.html" %}
-                {% endfor %}
+    <div class="mb-4">
+        <form method="POST">
+            {% csrf_token %}
+            {% for field in profile_form %}
+            {% include "./field.html" %}
+            {% endfor %}
 
-                <button class="mt-2 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline" type="submit">
-                    Save changes
-                </button>
-            </form>
-        </div>
+            <button
+                class="mt-2 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                type="submit">
+                Save changes
+            </button>
+        </form>
+    </div>
 </div>
 {% endblock %}

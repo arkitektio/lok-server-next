@@ -14,10 +14,14 @@ def profile(request):
             profile_form.save()
             return redirect("profile")
 
-
     context = {
         "profile_form": profile_form,
         "social_accounts": [],
     }
 
     return render(request, "karakter/profile.html", context)
+
+
+@login_required
+def home(request):
+    return render(request, "account/home.html")

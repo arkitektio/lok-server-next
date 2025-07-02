@@ -368,7 +368,7 @@ LOGGING = {
 
 LOGIN_URL = "account_login"  # Redirect to login page if not authenticated
 LOGOUT_URL = "account_logout"  # Redirect to logout page
-LOGIN_REDIRECT_URL = "home"  # Redirect to home after login
+LOGIN_REDIRECT_URL = "profile"  # Redirect to home after login
 LOGOUT_REDIRECT_URL = "home"  # Redirect to home after logout
 ACCOUNT_LOGOUT_REDIRECT_URL = "home"
 
