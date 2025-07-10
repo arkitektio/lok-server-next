@@ -32,6 +32,12 @@ class MyJWTBearerTokenGenerator(JWTBearerTokenGenerator):
         if not user:
             user = client.user
             
+        if not scope:
+            print("No scope provided, using client scope")
+            scope = client.scope
+            
+            
+            
         if not user:
             raise ValueError("User not found")
         
@@ -39,7 +45,7 @@ class MyJWTBearerTokenGenerator(JWTBearerTokenGenerator):
             
         
         #TODO: Impement correct scoping
-        return {"roles": [group.name for group in user.groups.all()], "preferred_username": user.username, "sub": user.id, "scope": "openid"}
+        return {"roles": [group.name for group in user.groups.all()], "preferred_username": user.username, "sub": user.id, "scope": scope, "active_org": str(user.active_organization.identifier) if user.active_organization else None,}
     
     
     def get_audiences(self, client, user, scope) -> str | list[str]:

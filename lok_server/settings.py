@@ -375,7 +375,15 @@ ACCOUNT_LOGOUT_REDIRECT_URL = "home"
 
 ENSURED_APPS = []
 
+
+
+
+ENSURE_ORGANIZATIONS = OmegaConf.to_object(conf.get("organizations", [{"identifier": "default", "name": "Default Organization", "description": "Default Organization Description"}]))
 ENSURED_USERS = OmegaConf.to_object(conf.users)
+ENSURED_ROLES = OmegaConf.to_object(conf.roles)
+
+
+
 
 SYSTEM_MESSAGES = conf.get(
     "system_messages",

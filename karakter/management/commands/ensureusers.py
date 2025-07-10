@@ -3,6 +3,10 @@ from django.contrib.auth.models import Group
 from django.core.management.base import BaseCommand
 from django.conf import settings
 from karakter.base_models import UserConfig
+from karakter.models import Organization
+
+
+
 
 
 class Command(BaseCommand):
@@ -18,6 +22,9 @@ class Command(BaseCommand):
             if User.objects.filter(username=user_config.username).exists():
                 user = User.objects.get(username=user_config.username)
                 user.email = user_config.email
+                user.active_organization = Organization.objects.get(
+                    identifier=user_config.active_organization
+                )
                 user.set_password(user_config.password.strip())
                 user.save()
 
@@ -27,12 +34,20 @@ class Command(BaseCommand):
                     username=user_config.username,
                     email=user_config.email,
                     password=user_config.password,
+                    active_organization = Organization.objects.get(
+                    identifier=user_config.active_organization
+                )
                 )
 
                 self.stdout.write(f"Created user {user.username}")
+                
+                
+                
             user.groups.add(
                 *[
-                    Group.objects.get_or_create(name=groupname)[0]
-                    for groupname in user_config.groups
+                    Group.objects.get(name=groupname)
+                    for groupname in user_config.roles
                 ]
             )
+            
+            print(f"Added groups {user_config.roles} to user {user.username}")

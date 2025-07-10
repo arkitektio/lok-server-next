@@ -35,6 +35,35 @@ class MediaStore(S3Store):
         s3 = datalayer.s3
         s3.upload_fileobj(file, self.bucket, self.key)
         self.save()
+        
+        
+        
+class Organization(models.Model):
+    """An Organization in the System
+
+    An Organization is a group of users that can be used to manage access to resources.
+    Each organization has a unique name and can have multiple users associated with it.
+    """
+    identifier = models.CharField(max_length=1000, null=True, blank=True, unique=True)
+    name = models.CharField(max_length=1000, null=True, blank=True)
+    description = models.CharField(max_length=4000, null=True, blank=True)
+    avatar = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
+    
+    
+    
+    
+class Role(models.Model):
+    group = models.OneToOneField(Group, on_delete=models.CASCADE, related_name="role")
+    identifier = models.CharField(max_length=1000, null=True, blank=True)
+    description = models.CharField(max_length=4000, null=True, blank=True)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="roles")    
+    is_builtin = models.BooleanField(default=False, help_text="If this role is a built-in role that cannot be deleted (admin)")
+    
+    class Meta:
+        unique_together = ("identifier", "organization")
+    
+
+
 
 
 
@@ -47,6 +76,14 @@ class User(AbstractUser):
 
     """
     email = models.EmailField(null=True, blank=True)
+    active_organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="active_users",
+        null=True,
+        blank=True,
+        help_text="The organization that the user is currently active in",
+    )
 
     @property
     def is_faktsadmin(self):
