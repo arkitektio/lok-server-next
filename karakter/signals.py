@@ -27,7 +27,7 @@ def create_role(organization: Organization, identifier: str):
     return role
 
 def create_default_groups_for_org(org: Organization):
-    for identifier in ["admin", "guest", "researcher"]:
+    for identifier in ["admin", "guest", "bot"]:
         create_role(org, identifier)
         
         
