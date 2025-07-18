@@ -24,10 +24,11 @@
 
 
             <h1 class="text-3xl mt-2 font-light"><b> Hi {{ request.user.username }} !</b></h1>
+            <h2 class="text-xl font-light mt-2 text-green-500">You are currently acting on behalf of {{request.user.active_organization.name}}</h2>
             <h3 class="text-xl font-bold mt-2">{% trans "New Development App" %}</h3>
 
             <div class="mt-2 mb-2 text-sm font-light">
-                <span> A new device or application wants to be configured to be an app that you control. Please check if you trust
+                <span> A new device or application wants to be configured to be an app that you control and to work with your organizational data. Please check if you trust
                     them and that their claims are sensical to you. If you agree with their claims. Please allow
                     it. Otherwise deny. This app will only be able data that you can access.</span>
             </div>

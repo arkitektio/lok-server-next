@@ -17,7 +17,7 @@ def create_role(organization: Organization, identifier: str):
     """
     Create a role for the organization with the given identifier.
     """
-    group_name = f"{organization.identifier}:{identifier}"
+    group_name = f"{organization.slug}:{identifier}"
     group, _ = Group.objects.get_or_create(name=group_name)
     role, _ = Role.objects.update_or_create(
         identifier=identifier,

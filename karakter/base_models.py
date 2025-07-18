@@ -18,11 +18,18 @@ class RoleConfig(BaseModel):
     
 
 
+class MembershipConfig(BaseModel):
+    organization: str
+    is_active: bool = True
+    roles: list[str] = []
+
+
+
 class UserConfig(BaseModel):
     """A Config Item to serialize yaml users"""
 
     username: str
     password: str
+    active_organization: str
     email: Optional[str] = None
-    roles: list[str] = []
-    active_organization: Optional[str] = None
+    memberships: list[MembershipConfig] = []

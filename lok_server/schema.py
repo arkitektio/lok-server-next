@@ -30,6 +30,8 @@ class Query:
     stashes: list[pak_types.Stash] = strawberry_django.field()
     stash_items: list[pak_types.StashItem] = strawberry_django.field()
     my_stashes = strawberry_django.field(resolver=pak_queries.my_stashes)
+    
+    mycontext = strawberry_django.field(resolver=karakter_queries.mycontext)
 
     apps: list[fakts_types.App] = strawberry_django.field()
     releases: list[fakts_types.Release] = strawberry_django.field()

@@ -13,3 +13,7 @@ def user(info: Info, id: strawberry.ID) -> types.User:
 
 def me(info: Info) -> types.User:
     return info.context.request.user
+
+
+
+

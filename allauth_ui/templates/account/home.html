@@ -6,6 +6,25 @@
         <h2 class="text-3xl font-semibold">Hi <div class="text-3xl inline">{{ user.username }}</div>!</h2>
         <p class="text-sm font-light">You are logged in and can now use connected apps</p>
         </p>
+
+        Your active organization is: <strong>{{ user.active_organization.name }}</strong> 
+
+        <a href="{% url 'organization_detail' user.active_organization.slug %}" class="text-blue-500 hover:underline">
+            View Organization Details
+        </a>
+
+
+
+        <p class="text-sm font-light">You are a member of the following organizations:</p>
+        <ul>
+            {% for role in user.roles.all %}
+                <li>
+                    <a href="{% url 'organization_detail' role.organization.slug %}">{{ role.organization.name }}</a> {{role.identifier}}
+                </li>
+            {% endfor %}
+        </ul>
+
+
     </div>
 
 

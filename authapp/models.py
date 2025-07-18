@@ -42,6 +42,7 @@ def now_timestamp():
 
 class OAuth2Client(models.Model, ClientMixin):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
+    organization = models.ForeignKey("karakter.Organization", on_delete=models.CASCADE, related_name="oauth2_clients")
     client_id = models.CharField(max_length=48, unique=True)
     client_secret = models.CharField(max_length=120)
     redirect_uris = models.TextField(blank=True)
@@ -49,6 +50,10 @@ class OAuth2Client(models.Model, ClientMixin):
     token_endpoint_auth_method = models.CharField(max_length=48, default="client_secret_post")
     grant_types = models.TextField()
     response_types = models.TextField(blank=True)
+    
+    
+    def __str__(self):
+        return f"{self.client_id} ({self.user.username} @ {self.organization.slug})"
 
     def get_client_id(self):
         return self.client_id

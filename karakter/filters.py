@@ -41,7 +41,64 @@ class GroupFilter:
         if self.search is None:
             return queryset
         return queryset.filter(name__contains=self.search)
+    
+    
+@strawberry_django.filter(models.Role, description="__doc__")
+class RoleFilter:
+    """A Filterset to Filter Groups"""
 
+    search: str | None
+    name: Optional[FilterLookup[str]] | None
+    ids: list[strawberry.ID] | None
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+
+    def filter_search(self, queryset, info):
+        if self.search is None:
+            return queryset
+        return queryset.filter(name__contains=self.search)
+
+
+
+@strawberry_django.filter(models.Organization, description="__doc__")
+class OrganizationFilter:
+    """A Filterset to Filter Groups"""
+
+    search: str | None
+    name: Optional[FilterLookup[str]] | None
+    ids: list[strawberry.ID] | None
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+
+    def filter_search(self, queryset, info):
+        if self.search is None:
+            return queryset
+        return queryset.filter(name__contains=self.search)
+
+
+@strawberry_django.filter(models.Membership, description="__doc__")
+class MembershipFilter:
+    """A Filterset to Filter Groups"""
+
+    search: str | None
+    name: Optional[FilterLookup[str]] | None
+    ids: list[strawberry.ID] | None
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+
+    def filter_search(self, queryset, info):
+        if self.search is None:
+            return queryset
+        return queryset.filter(name__contains=self.search)
 
 @strawberry_django.filter(models.Profile)
 class ProfileFilter:
@@ -91,3 +148,4 @@ class SocialAccountFilter:
         if self.provider is None:
             return queryset
         return queryset.filter(provider=self.provider)
+

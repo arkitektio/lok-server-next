@@ -23,6 +23,7 @@ def create_developmental_client(info: Info, input: inputs.DevelopmentClientInput
         token=token,
         tenant=info.context.request.user.username,
         user=info.context.request.user.username,
+        organization=info.context.request.organization.slug,
     )
 
     manifest = Manifest(

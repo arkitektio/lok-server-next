@@ -23,6 +23,7 @@ def render_composition(client: models.Client, context: base_models.LinkingContex
         deployment_name=context.deployment_name,
     )
     
+    
     auth_claim = AuthClaim(
         client_id=client.oauth2_client.client_id,
         client_secret=client.oauth2_client.client_secret,

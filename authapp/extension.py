@@ -2,7 +2,7 @@ from typing import AsyncIterator, Iterator, Union
 from strawberry.extensions import SchemaExtension
 from kante.context import WsContext, HttpContext
 from authentikate.strawberry.extension import AuthentikateExtension, ClientModel, UserModel, JWTToken
-from karakter.models import User
+from karakter.models import User, Organization
 from authapp.models import OAuth2Client
 
 
@@ -37,6 +37,13 @@ class AuthAppExtension(AuthentikateExtension):
         """ Expand a client from the provided JWT token """
         
         return await OAuth2Client.objects.aget(client_id=token.client_id)
+    
+    
+    async def aexpand_organization_from_token(self, token: JWTToken) -> "Organization":
+        """ Expand an organization from the provided JWT token """
+        
+        # Assuming the organization is stored in the token
+        return await Organization.objects.aget(slug=token.active_org)
         
         
         

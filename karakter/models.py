@@ -44,10 +44,14 @@ class Organization(models.Model):
     An Organization is a group of users that can be used to manage access to resources.
     Each organization has a unique name and can have multiple users associated with it.
     """
-    identifier = models.CharField(max_length=1000, null=True, blank=True, unique=True)
+    slug = models.CharField(max_length=1000, null=True, blank=True, unique=True)
     name = models.CharField(max_length=1000, null=True, blank=True)
     description = models.CharField(max_length=4000, null=True, blank=True)
     avatar = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
+    
+    
+    def __str__(self):
+        return self.name or self.slug or "Unnamed Organization"
     
     
     
@@ -62,6 +66,23 @@ class Role(models.Model):
     class Meta:
         unique_together = ("identifier", "organization")
     
+
+
+
+
+class Membership(models.Model):
+    """A Membership of a User in an Organization with a Role"""
+    user = models.ForeignKey(
+        "User", on_delete=models.CASCADE, related_name="memberships"
+    )
+    organization = models.ForeignKey(
+        Organization, on_delete=models.CASCADE, related_name="memberships"
+    )
+    roles = models.ManyToManyField(Role, related_name="memberships", blank=True)
+
+    class Meta:
+        unique_together = ("user", "organization")
+
 
 
 
@@ -84,7 +105,8 @@ class User(AbstractUser):
         blank=True,
         help_text="The organization that the user is currently active in",
     )
-
+    
+    
     @property
     def is_faktsadmin(self):
         return self.groups.filter(name="admin").exists()
@@ -96,7 +118,8 @@ class User(AbstractUser):
     def notify(self, title, message):
         for channel in self.channels.all():
             channel.publish(title, message)
-
+            
+            
 
 class Profile(models.Model):
     """A Profile of a User"""

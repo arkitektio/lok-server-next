@@ -9,20 +9,20 @@ from strawberry import LazyType
 
 class DescendandInputModel(BaseModel):
     kind: enums.DescendantKind
-    children: list["DescendandInputModel"] | None
-    user: str | None
-    bold: bool | None
-    italic: bool | None
-    code: bool | None
-    text: str | None
+    children: list["DescendandInputModel"] | None = None
+    user: str | None = None
+    bold: bool | None = None
+    italic: bool | None = None
+    code: bool | None = None
+    text: str | None = None
 
 
 @pydantic.input(DescendandInputModel)
 class DescendantInput:
     kind: enums.DescendantKind
-    children: list[LazyType["DescendantInput", __name__]] | None
-    user: str | None
-    bold: bool | None
-    italic: bool | None
-    code: bool | None
-    text: str | None
+    children: list[LazyType["DescendantInput", __name__]] | None = None
+    user: str | None = None
+    bold: bool | None = None
+    italic: bool | None = None
+    code: bool | None = None
+    text: str | None = None

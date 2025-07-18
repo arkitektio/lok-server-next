@@ -145,6 +145,7 @@ class ClientConfig(BaseModel):
 class DevelopmentClientConfig(ClientConfig):
     kind: Literal["development"]
     user: str
+    organization: Optional[str] = None
 
     def get_user(self):
         from django.contrib.auth import get_user_model
@@ -153,6 +154,17 @@ class DevelopmentClientConfig(ClientConfig):
             return get_user_model().objects.get(username=self.user)
         except get_user_model().DoesNotExist:
             raise ValueError(f"User {self.user} does not exist. Please create them first")
+        
+        
+    def get_organization(self):
+        from karakter.models import Organization
+
+        if not self.organization:
+            return None
+        try:
+            return Organization.objects.get(slug=self.organization)
+        except Organization.DoesNotExist:
+            raise ValueError(f"organization {self.organization} does not exist. Please create it first")
 
 
 class DesktopClientConfig(ClientConfig):

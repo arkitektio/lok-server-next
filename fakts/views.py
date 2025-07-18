@@ -139,6 +139,7 @@ class ConfigureView(LoginRequiredMixin, FormView):
                         release=release,
                         kind=x.staging_kind,
                         tenant=self.request.user,
+                        organization=self.request.user.active_organization,
                         redirect_uris=" ".join(x.staging_redirect_uris),
                     ).first()
                     if client:
@@ -169,6 +170,7 @@ class ConfigureView(LoginRequiredMixin, FormView):
                 release__version=device_code.staging_manifest["version"],
                 kind=device_code.staging_kind,
                 tenant=self.request.user,
+                organization=self.request.user.active_organization,
                 redirect_uris=redirect_uris,
             ).first()
 
@@ -183,6 +185,7 @@ class ConfigureView(LoginRequiredMixin, FormView):
                         kind=enums.ClientKindVanilla.DEVELOPMENT.value,
                         token=token,
                         user=self.request.user.username,
+                        organization=self.request.user.active_organization.slug,
                         tenant=self.request.user.username,
                     )
 
@@ -531,6 +534,7 @@ class RedeemView(View):
                     token=token,
                     user=valid_token.user.username,
                     tenant=valid_token.user.username,
+                    organization=valid_token.organization.slug if valid_token.organization else None,
                 )
 
                 client = builders.create_client(

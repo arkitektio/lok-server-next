@@ -11,7 +11,7 @@ from karakter.models import Organization, Role
 
 def create_default_groups_for_org(org):
     for identifier in ["admin", "guest", "researcher"]:
-        g, _  = Group.objects.get_or_create(name=f"{org.identifier}:{identifier}")
+        g, _  = Group.objects.get_or_create(name=f"{org.slug}:{identifier}")
         Role.objects.update_or_create(group=g, identifier=identifier, organization=org)
 
 
@@ -25,20 +25,20 @@ class Command(BaseCommand):
         for lokuser in organizations:
             org_config = OrganizationConfig(**lokuser)
 
-            if Organization.objects.filter(identifier=org_config.identifier).exists():
-                org = Organization.objects.get(identifier=org_config.identifier)
+            if Organization.objects.filter(slug=org_config.identifier).exists():
+                org = Organization.objects.get(slug=org_config.identifier)
                 org.description = org_config.description
                 org.name = org_config.name
                 org.save()
 
-                self.stdout.write(f"Updated org {org.identifier}")
+                self.stdout.write(f"Updated org {org.slug}")
             else:
                 org = Organization.objects.create(
-                    identifier=org_config.identifier,
+                    slug=org_config.identifier,
                     name=org_config.name,
                     description=org_config.description,
                 )
 
-                self.stdout.write(f"Created org {org.identifier}")
+                self.stdout.write(f"Created org {org.slug}")
                  
             create_default_groups_for_org(org)
