@@ -17,22 +17,18 @@ from typing import Dict
 
 def render_composition(client: models.Client, context: base_models.LinkingContext) -> dict:
     config_dict = {}
-    
-    
+
     self_claim = SelfClaim(
         deployment_name=context.deployment_name,
     )
-    
-    
+
     auth_claim = AuthClaim(
         client_id=client.oauth2_client.client_id,
         client_secret=client.oauth2_client.client_secret,
         scopes=client.release.scopes,
         token_url=f"{context.request.base_url}/o/token/",
     )
-    
 
-     
     instances_map: Dict[str, InstanceClaim] = {}
 
     for mapping in client.mappings.all():
@@ -41,17 +37,11 @@ def render_composition(client: models.Client, context: base_models.LinkingContex
         value = instance.render(context)
         instances_map[mapping.key] = value
 
-
-
-
-
     claim = ClaimAnswer(
         self=self_claim,
         auth=auth_claim,
         instances=instances_map,
     )
-
-
 
     return claim.model_dump()
 
@@ -206,3 +196,53 @@ def create_fake_linking_context(client: models.Client, host, port, secure=False)
             redirect_uris=client.oauth2_client.redirect_uris.split(" "),
         ),
     )
+
+
+def validate_device_code(literal_device_code: str, user: models.AbstractUser, org: models.Organization) -> models.DeviceCode:
+    from .builders import create_client
+
+    try:
+        device_code = models.DeviceCode.objects.get(
+            code=literal_device_code,
+        )
+        if device_code.client:
+            raise ValueError(f"Device code {literal_device_code} is already validated.")
+
+        manifest = base_models.Manifest(**device_code.staging_manifest)
+
+        redirect_uris = (" ".join(device_code.staging_redirect_uris),)
+
+        client = models.Client.objects.filter(
+            release__app__identifier=device_code.staging_manifest["identifier"],
+            release__version=device_code.staging_manifest["version"],
+            kind=device_code.staging_kind,
+            tenant=user,
+            organization=org,
+            redirect_uris=redirect_uris,
+        ).first()
+
+        if not client:
+            token = create_api_token()
+
+            manifest = base_models.Manifest(**device_code.staging_manifest)
+            config = None
+
+            if device_code.staging_kind == enums.ClientKindVanilla.DEVELOPMENT.value:
+                config = base_models.DevelopmentClientConfig(
+                    kind=enums.ClientKindVanilla.DEVELOPMENT.value,
+                    token=token,
+                    user=user.username,
+                    organization=org.slug,
+                    tenant=user.username,
+                )
+
+            else:
+                raise Exception("Unknown client kind or no longer supported")
+
+            client = create_client(manifest=manifest, config=config, user=user)
+
+        device_code.client = client
+        device_code.save()
+        return device_code
+    except models.DeviceCode.DoesNotExist:
+        raise ValueError(f"Device code {literal_device_code} does not exist or is invalid.")
