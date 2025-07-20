@@ -61,6 +61,7 @@ class Command(BaseCommand):
                     defaults={
                         "host": alias.host,
                         "port": alias.port,
+                        "ssl": alias.ssl,
                         "path": alias.path,
                         "kind": alias.kind,
                         "challenge": alias.challenge,
