@@ -12,25 +12,21 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
-
 def create_role(organization: Organization, identifier: str):
     """
     Create a role for the organization with the given identifier.
     """
     group_name = f"{organization.slug}:{identifier}"
     group, _ = Group.objects.get_or_create(name=group_name)
-    role, _ = Role.objects.update_or_create(
-        identifier=identifier,
-        organization=organization,
-        defaults={"group": group}
-    )
+    role, _ = Role.objects.update_or_create(identifier=identifier, organization=organization, defaults={"group": group})
     return role
+
 
 def create_default_groups_for_org(org: Organization):
     for identifier in ["admin", "guest", "user", "bot", "viewer", "editor", "contributor", "manager", "owner", "labeler"]:
         create_role(org, identifier)
-        
-        
+
+
 def ensure_admins_are_admins_for_org(org: Organization):
     """
     Ensure that the admin user is added to the admin group of the organization.
@@ -43,13 +39,10 @@ def ensure_admins_are_admins_for_org(org: Organization):
         user.save()
 
 
-
 @receiver(post_save, sender=Organization)
 def ensure_default_groups_for_org(sender, instance, created, **kwargs):
     create_default_groups_for_org(instance)
     ensure_admins_are_admins_for_org(instance)
-
-
 
 
 @receiver(post_save, sender=User)
@@ -64,6 +57,7 @@ def create_or_update_user_profile(sender, instance, created, **kwargs):
 
 @receiver(user_signed_up)
 def user_signed_up_handler(request, user, **kwargs):
+    # Automatically sets the user to inactive until approved
     user.is_active = False
     user.save()
 
