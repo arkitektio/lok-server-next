@@ -210,14 +210,14 @@ DATABASES = {
     }
 }
 
-
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = conf.email.get("host", "NOTSET")  # Use your SMTP server
-EMAIL_PORT = conf.email.get("port", 587)  # Common SMTP port
-EMAIL_USE_TLS = conf.email.get("use_tls", True)  # Use TLS for security
-EMAIL_HOST_USER = conf.email.get("user", "NOTSET")  # Your email address or SMTP username
-EMAIL_HOST_PASSWORD = conf.email.get("password", "NOTSET")  # Your email password or SMTP password
-DEFAULT_FROM_EMAIL = conf.email.get("email", "NOTSET")  # Default sender email address
+if conf.get("email", None) is not None:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_HOST = conf.email.get("host", "NOTSET")  # Use your SMTP server
+    EMAIL_PORT = conf.email.get("port", 587)  # Common SMTP port
+    EMAIL_USE_TLS = conf.email.get("use_tls", True)  # Use TLS for security
+    EMAIL_HOST_USER = conf.email.get("user", "NOTSET")  # Your email address or SMTP username
+    EMAIL_HOST_PASSWORD = conf.email.get("password", "NOTSET")  # Your email password or SMTP password
+    DEFAULT_FROM_EMAIL = conf.email.get("email", "NOTSET")  # Default sender email address
 
 
 # Unomment and re run
@@ -376,13 +376,9 @@ ACCOUNT_LOGOUT_REDIRECT_URL = "home"
 ENSURED_APPS = []
 
 
-
-
 ENSURE_ORGANIZATIONS = OmegaConf.to_object(conf.get("organizations", [{"identifier": "default", "name": "Default Organization", "description": "Default Organization Description"}]))
 ENSURED_USERS = OmegaConf.to_object(conf.users)
 ENSURED_ROLES = OmegaConf.to_object(conf.roles)
-
-
 
 
 SYSTEM_MESSAGES = conf.get(
