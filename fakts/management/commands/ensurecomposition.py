@@ -62,6 +62,7 @@ class Command(BaseCommand):
                         "host": alias.host,
                         "port": alias.port,
                         "path": alias.path,
+                        "kind": alias.kind,
                         "challenge": alias.challenge,
                     },
                 )
