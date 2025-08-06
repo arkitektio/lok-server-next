@@ -27,7 +27,7 @@ jobs:
           push: true
           tags: jhnnsrs/lok:dev
 
-      - name: Deploy on Go-Arkitekt-live
+      - name: Refresh Go-Arkitekt-live
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.GO_LIVE_HOST }}
