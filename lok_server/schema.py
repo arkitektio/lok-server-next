@@ -30,7 +30,7 @@ class Query:
     stashes: list[pak_types.Stash] = strawberry_django.field()
     stash_items: list[pak_types.StashItem] = strawberry_django.field()
     my_stashes = strawberry_django.field(resolver=pak_queries.my_stashes)
-    
+
     mycontext = strawberry_django.field(resolver=karakter_queries.mycontext)
 
     apps: list[fakts_types.App] = strawberry_django.field()
@@ -90,6 +90,12 @@ class Mutation:
     )
     create_comment = strawberry_django.mutation(
         resolver=komment_mutations.create_comment,
+    )
+    register_com_channel = strawberry_django.mutation(
+        resolver=karakter_mutations.register_com_channel,
+    )
+    notify_user = strawberry_django.mutation(
+        resolver=karakter_mutations.notify_user,
     )
 
     reply_to = strawberry_django.mutation(

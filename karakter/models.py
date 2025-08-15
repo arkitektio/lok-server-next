@@ -1,22 +1,21 @@
 import logging
 from django.contrib.auth.models import AbstractUser, Group
 from django.db import models
+
 logger = logging.getLogger(__name__)
 from karakter import fields, datalayer
+import requests
+
 
 class S3Store(models.Model):
-    path = fields.S3Field(
-        null=True, blank=True, help_text="The stodre of the image", unique=True
-    )
+    path = fields.S3Field(null=True, blank=True, help_text="The stodre of the image", unique=True)
     key = models.CharField(max_length=1000)
     bucket = models.CharField(max_length=1000)
     populated = models.BooleanField(default=False)
 
-class MediaStore(S3Store):
 
-    def get_presigned_url(
-        self, info, datalayer: datalayer.Datalayer, host: str | None = None
-    ) -> str:
+class MediaStore(S3Store):
+    def get_presigned_url(self, info, datalayer: datalayer.Datalayer, host: str | None = None) -> str:
         s3 = datalayer.s3
         url: str = s3.generate_presigned_url(
             ClientMethod="get_object",
@@ -31,61 +30,48 @@ class MediaStore(S3Store):
     def fill_info(self) -> None:
         pass
 
-    def put_file(self, datalayer:  datalayer.Datalayer, file) -> None:
+    def put_file(self, datalayer: datalayer.Datalayer, file) -> None:
         s3 = datalayer.s3
         s3.upload_fileobj(file, self.bucket, self.key)
         self.save()
-        
-        
-        
+
+
 class Organization(models.Model):
     """An Organization in the System
 
     An Organization is a group of users that can be used to manage access to resources.
     Each organization has a unique name and can have multiple users associated with it.
     """
+
     slug = models.CharField(max_length=1000, null=True, blank=True, unique=True)
     name = models.CharField(max_length=1000, null=True, blank=True)
     description = models.CharField(max_length=4000, null=True, blank=True)
     avatar = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
-    
-    
+
     def __str__(self):
         return self.name or self.slug or "Unnamed Organization"
-    
-    
-    
-    
+
+
 class Role(models.Model):
     group = models.OneToOneField(Group, on_delete=models.CASCADE, related_name="role")
     identifier = models.CharField(max_length=1000, null=True, blank=True)
     description = models.CharField(max_length=4000, null=True, blank=True)
-    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="roles")    
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="roles")
     is_builtin = models.BooleanField(default=False, help_text="If this role is a built-in role that cannot be deleted (admin)")
-    
+
     class Meta:
         unique_together = ("identifier", "organization")
-    
-
-
 
 
 class Membership(models.Model):
     """A Membership of a User in an Organization with a Role"""
-    user = models.ForeignKey(
-        "User", on_delete=models.CASCADE, related_name="memberships"
-    )
-    organization = models.ForeignKey(
-        Organization, on_delete=models.CASCADE, related_name="memberships"
-    )
+
+    user = models.ForeignKey("User", on_delete=models.CASCADE, related_name="memberships")
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="memberships")
     roles = models.ManyToManyField(Role, related_name="memberships", blank=True)
 
     class Meta:
         unique_together = ("user", "organization")
-
-
-
-
 
 
 class User(AbstractUser):
@@ -96,6 +82,7 @@ class User(AbstractUser):
 
 
     """
+
     email = models.EmailField(null=True, blank=True)
     active_organization = models.ForeignKey(
         Organization,
@@ -105,8 +92,7 @@ class User(AbstractUser):
         blank=True,
         help_text="The organization that the user is currently active in",
     )
-    
-    
+
     @property
     def is_faktsadmin(self):
         return self.groups.filter(name="admin").exists()
@@ -116,10 +102,10 @@ class User(AbstractUser):
         return None
 
     def notify(self, title, message):
-        for channel in self.channels.all():
+        for channel in self.com_channels.all():
+            print("Notifying channel:", channel)
             channel.publish(title, message)
-            
-            
+
 
 class Profile(models.Model):
     """A Profile of a User"""
@@ -129,13 +115,12 @@ class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
     avatar = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
 
+
 class GroupProfile(models.Model):
     """A Profile of a Group"""
 
     name = models.CharField(max_length=1000, null=True, blank=True)
-    group = models.OneToOneField(
-        Group, on_delete=models.CASCADE, related_name="profile"
-    )
+    group = models.OneToOneField(Group, on_delete=models.CASCADE, related_name="profile")
     bio = models.CharField(max_length=4000, null=True, blank=True)
     avatar = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
 
@@ -144,7 +129,7 @@ class ComChannel(models.Model):
     """A Channel to send notifications to a user"""
 
     name = models.CharField(max_length=1000, null=True, blank=True)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="channels")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="com_channels")
     token = models.CharField(max_length=1000, null=True, blank=True, unique=True)
 
     def publish(self, title, message):
