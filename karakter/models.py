@@ -1,13 +1,22 @@
 import logging
+from typing import Optional, List, Tuple
+
+import requests
+from django.conf import settings
 from django.contrib.auth.models import AbstractUser, Group
 from django.db import models
 
-logger = logging.getLogger(__name__)
 from karakter import fields, datalayer
-import requests
+
+logger = logging.getLogger(__name__)
 
 
 class S3Store(models.Model):
+    """Base model for objects stored in S3.
+
+    Attributes mirror essential S3 metadata used elsewhere in the
+    codebase.
+    """
     path = fields.S3Field(null=True, blank=True, help_text="The stodre of the image", unique=True)
     key = models.CharField(max_length=1000)
     bucket = models.CharField(max_length=1000)
@@ -15,7 +24,20 @@ class S3Store(models.Model):
 
 
 class MediaStore(S3Store):
-    def get_presigned_url(self, info, datalayer: datalayer.Datalayer, host: str | None = None) -> str:
+    """Small helper around S3-backed stored objects.
+
+    Provides convenience helpers for generating presigned URLs and
+    uploading content.
+    """
+
+    def get_presigned_url(self, info, datalayer: datalayer.Datalayer, host: Optional[str] = None) -> str:
+        """Return a presigned URL for the stored S3 object.
+
+        Args:
+            info: GraphQL resolver info (passed through to datalayer if used).
+            datalayer: object exposing ``s3`` boto3 session/client.
+            host: optional host to replace the endpoint with when returning.
+        """
         s3 = datalayer.s3
         url: str = s3.generate_presigned_url(
             ClientMethod="get_object",
@@ -25,12 +47,14 @@ class MediaStore(S3Store):
             },
             ExpiresIn=3600,
         )
-        return url.replace(settings.AWS_S3_ENDPOINT_URL, host or "")
+        return url.replace(getattr(settings, "AWS_S3_ENDPOINT_URL", ""), host or "")
 
     def fill_info(self) -> None:
+        """Populate or refresh derived metadata for the stored object."""
         pass
 
     def put_file(self, datalayer: datalayer.Datalayer, file) -> None:
+        """Upload a file-like object to the object's S3 location and save model."""
         s3 = datalayer.s3
         s3.upload_fileobj(file, self.bucket, self.key)
         self.save()
@@ -101,10 +125,23 @@ class User(AbstractUser):
     def avatar(self):
         return None
 
-    def notify(self, title, message):
+    def notify(self, title: str, message: str) -> List[Tuple[Optional[int], str]]:
+        """Send a notification to all registered communication channels.
+
+        Logs publish failures but attempts all channels. Returns a list of
+        (channel_id, status) tuples so callers can inspect individual
+        delivery results.
+        """
+        results: List[Tuple[Optional[int], str]] = []
         for channel in self.com_channels.all():
-            print("Notifying channel:", channel)
-            channel.publish(title, message)
+            try:
+                status = channel.publish(title, message)
+            except Exception:
+                logger.exception("Error publishing to channel=%s for user=%s", getattr(channel, "id", None), getattr(self, "id", None))
+                status = "Error"
+            results.append((getattr(channel, "id", None), status))
+
+        return results
 
 
 class Profile(models.Model):
@@ -132,20 +169,34 @@ class ComChannel(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="com_channels")
     token = models.CharField(max_length=1000, null=True, blank=True, unique=True)
 
-    def publish(self, title, message):
+    def publish(self, title: str, message: str) -> str:
+        """Publish a notification to the configured push endpoint.
+
+        Returns a string status and logs HTTP/JSON errors instead of
+        raising to make caller handling simpler.
+        """
         try:
-            x = requests.post(
+            resp = requests.post(
                 "https://exp.host/--/api/v2/push/send",
                 json={
                     "to": self.token,
                     "title": title,
                     "body": message,
                 },
+                timeout=5,
             )
-            status = x.json()["data"]["status"]
+            resp.raise_for_status()
+        except requests.RequestException:
+            logger.exception("HTTP error while publishing to token=%s", self.token)
+            return "Error"
+
+        try:
+            data = resp.json()
+            # Safely navigate nested JSON
+            status = data.get("data", {}).get("status", "unknown")
             return status
-        except Exception as e:
-            logger.error("Publish error", exc_info=True)
+        except ValueError:
+            logger.exception("Invalid JSON response when publishing to token=%s", self.token)
             return "Error"
 
 
