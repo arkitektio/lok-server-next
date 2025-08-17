@@ -9,6 +9,7 @@ from fakts.graphql import queries as fakts_queries
 from fakts.graphql import subscriptions as fakts_subscriptions
 from fakts import models as fakts_models
 from karakter import types as karakter_types
+from karakter import models as karakter_models
 from karakter.graphql import mutations as karakter_mutations
 from karakter.graphql import queries as karakter_queries
 from karakter.graphql import subscriptions as karakter_subscriptions
@@ -25,11 +26,14 @@ from strawberry_django.optimizer import DjangoOptimizerExtension
 from authapp.extension import AuthAppExtension
 import kante
 
+
 @strawberry.type
 class Query:
     stashes: list[pak_types.Stash] = strawberry_django.field()
     stash_items: list[pak_types.StashItem] = strawberry_django.field()
     my_stashes = strawberry_django.field(resolver=pak_queries.my_stashes)
+
+    organizations: list[karakter_types.Organization] = kante.django_field()
 
     mycontext = strawberry_django.field(resolver=karakter_queries.mycontext)
 
@@ -37,6 +41,7 @@ class Query:
     releases: list[fakts_types.Release] = strawberry_django.field()
     clients: list[fakts_types.Client] = strawberry_django.field()
     users: list[karakter_types.User] = strawberry_django.field()
+    roles: list[karakter_types.Role] = strawberry_django.field()
     groups: list[karakter_types.Group] = strawberry_django.field()
     comments: list[komment_types.Comment] = strawberry_django.field()
     services: list[fakts_types.Service] = strawberry_django.field()
@@ -65,20 +70,28 @@ class Query:
     my_active_messages = strawberry_django.field(resolver=karakter_queries.my_active_messages)
     message = strawberry_django.field(resolver=karakter_queries.message)
 
-    @strawberry_django.field()
+    @kante.django_field()
     def hallo(self, info: Info) -> str:
         print("hallosss")
         return "hallo"
 
-    @strawberry_django.field()
-    def service(self, info: Info, id: strawberry.ID) -> fakts_types.Service:
+    @kante.django_field(name="service")
+    def detail_service(self, info: Info, id: strawberry.ID) -> fakts_types.Service:
         return fakts_models.Service.objects.get(id=id)
 
-    @strawberry_django.field()
+    @kante.django_field()
+    def role(self, info: Info, id: strawberry.ID) -> karakter_types.Role:
+        return karakter_models.Role.objects.get(id=id)
+
+    @kante.django_field()
+    def organization(self, info: Info, id: strawberry.ID) -> karakter_types.Organization:
+        return karakter_models.Organization.objects.get(id=id)
+
+    @kante.django_field()
     def layer(self, info: Info, id: strawberry.ID) -> fakts_types.Layer:
         return fakts_models.Layer.objects.get(id=id)
 
-    @strawberry_django.field()
+    @kante.django_field()
     def service_instance(self, info: Info, id: strawberry.ID) -> fakts_types.ServiceInstance:
         return fakts_models.ServiceInstance.objects.get(id=id)
 
