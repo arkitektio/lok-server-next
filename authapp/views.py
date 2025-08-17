@@ -1,4 +1,5 @@
 # authapp/views.py
+from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
@@ -15,10 +16,8 @@ from django.views.decorators.csrf import csrf_exempt
 
 @csrf_exempt
 @require_http_methods(["POST"])  # we only allow POST for token endpoint
-def issue_token(request):
+def issue_token(request: HttpRequest) -> HttpResponse:
     return server.create_token_response(request)
-
-
 
 
 

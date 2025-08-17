@@ -23,7 +23,7 @@ from pak.graphql import subscriptions as pak_subscriptions
 from karakter.datalayer import DatalayerExtension
 from strawberry_django.optimizer import DjangoOptimizerExtension
 from authapp.extension import AuthAppExtension
-
+import kante
 
 @strawberry.type
 class Query:
@@ -88,6 +88,11 @@ class Mutation:
     create_user = strawberry_django.mutation(
         resolver=karakter_mutations.create_user,
     )
+
+    add_user_to_organization = strawberry_django.mutation(
+        resolver=karakter_mutations.add_user_to_organization,
+    )
+
     create_comment = strawberry_django.mutation(
         resolver=komment_mutations.create_comment,
     )
@@ -165,7 +170,7 @@ class Subscription:
     mentions = strawberry.subscription(resolver=komment_subscriptions.mentions)
 
 
-schema = strawberry.Schema(
+schema = kante.Schema(
     query=Query,
     subscription=Subscription,
     mutation=Mutation,

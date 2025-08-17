@@ -282,7 +282,7 @@ class Membership:
 @strawberry_django.type(models.Organization, filters=filters.OrganizationFilter, pagination=True, description="""An Organization is a group of users that can work together on a project.""")
 class Organization:
     id: strawberry.ID
-    name: str
+    
     slug: str
     description: str | None = strawberry.field(description="A short description of the organization")
     logo: MediaStore | None = strawberry.field(description="The logo of the organization")
@@ -292,6 +292,10 @@ class Organization:
     @strawberry_django.field(description="The roles that are available in the organization")
     def roles(self) -> List["Role"]:
         return self.roles.all()
+    
+    @strawberry_django.field(description="The name of this organization")
+    def name(self) -> str:
+        return self.name or self.slug
 
 
 @strawberry_django.type(models.ComChannel, filters=filters.OrganizationFilter, pagination=True, description="""An Organization is a group of users that can work together on a project.""")
