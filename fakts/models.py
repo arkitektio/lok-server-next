@@ -12,10 +12,11 @@ import _json
 from typing import Optional
 from fakts import fields, enums
 from django.contrib.auth.models import AbstractUser, Group
-from karakter.models import MediaStore
+from karakter.models import MediaStore, Organization
 from django.conf import settings
 from authapp.models import OAuth2Client
 from fakts import base_models, errors
+
 
 
 class Layer(models.Model):
@@ -180,6 +181,11 @@ class RedeemToken(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(null=True)
     user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="issued_tokens")
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="issued_tokens",
+    )
 
 
 class DeviceCode(models.Model):
@@ -248,6 +254,11 @@ class Client(models.Model):
         help_text="The kind of transformation",
     )
     user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="clients")
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="clients",
+    )
     redirect_uris = models.CharField(max_length=1000, default=" ")
     public = models.BooleanField(default=False)
     token = models.CharField(default=uuid.uuid4, unique=True, max_length=10000)
@@ -260,8 +271,8 @@ class Client(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["release", "user"],
-                name="Only one per releast, tenankt and kind",
+                fields=["release", "user", "organization"],
+                name="Only one per release, user and organization",
             )
         ]
 

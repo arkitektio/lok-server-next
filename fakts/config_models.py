@@ -17,6 +17,9 @@ class AliasModel(BaseModel):
     """Model representing an alias for a service instance."""
 
     layer: str
+    "Layer identifier this alias belongs to."
+    ssl: Optional[bool] = None
+    """The ssl flag indicates if the alias is available over SSL or not."""
     name: Optional[str] = None
     host: Optional[str] = None
     port: Optional[int] = None

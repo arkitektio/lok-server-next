@@ -20,6 +20,7 @@ def custom_token_generator(request, refresh_token=False):
         "sub": str(user.id) if user else None,
         "preferred_username": user.username if user else None,
         "roles": [group.name for group in user.groups.all()] if user else [],
+        "active_org": str(user.active_organization.identifier) if user and user.active_organization else None,
         "scope": " ".join(request.scopes),
         "iss": "herre",
         "iat": datetime.datetime.now().timestamp(),

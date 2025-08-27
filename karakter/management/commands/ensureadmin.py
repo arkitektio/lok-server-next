@@ -1,8 +1,8 @@
-from email.headerregistry import Group
+
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.conf import settings
-
+from karakter.models import Organization, Role
 
 class Command(BaseCommand):
     help = "Creates an admin user non-interactively if it doesn't exist"
@@ -14,21 +14,23 @@ class Command(BaseCommand):
 
         for superuser in superusers:
             User = get_user_model()
-            if not User.objects.filter(username=str(superuser["USERNAME"])).exists():
+            
+            user = User.objects.filter(username=str(superuser["USERNAME"])).first()
+            
+            if not user:
                 user = User.objects.create_superuser(
                     username=str(superuser["USERNAME"]),
                     email=str(superuser["EMAIL"]),
                     password=str(superuser["PASSWORD"]),
                 )
+            
+                
+                
+            # Go through all orgnisations and add the admin role to the user
+            for role in Role.objects.filter(identifier="admin").all():
+                org = role.organization
+                user.groups.add(role.group)
+                self.stdout.write(f"Added admin role for {org.name} to user {user.username}")
+            
 
-                user.groups.set(
-                    [
-                        Group.objects.get_or_create(name=groupname)[0]
-                        for groupname in set(
-                            superuser.get("GROUPS", [])
-                            + [group.name for group in user.groups.all()]
-                        )
-                    ]
-                )
-
-                user.save()
+            user.save()

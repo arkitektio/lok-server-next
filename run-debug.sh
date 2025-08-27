@@ -5,14 +5,18 @@ uv run python manage.py wait_for_database -s 2
 echo "=> Performing database migrations..."
 uv run python manage.py migrate
 
+echo "=> Ensuring Organizations..."
+uv run python manage.py ensureorganizations
+
+echo "=> Ensuring Roles..."
+uv run python manage.py ensureroles
+
+
 echo "=> Ensuring Superusers..."
 uv run python manage.py ensureadmin
 
 echo "=> Ensuring Users..."
 uv run python manage.py ensureusers
-
-echo "=> Ensuring Groups..."
-uv run python manage.py ensuregroups
 
 
 echo "=> Ensuring Composition..."

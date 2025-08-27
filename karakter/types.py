@@ -8,6 +8,7 @@ from kante.types import Info
 from karakter import enums, filters, models, scalars
 from strawberry import LazyType
 from allauth.socialaccount import models as smodels
+import kante
 
 
 @strawberry_django.type(
@@ -65,9 +66,11 @@ class User:
     last_name: str | None
     email: str | None
     groups: list[Group]
+    memberships: list["Membership"] = strawberry_django.field(description="The memberships of the user in organizations")
     avatar: str | None
     profile: "Profile"
     managed_clients: strawberry.auto
+    com_channels: list["ComChannel"] = strawberry_django.field(description="The communication channels that the user has")
 
 
 @strawberry_django.type(
@@ -249,3 +252,75 @@ class SystemMessage:
     message: str
     action: str
     user: User
+
+
+@strawberry_django.type(models.Role, filters=filters.RoleFilter, pagination=True, description="""A Role is a set of permissions that can be assigned to a user. It is used to define what a user can do in the system.""")
+class Role:
+    id: strawberry.ID
+    identifier: str
+    organization: "Organization"
+
+    @kante.django_field()
+    def description(self, info: Info) -> "str":
+        return self.description or self.identifier
+
+
+@strawberry_django.type(
+    models.Membership,
+    filters=filters.MembershipFilter,
+    pagination=True,
+    description="""
+A Membership is a relation between a User and an Organization. It can have multiple Roles assigned to it.
+""",
+)
+class Membership:
+    id: strawberry.ID
+    user: User
+    organization: "Organization"
+    roles: List["Role"] = strawberry.field(description="The roles that the user has in the organization")
+
+    @strawberry_django.field(description="The groups that the user has in the organization")
+    def groups(self) -> List[Group]:
+        return [role.group for role in self.roles]
+
+
+@strawberry_django.type(models.Organization, filters=filters.OrganizationFilter, pagination=True, description="""An Organization is a group of users that can work together on a project.""")
+class Organization:
+    id: strawberry.ID
+
+    slug: str
+    description: str | None = strawberry.field(description="A short description of the organization")
+    logo: MediaStore | None = strawberry.field(description="The logo of the organization")
+    users: List[User] = strawberry.field(description="The users that are part of the organization")
+    active_users: List[User] = strawberry.field(description="The users that are currently active in the organization")
+
+    @strawberry_django.field(description="The roles that are available in the organization")
+    def roles(self) -> List["Role"]:
+        return self.roles.all()
+
+    @strawberry_django.field(description="The name of this organization")
+    def name(self) -> str:
+        return self.name or self.slug
+
+
+@strawberry_django.type(models.ComChannel, filters=filters.OrganizationFilter, pagination=True, description="""An Organization is a group of users that can work together on a project.""")
+class ComChannel:
+    id: strawberry.ID
+    user: User
+
+
+@strawberry.type
+class Context:
+    """The context of this app. It is used to provide information about the current request and user."""
+
+    user: User = strawberry.field(description="The user that is associated with this app")
+    organization: Organization = strawberry.field(description="The organization that is associated with this app")
+    roles: List[str] = strawberry.field(description="The roles that the user has in the organization")
+    scope: List[str] = strawberry.field(description="The scope of the app within in the organization")
+
+    @strawberry_django.field(description="Are we acting in the active organization of the user?")
+    def fits_active_organization(self) -> bool:
+        """Check if the context is for the active organization of the user"""
+        if not self.user or not self.organization:
+            return False
+        return self.user.active_organization == self.organization

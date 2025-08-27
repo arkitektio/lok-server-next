@@ -7,13 +7,13 @@ csrf_trusted_origins:
   - http://localhost
   - https://localhost
 db:
-  db_name: lok_db
+  db_name: lok
   dependency: db
   engine: django.db.backends.postgresql
   host: db
-  password: postgres
+  password: 8b13613b7518e1b293133d68622635ad
   port: 5432
-  username: fostgres
+  username: flakyvioletcaterpillar
 deployment:
   name: default
 django:
@@ -25,13 +25,7 @@ django:
   hosts:
     - "*"
   secret_key: c5d84589433e1d0b4198072c54ee0dd1
-groups:
-  - description: admin_group
-    name: admin
-  - description: The linz anatomy group
-    name: linz-iac
-  - description: The UC2 group
-    name: uc2
+force_script_name: lok
 livekit:
   api_key: devkey
   api_secret: secret
@@ -100,7 +94,8 @@ private_key: "-----BEGIN PRIVATE KEY-----
 public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDXx/g7dyiwmfIQvkBKvUAM+KBuL1KdvZfZMlYhbyrz9Auk2xao1gLYiQJ183joiXadUreL4BugUrasQVdR9JvBWXOBeqm2FD5Ehf9VvqXdzCOQ7/fUXkb9N8sqmz5YitQuheKGDh0weNmVcfdsCGU38sACEvFQg+5dv1tqLbm7EllT+vogntDVX16DmvpvFEX4HYHpT8qM/xuqSB6yQ8+wBuQd3K7WTFgUrUqQx6zFrSMUbSArPrrY5Z0GJAeDAHKp4+V+um4mSHpYM2nBJ5pn80wYpsf97KIL9P+UJzjb/indB8dCqpPkAk3HogBhj67Tp5JoqCMoaXHFU3tiYQCp
 redeem_tokens:
   - token: Y22joLbkjm4vtXMj_T4FD3U99Mb71pTFnUe-8KToAQI
-    user: admin
+    user: iacbot
+    organization: iac
 redis:
   dependency: redis
   host: redis
@@ -117,41 +112,156 @@ scopes:
   rekuest_call: Call other apps with rekuest
   write: A generic write access
 token_expire_seconds: 700000
+
+organizations:
+  - name: Default
+    identifier: default
+  - name: UC2
+    identifier: uc2
+  - name: IAC
+    identifier: iac
+
+roles:
+  - name: IAC PhD-Students
+    identifier: phd
+    description: "All phds in the group"
+    organization: iac
+
 users:
   - name: Johannes Roos
     username: jhnnsrs
-    password: mysecret-name
-    groups: [iac-linz, uc2]
+    password: mysecret
+    active_organization: iac
+    memberships:
+      - organization: iac
+        roles: ["admin"]
+      - organization: uc2
+        roles: ["admin"]
+
+  - name: DemoUser
+    username: demo
+    password: demo
+    active_organization: iac
+    memberships:
+      - organization: iac
+        roles: ["viewer"]
+
   - name: Benedict Diederich
     username: beniroquai
     password: my-other-name
-    groups: [uc2]
-ensured_layers:
-  - kind: tailscale
-    identifier: jhnnsrs-tailscale
-ensured_instances:
-  mikro_base:
-    builder: arkitekt.relpath
-    service: arkitekt.live.mikro
-    limited_to_groups:
-      - uc2
-    layer: web
-    params:
-      path: "mikro"
-  fluss_base:
-    builder: arkitekt.relpath
-    service: arkitekt.live.fluss
-    limited_to_users:
-      - jhnnsrs
-    layer: web
-    params:
-      path: "fluss"
-  kraph_base:
-    builder: arkitekt.relpath
-    service: arkitekt.live.mikro
-    layer: web
-    params:
-      path: "kraph"
+    active_organization: uc2
+    memberships:
+      - organization: uc2
+        roles: ["admin"]
+
+  - name: IAC-Bot
+    username: iacbot
+    password: my-other-name
+    active_organization: iac
+    memberships:
+      - organization: iac
+        roles: ["bot"]
+
+layers:
+  - identifier: johannes-tailscale
+    kind: tailscale
+    steward: jhnnsrs
+    dns_probe: mikro.johannes-taiscale.ts.net
+  - identifier: public
+    kind: public
+  - identifier: docker
+    kind: docker
+
+instances:
+  - identifier: local-mikro
+    service: live.arkitekt.mikro
+    aliases:
+      - layer: public
+        kind: relative
+        path: mikro
+        challenge: ht
+  - identifier: local-fluss
+    service: live.arkitekt.fluss
+    aliases:
+      - layer: public
+        kind: relative
+        path: fluss
+        challenge: ht
+  - identifier: local-lok
+    service: live.arkitekt.lok
+    aliases:
+      - layer: public
+        kind: relative
+        path: lok
+        challenge: ht
+  - identifier: local-rekuest
+    service: live.arkitekt.rekuest
+    aliases:
+      - layer: public
+        kind: relative
+        path: rekuest
+        challenge: ht
+  - identifier: local-kraph
+    service: live.arkitekt.kraph
+    aliases:
+      - layer: public
+        kind: relative
+        path: kraph
+        challenge: ht
+  - identifier: local-kabinet
+    service: live.arkitekt.kabinet
+    aliases:
+      - layer: public
+        kind: relative
+        path: kabinet
+        challenge: ht
+  - identifier: local-datalayer
+    service: live.arkitekt.s3
+    aliases:
+      - layer: public
+        kind: relative
+        challenge: minio/health/live
+  - identifier: local-lovekit
+    service: live.arkitekt.lovekit
+    aliases:
+      - layer: public
+        kind: relative
+        path: lovekit
+        challenge: ht
+  - identifier: local-elektro
+    service: live.arkitekt.elektro
+    aliases:
+      - layer: public
+        kind: relative
+        path: elektro
+        challenge: ht
+  - identifier: local-alpaka
+    service: live.arkitekt.alpaka
+    aliases:
+      - layer: public
+        kind: relative
+        path: alpaka
+        challenge: ht
+  - identifier: local-omero-ark
+    service: live.arkitekt.omero_ark
+    aliases:
+      - layer: public
+        kind: relative
+        path: omero_ark
+        challenge: ht
+  - identifier: local-dokuments
+    service: live.arkitekt.dokuments
+    aliases:
+      - layer: public
+        kind: relative
+        path: dokuments
+        challenge: ht
+  - identifier: local-livekit
+    service: io.livekit.livekit
+    aliases:
+      - layer: public
+        kind: relative
+        challenge: ""
 s3:
   access_key: ZvBLOQAApECKXISSJyiox192s6RNhVgmN9LZhWFYbdA
   buckets:

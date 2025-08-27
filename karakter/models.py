@@ -1,22 +1,43 @@
 import logging
+from typing import Optional, List, Tuple
+
+import requests
+from django.conf import settings
 from django.contrib.auth.models import AbstractUser, Group
 from django.db import models
-logger = logging.getLogger(__name__)
+
 from karakter import fields, datalayer
 
+logger = logging.getLogger(__name__)
+
+
 class S3Store(models.Model):
-    path = fields.S3Field(
-        null=True, blank=True, help_text="The stodre of the image", unique=True
-    )
+    """Base model for objects stored in S3.
+
+    Attributes mirror essential S3 metadata used elsewhere in the
+    codebase.
+    """
+    path = fields.S3Field(null=True, blank=True, help_text="The stodre of the image", unique=True)
     key = models.CharField(max_length=1000)
     bucket = models.CharField(max_length=1000)
     populated = models.BooleanField(default=False)
 
-class MediaStore(S3Store):
 
-    def get_presigned_url(
-        self, info, datalayer: datalayer.Datalayer, host: str | None = None
-    ) -> str:
+class MediaStore(S3Store):
+    """Small helper around S3-backed stored objects.
+
+    Provides convenience helpers for generating presigned URLs and
+    uploading content.
+    """
+
+    def get_presigned_url(self, info, datalayer: datalayer.Datalayer, host: Optional[str] = None) -> str:
+        """Return a presigned URL for the stored S3 object.
+
+        Args:
+            info: GraphQL resolver info (passed through to datalayer if used).
+            datalayer: object exposing ``s3`` boto3 session/client.
+            host: optional host to replace the endpoint with when returning.
+        """
         s3 = datalayer.s3
         url: str = s3.generate_presigned_url(
             ClientMethod="get_object",
@@ -26,16 +47,55 @@ class MediaStore(S3Store):
             },
             ExpiresIn=3600,
         )
-        return url.replace(settings.AWS_S3_ENDPOINT_URL, host or "")
+        return url.replace(getattr(settings, "AWS_S3_ENDPOINT_URL", ""), host or "")
 
     def fill_info(self) -> None:
+        """Populate or refresh derived metadata for the stored object."""
         pass
 
-    def put_file(self, datalayer:  datalayer.Datalayer, file) -> None:
+    def put_file(self, datalayer: datalayer.Datalayer, file) -> None:
+        """Upload a file-like object to the object's S3 location and save model."""
         s3 = datalayer.s3
         s3.upload_fileobj(file, self.bucket, self.key)
         self.save()
 
+
+class Organization(models.Model):
+    """An Organization in the System
+
+    An Organization is a group of users that can be used to manage access to resources.
+    Each organization has a unique name and can have multiple users associated with it.
+    """
+
+    slug = models.CharField(max_length=1000, null=True, blank=True, unique=True)
+    name = models.CharField(max_length=1000, null=True, blank=True)
+    description = models.CharField(max_length=4000, null=True, blank=True)
+    avatar = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
+
+    def __str__(self):
+        return self.name or self.slug or "Unnamed Organization"
+
+
+class Role(models.Model):
+    group = models.OneToOneField(Group, on_delete=models.CASCADE, related_name="role")
+    identifier = models.CharField(max_length=1000, null=True, blank=True)
+    description = models.CharField(max_length=4000, null=True, blank=True)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="roles")
+    is_builtin = models.BooleanField(default=False, help_text="If this role is a built-in role that cannot be deleted (admin)")
+
+    class Meta:
+        unique_together = ("identifier", "organization")
+
+
+class Membership(models.Model):
+    """A Membership of a User in an Organization with a Role"""
+
+    user = models.ForeignKey("User", on_delete=models.CASCADE, related_name="memberships")
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="memberships")
+    roles = models.ManyToManyField(Role, related_name="memberships", blank=True)
+
+    class Meta:
+        unique_together = ("user", "organization")
 
 
 class User(AbstractUser):
@@ -46,7 +106,16 @@ class User(AbstractUser):
 
 
     """
+
     email = models.EmailField(null=True, blank=True)
+    active_organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="active_users",
+        null=True,
+        blank=True,
+        help_text="The organization that the user is currently active in",
+    )
 
     @property
     def is_faktsadmin(self):
@@ -56,9 +125,23 @@ class User(AbstractUser):
     def avatar(self):
         return None
 
-    def notify(self, title, message):
-        for channel in self.channels.all():
-            channel.publish(title, message)
+    def notify(self, title: str, message: str) -> List[Tuple[Optional[int], str]]:
+        """Send a notification to all registered communication channels.
+
+        Logs publish failures but attempts all channels. Returns a list of
+        (channel_id, status) tuples so callers can inspect individual
+        delivery results.
+        """
+        results: List[Tuple[Optional[int], str]] = []
+        for channel in self.com_channels.all():
+            try:
+                status = channel.publish(title, message)
+            except Exception:
+                logger.exception("Error publishing to channel=%s for user=%s", getattr(channel, "id", None), getattr(self, "id", None))
+                status = "Error"
+            results.append((getattr(channel, "id", None), status))
+
+        return results
 
 
 class Profile(models.Model):
@@ -69,13 +152,12 @@ class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
     avatar = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
 
+
 class GroupProfile(models.Model):
     """A Profile of a Group"""
 
     name = models.CharField(max_length=1000, null=True, blank=True)
-    group = models.OneToOneField(
-        Group, on_delete=models.CASCADE, related_name="profile"
-    )
+    group = models.OneToOneField(Group, on_delete=models.CASCADE, related_name="profile")
     bio = models.CharField(max_length=4000, null=True, blank=True)
     avatar = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
 
@@ -84,23 +166,37 @@ class ComChannel(models.Model):
     """A Channel to send notifications to a user"""
 
     name = models.CharField(max_length=1000, null=True, blank=True)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="channels")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="com_channels")
     token = models.CharField(max_length=1000, null=True, blank=True, unique=True)
 
-    def publish(self, title, message):
+    def publish(self, title: str, message: str) -> str:
+        """Publish a notification to the configured push endpoint.
+
+        Returns a string status and logs HTTP/JSON errors instead of
+        raising to make caller handling simpler.
+        """
         try:
-            x = requests.post(
+            resp = requests.post(
                 "https://exp.host/--/api/v2/push/send",
                 json={
                     "to": self.token,
                     "title": title,
                     "body": message,
                 },
+                timeout=5,
             )
-            status = x.json()["data"]["status"]
+            resp.raise_for_status()
+        except requests.RequestException:
+            logger.exception("HTTP error while publishing to token=%s", self.token)
+            return "Error"
+
+        try:
+            data = resp.json()
+            # Safely navigate nested JSON
+            status = data.get("data", {}).get("status", "unknown")
             return status
-        except Exception as e:
-            logger.error("Publish error", exc_info=True)
+        except ValueError:
+            logger.exception("Invalid JSON response when publishing to token=%s", self.token)
             return "Error"
 
 

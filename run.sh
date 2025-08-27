@@ -3,10 +3,19 @@ echo "=> Waiting for DB to be online"
 uv run python manage.py wait_for_database -s 6
 
 echo "=> Performing database migrations..."
-uv ru python manage.py migrate
+uv run python manage.py migrate
+
 
 echo "=> Ensuring Superusers..."
 uv run python manage.py ensureadmin
+
+
+echo "=> Ensuring Roles..."
+uv run python manage.py ensureroles
+
+
+echo "=> Ensuring Organizations..."
+uv run python manage.py ensureorganizations
 
 echo "=> Ensuring Users..."
 uv run python manage.py ensureusers

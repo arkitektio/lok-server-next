@@ -145,6 +145,7 @@ class ClientConfig(BaseModel):
 class DevelopmentClientConfig(ClientConfig):
     kind: Literal["development"]
     user: str
+    organization: Optional[str] = None
 
     def get_user(self):
         from django.contrib.auth import get_user_model
@@ -153,6 +154,16 @@ class DevelopmentClientConfig(ClientConfig):
             return get_user_model().objects.get(username=self.user)
         except get_user_model().DoesNotExist:
             raise ValueError(f"User {self.user} does not exist. Please create them first")
+
+    def get_organization(self):
+        from karakter.models import Organization
+
+        if not self.organization:
+            return None
+        try:
+            return Organization.objects.get(slug=self.organization)
+        except Organization.DoesNotExist:
+            raise ValueError(f"organization {self.organization} does not exist. Please create it first")
 
 
 class DesktopClientConfig(ClientConfig):
@@ -173,7 +184,6 @@ class AppConfig(Manifest):
     clients: list[ClientUnion]
 
 
-
 class SelfClaim(BaseModel):
     deployment_name: str = Field(default=settings.DEPLOYMENT_NAME)
 
@@ -183,29 +193,29 @@ class AuthClaim(BaseModel):
     client_secret: str
     scopes: List[str] = Field(default_factory=list)
     token_url: str
-    
-    
-    
+
+
 class Alias(BaseModel):
     ssl: bool = True
     """The ssl flag indicates if the alias is available over SSL or not."""
     host: str
     """The host is the host of the alias, it is used to create the URL."""
-    port: Optional[str] = None
+    port: Optional[int] = None
     """The port is the port of the alias, it is used to create the URL."""
     path: Optional[str] = None
     """The path is the path of the alias, it is used to create the URL."""
     challenge: str = Field(
         description="A challenge url to verify the alias on the client. If it returns a 200 OK, the alias is valid. It can additionally return a JSON object with a `challenge` key that contains the challenge to be solved by the client.",
     )
-    
-    
+
+
 class InstanceClaim(BaseModel):
     """InstancesClaim is a claim that contains the instances that are available
     for the client. It is used to link the client to the server and to provide
     the client with the necessary information to connect to the server.
     """
-    service: str 
+
+    service: str
     """The service is the service that will be used to fill the key, it will be used to find the correct instance. It needs to fullfill"""
     identifier: str
     """The identifier is a unique string that identifies the instance."""
@@ -216,8 +226,7 @@ class ClaimAnswer(BaseModel):
     """A ClaimAnswer is the answer to a claim request. It contains the
     linking context that should be used to link the client to the server.
     """
+
     self: SelfClaim
     auth: AuthClaim
     instances: Dict[str, InstanceClaim] = Field(default_factory=dict)
-    
-    
