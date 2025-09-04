@@ -200,3 +200,6 @@ class RedeemToken:
     token: str = strawberry.field(description="The token of the redeem token")
     client: Client | None = strawberry.field(description="The client that this redeem token belongs to.")
     user: types.User = strawberry.field(description="The user that this redeem token belongs to.")
+
+    def get_queryset(cls, info) -> models.RedeemToken:
+        return models.RedeemToken.objects.filter(user=info.context.request.user, organization=info.context.request.organization)

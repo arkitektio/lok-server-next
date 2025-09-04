@@ -69,7 +69,7 @@ class Query:
     stash_item: pak_types.StashItem = strawberry_django.field(resolver=pak_queries.stash_item)
     my_active_messages = strawberry_django.field(resolver=karakter_queries.my_active_messages)
     message = strawberry_django.field(resolver=karakter_queries.message)
-
+    
     @kante.django_field()
     def hallo(self, info: Info) -> str:
         print("hallosss")
@@ -86,6 +86,17 @@ class Query:
     @kante.django_field()
     def organization(self, info: Info, id: strawberry.ID) -> karakter_types.Organization:
         return karakter_models.Organization.objects.get(id=id)
+    
+    
+    @kante.django_field()
+    def redeem_token(self, info: Info, id: strawberry.ID) -> fakts_types.RedeemToken:
+        return fakts_models.RedeemToken.objects.get(id=id)
+    
+    @kante.django_field()
+    def my_redeem_tokens(self, info: Info) -> list[fakts_types.RedeemToken]:
+        return fakts_models.RedeemToken.objects.filter(user=info.context.request.user, organization=info.context.request.organization)
+    
+    
 
     @kante.django_field()
     def layer(self, info: Info, id: strawberry.ID) -> fakts_types.Layer:
@@ -114,6 +125,10 @@ class Mutation:
     )
     notify_user = strawberry_django.mutation(
         resolver=karakter_mutations.notify_user,
+    )
+    
+    create_redeem_token = strawberry_django.mutation(
+        resolver=fakts_mutations.create_redeem_token,
     )
 
     reply_to = strawberry_django.mutation(
