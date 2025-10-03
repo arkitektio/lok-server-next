@@ -31,7 +31,7 @@ from django.http import HttpResponse
 
 def fakts_challenge(request):
     """
-    Placeholder view for the .well-known/fakts-challenge endpoint.
+    Placeholdesr view for the .well-known/fakts-challenge endpoint.
     This should be replaced with the actual logic to handle the challenge.
     """
     return HttpResponse("Fakts Challenge Endpoint", status=200)

@@ -89,6 +89,12 @@ class FilterKind(str, Enum):
     IDENTIFIER_REGEX = "identifier_regex"
     USER_IS = "user_is"
     USER_IS_DEVELOPER = "user_is_developer"
+    
+    
+@strawberry.enum
+class InstancePermissionKind(str, Enum):
+    ALLOW = "allow"
+    DENY = "deny"
 
 
 class FaktsGrantKindChoices(TextChoices):

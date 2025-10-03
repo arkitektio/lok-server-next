@@ -27,6 +27,7 @@ from authapp.extension import AuthAppExtension
 import kante
 
 
+
 @strawberry.type
 class Query:
     stashes: list[pak_types.Stash] = strawberry_django.field()

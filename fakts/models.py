@@ -53,7 +53,9 @@ class Service(models.Model):
             errors.append("Instance does not contain a key")
 
         return errors + warnings
-
+    
+    
+    
 
 class ServiceInstance(models.Model):
     service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name="instances")
@@ -72,6 +74,7 @@ class ServiceInstance(models.Model):
     denied_groups = models.ManyToManyField(Group, related_name="denied_instances")
     allowed_users = models.ManyToManyField(get_user_model(), related_name="allowed_instances")
     allowed_groups = models.ManyToManyField(Group, related_name="allowed_instances")
+    allowed_organizations = models.ManyToManyField(Organization, related_name="allowed_instances")
 
     def __str__(self):
         return f"{self.service}:{self.identifier}"
@@ -96,6 +99,20 @@ class ServiceInstance(models.Model):
             identifier=self.identifier,
             aliases=urls,
         )
+        
+        
+class InstancePermission(models.Model):
+    kind = models.CharField(
+        max_length=10,
+        choices=[(e.value, e.name) for e in enums.InstancePermissionKind],
+        help_text="Allow or deny access",
+    )
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="instance_permissions")
+    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="instance_permissions", null=True, blank=True)
+    instance = models.ForeignKey(ServiceInstance, on_delete=models.CASCADE, related_name="permissions")
+    
+
+
 
 
 class InstanceAlias(models.Model):

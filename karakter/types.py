@@ -11,6 +11,19 @@ from allauth.socialaccount import models as smodels
 import kante
 
 
+
+def build_prescoped_queryset(info, queryset, field="organization"):
+    print(info)
+    if info.variable_values.get("filters", {}).get("scope") is None:
+        queryset = queryset.filter(**{field: info.context.request.organization})
+        return queryset
+    
+    else:
+        raise Exception("Custom scopes not implemented yet")
+
+
+
+
 @strawberry_django.type(
     models.Group,
     filters=filters.GroupFilter,
@@ -71,6 +84,11 @@ class User:
     profile: "Profile"
     managed_clients: strawberry.auto
     com_channels: list["ComChannel"] = strawberry_django.field(description="The communication channels that the user has")
+    
+    @classmethod
+    def get_queryset(cls, queryset, info: Info):
+        return build_prescoped_queryset(info, queryset, field="memberships__organization")
+    
 
 
 @strawberry_django.type(
@@ -263,6 +281,10 @@ class Role:
     @kante.django_field()
     def description(self, info: Info) -> "str":
         return self.description or self.identifier
+    
+    @classmethod
+    def get_queryset(cls, queryset, info: Info):
+        return build_prescoped_queryset(info, queryset, field="organization")
 
 
 @strawberry_django.type(
@@ -282,12 +304,17 @@ class Membership:
     @strawberry_django.field(description="The groups that the user has in the organization")
     def groups(self) -> List[Group]:
         return [role.group for role in self.roles]
+    
+    
+    @classmethod
+    def get_queryset(cls, queryset, info: Info):
+        return build_prescoped_queryset(info, queryset, field="organization")
+
 
 
 @strawberry_django.type(models.Organization, filters=filters.OrganizationFilter, pagination=True, description="""An Organization is a group of users that can work together on a project.""")
 class Organization:
     id: strawberry.ID
-
     slug: str
     description: str | None = strawberry.field(description="A short description of the organization")
     logo: MediaStore | None = strawberry.field(description="The logo of the organization")
@@ -301,6 +328,11 @@ class Organization:
     @strawberry_django.field(description="The name of this organization")
     def name(self) -> str:
         return self.name or self.slug
+    
+    
+    @classmethod
+    def get_queryset(cls, queryset, info: Info):
+        return queryset.filter(memberships__organization=info.context.request.organization)
 
 
 @strawberry_django.type(models.ComChannel, filters=filters.OrganizationFilter, pagination=True, description="""An Organization is a group of users that can work together on a project.""")

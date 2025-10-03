@@ -15,6 +15,15 @@ from karakter.datalayer import get_current_datalayer
 from authapp import types as atypes
 
 
+def build_prescoped_queryset(info, queryset, field="organization"):
+    print(info)
+    if info.variable_values.get("filters", {}).get("scope") is None:
+        queryset = queryset.filter(**{field: info.context.request.organization})
+        return queryset
+    
+    else:
+        raise Exception("Custom scopes not implemented yet")
+
 @strawberry.type(description="Temporary Credentials for a file upload that can be used by a Client (e.g. in a python datalayer)")
 class PresignedPostCredentials:
     """Temporary Credentials for a a file upload."""
@@ -141,6 +150,8 @@ class App:
 
     logo: types.MediaStore | None = strawberry.field(description="The logo of the app. This should be a url to a logo that can be used to represent the app.")
 
+    
+    
 
 @strawberry_django.type(
     models.Release,
@@ -192,6 +203,9 @@ class Client:
         return self.token
 
     mappings: list["ServiceInstanceMapping"] = strawberry_django.field(description="The mappings of the client. A mapping is a mapping of a service to a service instance. This is used to configure the composition.")
+
+
+
 
 
 @strawberry_django.type(models.RedeemToken, filters=filters.RedeemTokenFilter, pagination=True)

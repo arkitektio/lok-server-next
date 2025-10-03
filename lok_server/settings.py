@@ -393,33 +393,7 @@ SYSTEM_MESSAGES = conf.get(
 
 STATIC_ROOT = os.path.join(BASE_DIR, "static")
 
-SOCIALACCOUNT_PROVIDERS = {
-    "github": {
-        # For each provider, you can choose whether or not the
-        # email address(es) retrieved from the provider are to be
-        # interpreted as verified.
-        "VERIFIED_EMAIL": True
-    },
-    "orcid": {
-        # For each OAuth based provider, either add a ``SocialApp``
-        # (``socialaccount`` app) containing the required client
-        # credentials, or list them here:
-        "APPS": [
-            {
-                "client_id": "APP-AGTOUJHZGVNFR157",
-                "secret": "e135b12b-fe4f-4c7a-a9ee-1c283ad41013",
-            },
-        ],
-        # These are provider-specific settings that can only be
-        # listed here:
-        "SCOPE": [
-            "openid",
-        ],
-        "AUTH_PARAMS": {
-            "access_type": "online",
-        },
-    },
-}
+SOCIALACCOUNT_PROVIDERS = conf.get("socialaccount_providers", {})
 
 
 MY_SCRIPT_NAME = conf.get("force_script_name", "lok")
