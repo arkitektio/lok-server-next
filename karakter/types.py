@@ -9,7 +9,7 @@ from karakter import enums, filters, models, scalars
 from strawberry import LazyType
 from allauth.socialaccount import models as smodels
 import kante
-
+from .type_gen import create_stats_type
 
 
 def build_prescoped_queryset(info, queryset, field="organization"):
@@ -17,11 +17,16 @@ def build_prescoped_queryset(info, queryset, field="organization"):
     if info.variable_values.get("filters", {}).get("scope") is None:
         queryset = queryset.filter(**{field: info.context.request.organization})
         return queryset
-    
+
     else:
         raise Exception("Custom scopes not implemented yet")
 
 
+def build_prescoper(field="organization"):
+    def prescoper(queryset, info):
+        return build_prescoped_queryset(info, queryset, field=field)
+
+    return prescoper
 
 
 @strawberry_django.type(
@@ -84,11 +89,21 @@ class User:
     profile: "Profile"
     managed_clients: strawberry.auto
     com_channels: list["ComChannel"] = strawberry_django.field(description="The communication channels that the user has")
-    
+
     @classmethod
     def get_queryset(cls, queryset, info: Info):
         return build_prescoped_queryset(info, queryset, field="memberships__organization")
-    
+
+
+UserStats, UserStatsResolver = create_stats_type(
+    model=models.User,
+    filters=filters.UserFilter,
+    allowed_fields={
+        "created_at": "created_at",
+    },
+    allowed_datetime_fields={"created_at": "created_at"},
+    prescope=build_prescoper(field="memberships__organization"),
+)
 
 
 @strawberry_django.type(
@@ -281,7 +296,7 @@ class Role:
     @kante.django_field()
     def description(self, info: Info) -> "str":
         return self.description or self.identifier
-    
+
     @classmethod
     def get_queryset(cls, queryset, info: Info):
         return build_prescoped_queryset(info, queryset, field="organization")
@@ -304,12 +319,10 @@ class Membership:
     @strawberry_django.field(description="The groups that the user has in the organization")
     def groups(self) -> List[Group]:
         return [role.group for role in self.roles]
-    
-    
+
     @classmethod
     def get_queryset(cls, queryset, info: Info):
         return build_prescoped_queryset(info, queryset, field="organization")
-
 
 
 @strawberry_django.type(models.Organization, filters=filters.OrganizationFilter, pagination=True, description="""An Organization is a group of users that can work together on a project.""")
@@ -328,8 +341,7 @@ class Organization:
     @strawberry_django.field(description="The name of this organization")
     def name(self) -> str:
         return self.name or self.slug
-    
-    
+
     @classmethod
     def get_queryset(cls, queryset, info: Info):
         return queryset.filter(memberships__organization=info.context.request.organization)
