@@ -18,7 +18,6 @@ from authapp.models import OAuth2Client
 from fakts import base_models, errors
 
 
-
 class Layer(models.Model):
     name = models.CharField(max_length=1000)
     identifier = fields.IdentifierField(unique=True)
@@ -53,9 +52,7 @@ class Service(models.Model):
             errors.append("Instance does not contain a key")
 
         return errors + warnings
-    
-    
-    
+
 
 class ServiceInstance(models.Model):
     service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name="instances")
@@ -88,19 +85,14 @@ class ServiceInstance(models.Model):
                 urls.append(url)
             except AssertionError as e:
                 raise errors.InstanceAliasNotFound(f"Error rendering alias {alias}: {str(e)}")
-            
-            
-            
-            
-            
-            
+
         return base_models.InstanceClaim(
             service=self.service.identifier,
             identifier=self.identifier,
             aliases=urls,
         )
-        
-        
+
+
 class InstancePermission(models.Model):
     kind = models.CharField(
         max_length=10,
@@ -110,9 +102,6 @@ class InstancePermission(models.Model):
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="instance_permissions")
     user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="instance_permissions", null=True, blank=True)
     instance = models.ForeignKey(ServiceInstance, on_delete=models.CASCADE, related_name="permissions")
-    
-
-
 
 
 class InstanceAlias(models.Model):
@@ -165,13 +154,13 @@ class InstanceAlias(models.Model):
             return base_models.Alias(
                 ssl=linking.request.is_secure,
                 host=linking.request.host,
-                port=linking.request.port,
+                port=self.port if self.port else linking.request.port,
                 path=self.path,
                 challenge=self.challenge,
             )
         else:
             return base_models.Alias(
-                ssl = self.ssl, 
+                ssl=self.ssl,
                 host=self.host,
                 port=self.port,
                 path=self.path,
