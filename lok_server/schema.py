@@ -37,6 +37,7 @@ class Query:
 
     mycontext = strawberry_django.field(resolver=karakter_queries.mycontext)
 
+    compute_nodes: list[fakts_types.ComputeNode] = strawberry_django.field()
     apps: list[fakts_types.App] = strawberry_django.field()
     releases: list[fakts_types.Release] = strawberry_django.field()
     clients: list[fakts_types.Client] = strawberry_django.field()
@@ -81,6 +82,10 @@ class Query:
     @kante.django_field(name="service")
     def detail_service(self, info: Info, id: strawberry.ID) -> fakts_types.Service:
         return fakts_models.Service.objects.get(id=id)
+
+    @kante.django_field()
+    def compute_node(self, info: Info, id: strawberry.ID) -> fakts_types.ComputeNode:
+        return fakts_models.ComputeNode.objects.get(id=id)
 
     @kante.django_field()
     def role(self, info: Info, id: strawberry.ID) -> karakter_types.Role:
@@ -190,6 +195,8 @@ class Mutation:
     create_group_profile = strawberry_django.mutation(
         resolver=karakter_mutations.create_group_profile,
     )
+
+    update_compute_node = strawberry_django.mutation(resolver=fakts_mutations.update_compute_node)
 
 
 @strawberry.type

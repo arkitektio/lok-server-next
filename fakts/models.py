@@ -250,6 +250,24 @@ class Release(models.Model):
         return f"{self.app}:{self.version}"
 
 
+class ComputeNode(models.Model):
+    node_id = models.CharField(max_length=1000)
+    name = models.CharField(max_length=1000, null=True, blank=True)
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="compute_nodes",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["node_id", "organization"],
+                name="Only one node_id per organization",
+            ),
+        ]
+
+
 class Client(models.Model):
     name = models.CharField(max_length=1000, default="No name")
     release = models.ForeignKey(Release, on_delete=models.CASCADE, related_name="clients", null=True)
@@ -268,6 +286,7 @@ class Client(models.Model):
     redirect_uris = models.CharField(max_length=1000, default=" ")
     public = models.BooleanField(default=False)
     token = models.CharField(default=uuid.uuid4, unique=True, max_length=10000)
+    node = models.ForeignKey(ComputeNode, null=True, related_name="clients", on_delete=models.SET_NULL)
 
     tenant = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="managed_clients")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -277,7 +296,7 @@ class Client(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["release", "user", "organization"],
+                fields=["release", "user", "organization", "node"],
                 name="Only one per release, user and organization",
             )
         ]

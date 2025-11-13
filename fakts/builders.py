@@ -3,19 +3,17 @@ from fakts import logic
 from authapp.models import generate_client_id, generate_client_secret
 
 
-def create_development_client(
-    release: models.Release,
-    config: base_models.DevelopmentClientConfig,
-):
+def create_development_client(release: models.Release, config: base_models.DevelopmentClientConfig, node: models.ComputeNode | None = None):
     tenant = config.get_tenant()
     user = config.get_user()
     organization = config.get_organization()
 
     try:
-        client = models.Client.objects.get(user=user, release=release, organization=organization, kind=enums.ClientKindVanilla.DEVELOPMENT.value)
+        client = models.Client.objects.get(user=user, release=release, organization=organization, node=node, kind=enums.ClientKindVanilla.DEVELOPMENT.value)
         if client.token != config.token:
             client.token = config.token
         client.tenant = tenant
+        client.node = node
         client.save()
 
         return client
@@ -36,6 +34,7 @@ def create_development_client(
             release=release,
             user=user,
             tenant=user,
+            node=node,
             token=config.token,
             kind=enums.ClientKindVanilla.DEVELOPMENT.value,
             oauth2_client=oauth2_client,
@@ -46,7 +45,7 @@ def create_development_client(
         )
 
 
-def create_client(manifest: base_models.Manifest, config: base_models.ClientConfig, user):
+def create_client(manifest: base_models.Manifest, config: base_models.ClientConfig, user, node: models.ComputeNode | None = None):
     from .utils import download_logo
 
     try:
@@ -75,10 +74,10 @@ def create_client(manifest: base_models.Manifest, config: base_models.ClientConf
         raise Exception("Not supported anymore")
 
     if config.kind == enums.ClientKindVanilla.DEVELOPMENT.value:
-        client = create_development_client(release, config)
+        client = create_development_client(release, config, node=node)
 
     if config.kind == enums.ClientKindVanilla.DESKTOP.value:
         raise Exception("Not supported anymore")
 
-    client = logic.auto_compose(client, manifest, user)
+    client = logic.auto_compose(client, manifest, user, node=node)
     return client

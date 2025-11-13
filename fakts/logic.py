@@ -69,7 +69,7 @@ def hash_requirements(requirements: list[base_models.Requirement]) -> str:
     return sha256(".".join(sorted([req.service + req.key for req in requirements])).encode()).hexdigest()
 
 
-def auto_compose(client: models.Client, manifest: base_models.Manifest, user: models.AbstractUser) -> models.Client:
+def auto_compose(client: models.Client, manifest: base_models.Manifest, user: models.AbstractUser, node: models.ComputeNode | None = None) -> models.Client:
     requirements = manifest.requirements
 
     if not requirements:
@@ -101,6 +101,7 @@ def auto_compose(client: models.Client, manifest: base_models.Manifest, user: mo
                     raise Exception(f"Unable to find instance for requirement {req.service}") from e
 
         client.requirements_hash = hash_requirements(requirements)
+
         client.save()
 
     return client

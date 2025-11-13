@@ -120,12 +120,21 @@ class ConfigureView(LoginRequiredMixin, FormView):
             context["composition_requirements"] = {req.key: req.service for req in manifest.requirements}
             context["composition_errors"] = composition_errors
             context["composition_warnings"] = composition_warnings
+
             context["staging_identifier"] = x.staging_manifest["identifier"]
             context["staging_version"] = x.staging_manifest["version"]
             context["staging_kind"] = x.staging_kind
             context["staging_redirect_uris"] = x.staging_redirect_uris
             context["staging_scopes"] = x.staging_manifest["scopes"]
             context["staging_logo"] = x.staging_manifest.get("logo", None)
+
+            node_id = x.staging_manifest.get("node_id")
+            if node_id:
+                try:
+                    node = models.ComputeNode.objects.get(organization=self.request.user.active_organization, node_id=node_id)
+                    context["on_node"] = node.name or node.node_id
+                except models.ComputeNode.DoesNotExist:
+                    context["staging_node"] = node_id
 
             context["code"] = x
 
@@ -163,12 +172,19 @@ class ConfigureView(LoginRequiredMixin, FormView):
 
             manifest = base_models.Manifest(**device_code.staging_manifest)
 
+            node_id = device_code.staging_manifest.get("node_id")
+            if node_id:
+                node, _ = models.ComputeNode.objects.get_or_create(organization=self.request.user.active_organization, node_id=node_id)
+            else:
+                node = None
+
             redirect_uris = (" ".join(device_code.staging_redirect_uris),)
 
             client = models.Client.objects.filter(
                 release__app__identifier=device_code.staging_manifest["identifier"],
                 release__version=device_code.staging_manifest["version"],
                 kind=device_code.staging_kind,
+                node=node,
                 tenant=self.request.user,
                 organization=self.request.user.active_organization,
                 redirect_uris=redirect_uris,
@@ -196,6 +212,7 @@ class ConfigureView(LoginRequiredMixin, FormView):
                     manifest=manifest,
                     config=config,
                     user=self.request.user,
+                    node=node,
                 )
 
             device_code.client = client
@@ -341,7 +358,6 @@ class StartChallengeView(View):
             staging_logo=logo,
             staging_public=start_grant.request_public,
         )
-
 
         return JsonResponse(
             data={

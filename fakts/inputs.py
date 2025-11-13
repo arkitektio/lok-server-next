@@ -119,6 +119,17 @@ class UpdateServiceInstanceInput:
     denied_users: list[strawberry.ID] | None = None
 
 
+class UpdateComputeNodeInputModel(BaseModel):
+    id: str
+    name: str | None
+
+
+@pydantic.input(UpdateComputeNodeInputModel)
+class UpdateComputeNodeInput:
+    id: strawberry.ID
+    name: str | None
+
+
 class CreateServiceInstanceInputModel(BaseModel):
     identifier: str
     service: str

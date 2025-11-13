@@ -48,6 +48,8 @@ class Manifest(BaseModel):
     """ The scopes are a list of scopes that the client can request. """
     requirements: Optional[List[Requirement]] = Field(default_factory=list)
     """ The requirements are a list of requirements that the client needs to run on (e.g. needs GPU)"""
+    node_id: Optional[str] = None
+    preferred_node_name: Optional[str] = None
 
 
 class CompositionInputModel(BaseModel):

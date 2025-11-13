@@ -20,9 +20,10 @@ def build_prescoped_queryset(info, queryset, field="organization"):
     if info.variable_values.get("filters", {}).get("scope") is None:
         queryset = queryset.filter(**{field: info.context.request.organization})
         return queryset
-    
+
     else:
         raise Exception("Custom scopes not implemented yet")
+
 
 @strawberry.type(description="Temporary Credentials for a file upload that can be used by a Client (e.g. in a python datalayer)")
 class PresignedPostCredentials:
@@ -101,6 +102,7 @@ class ServiceInstance:
         description="The aliases of the instance. An alias is a way to reach the instance. Clients can use these aliases to check if they can reach the instance. An alias can be an absolute alias (e.g. 'example.com') or a relative alias (e.g. 'example.com/path'). If the alias is relative, it will be relative to the layer's domain, port and path."
     )
 
+
 @strawberry_django.type(
     models.InstanceAlias,
     description="An alias for a service instance. This is used to provide a more user-friendly name for the instance.",
@@ -115,6 +117,7 @@ class InstanceAlias:
     path: Optional[str] = strawberry.field(description="The path of the alias, if its a ABSOLUTE alias (e.g. 'example.com/path'). If not set, the alias is relative to the layer's path.")
     ssl: bool = strawberry.field(description="Is this alias using SSL? If true, the alias will be accessed via https:// instead of http://. This is used to indicate that the alias is secure and should be accessed via SSL")
     challenge: str = strawberry.field(description="The challenge of the alias. This is used to verify that the alias is reachable. If set, the alias will be accessed via the challenge URL (e.g. 'example.com/.well-known/challenge'). If not set, the alias will be accessed via the instance's URL.")
+
 
 @strawberry_django.type(
     models.ServiceInstanceMapping,
@@ -150,8 +153,6 @@ class App:
 
     logo: types.MediaStore | None = strawberry.field(description="The logo of the app. This should be a url to a logo that can be used to represent the app.")
 
-    
-    
 
 @strawberry_django.type(
     models.Release,
@@ -187,6 +188,7 @@ class Client:
     user: types.User | None = strawberry_django.field(description="If the client is a DEVELOPMENT client, which requires no further authentication, this is the user that is authenticated with the client.")
     logo: types.MediaStore | None = strawberry_django.field(description="The logo of the release. This should be a url to a logo that can be used to represent the release.")
     name: str = strawberry_django.field(description="The name of the client. This is a human readable name of the client.")
+    node: Optional["ComputeNode"] = strawberry_django.field(description="The node this runs on")
 
     @strawberry_django.field(description="The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information.")
     def kind(self, info) -> enums.ClientKind:
@@ -205,7 +207,15 @@ class Client:
     mappings: list["ServiceInstanceMapping"] = strawberry_django.field(description="The mappings of the client. A mapping is a mapping of a service to a service instance. This is used to configure the composition.")
 
 
+@strawberry_django.type(models.ComputeNode, filters=filters.ComputeNodeFilter, pagination=True)
+class ComputeNode:
+    id: strawberry.ID
+    name: str | None
+    node_id: strawberry.ID
+    clients: list[Client]
 
+    def get_queryset(cls, info) -> models.ComputeNode:
+        return models.ComputeNode.objects.filter(organization=info.context.request.organization)
 
 
 @strawberry_django.type(models.RedeemToken, filters=filters.RedeemTokenFilter, pagination=True)
