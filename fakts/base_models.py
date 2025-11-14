@@ -33,6 +33,11 @@ class Requirement(BaseModel):
     """ The description is a human readable description of the requirement. Will be show to the user when asking for the requirement."""
 
 
+class PublicSource(BaseModel):
+    kind: Literal["github", "website"]
+    url: str
+
+
 class Manifest(BaseModel):
     """A Manifest is a description of a client. It contains all the information
     necessary to create a set of client, release and app objects in the database.
@@ -49,7 +54,11 @@ class Manifest(BaseModel):
     requirements: Optional[List[Requirement]] = Field(default_factory=list)
     """ The requirements are a list of requirements that the client needs to run on (e.g. needs GPU)"""
     node_id: Optional[str] = None
-    preferred_node_name: Optional[str] = None
+    """ The node_id is the id of the node that the runs on """
+    repo_url: Optional[str] = None
+    """ The repo_url is the url to track issues and get more information about the client. """
+    public_sources: Optional[List[PublicSource]] = None
+    """ The public_sources are a list of public sources where the client can be found. """
 
 
 class CompositionInputModel(BaseModel):

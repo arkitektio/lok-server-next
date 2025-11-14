@@ -212,7 +212,7 @@ class ConfigureView(LoginRequiredMixin, FormView):
                     manifest=manifest,
                     config=config,
                     user=self.request.user,
-                    node=node,
+                    organization=self.request.user.active_organization,
                 )
 
             device_code.client = client

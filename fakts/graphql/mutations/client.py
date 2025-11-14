@@ -31,13 +31,16 @@ def create_developmental_client(info: Info, input: inputs.DevelopmentClientInput
         version=input.manifest.version,
         logo=input.manifest.logo,
         scopes=input.manifest.scopes or [],
-        requirements=[strawberry.asdict(x) for x in input.requirements],
+        node_id=input.manifest.node_id,
+        requirements=[strawberry.asdict(x) for x in input.manifest.requirements],
+        public_sources=[strawberry.asdict(x) for x in input.manifest.public_sources] if input.manifest.public_sources else [],
     )
 
     client = create_client(
         manifest,
         config,
         user=info.context.request.user,
+        organization=info.context.request.organization,
     )
 
     return client

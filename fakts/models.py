@@ -287,7 +287,7 @@ class Client(models.Model):
     public = models.BooleanField(default=False)
     token = models.CharField(default=uuid.uuid4, unique=True, max_length=10000)
     node = models.ForeignKey(ComputeNode, null=True, related_name="clients", on_delete=models.SET_NULL)
-
+    public_sources = models.JSONField(default=list)
     tenant = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="managed_clients")
     created_at = models.DateTimeField(auto_now_add=True)
     requirements_hash = models.CharField(max_length=1000, unique=False)

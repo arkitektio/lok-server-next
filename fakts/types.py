@@ -189,6 +189,7 @@ class Client:
     logo: types.MediaStore | None = strawberry_django.field(description="The logo of the release. This should be a url to a logo that can be used to represent the release.")
     name: str = strawberry_django.field(description="The name of the client. This is a human readable name of the client.")
     node: Optional["ComputeNode"] = strawberry_django.field(description="The node this runs on")
+    mappings: list["ServiceInstanceMapping"] = strawberry_django.field(description="The mappings of the client. A mapping is a mapping of a service to a service instance. This is used to configure the composition.")
 
     @strawberry_django.field(description="The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information.")
     def kind(self, info) -> enums.ClientKind:
@@ -204,7 +205,14 @@ class Client:
         # TODO: Implement only tenant should be able to see the token
         return self.token
 
-    mappings: list["ServiceInstanceMapping"] = strawberry_django.field(description="The mappings of the client. A mapping is a mapping of a service to a service instance. This is used to configure the composition.")
+    @strawberry_django.field(description="The issue url of the client. This is the url where users can report issues and get more information about the client.")
+    def issue_url(self, info) -> str | None:
+        for source in self.public_sources:
+            print(source)
+            if source.get("kind").lower() == "github":
+                return source.get("url") + "/issues/new"
+
+        return None
 
 
 @strawberry_django.type(models.ComputeNode, filters=filters.ComputeNodeFilter, pagination=True)
