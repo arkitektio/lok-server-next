@@ -553,11 +553,7 @@ class RedeemView(View):
                     organization=valid_token.organization.slug if valid_token.organization else None,
                 )
 
-                client = builders.create_client(
-                    manifest=manifest,
-                    config=config,
-                    user=valid_token.user,
-                )
+                client = builders.create_client(manifest=manifest, config=config, user=valid_token.user, organization=valid_token.organization)
 
                 valid_token.client = client
                 valid_token.save()
