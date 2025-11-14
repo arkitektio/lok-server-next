@@ -1,3 +1,4 @@
+import datetime
 import logging
 from typing import Optional, List, Tuple
 
@@ -5,7 +6,8 @@ import requests
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser, Group
 from django.db import models
-
+from django.utils import timezone
+import uuid
 from karakter import fields, datalayer
 
 logger = logging.getLogger(__name__)
@@ -226,6 +228,53 @@ class SystemMessage(models.Model):
     action = models.CharField(help_text="The action to take (e.g. the node)")
     acknowledged = models.BooleanField(default=False)
     unique = models.CharField(max_length=1000, null=True, blank=True)
+
+
+class Invite(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        ACCEPTED = "accepted", "Accepted"
+        DECLINED = "declined", "Declined"
+        CANCELLED = "cancelled", "Cancelled"
+
+    token = models.UUIDField(default=uuid.uuid4, unique=True, db_index=True)
+    email = models.EmailField(null=True, blank=True)  # Optional, for reference only
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="created_invites")
+    created_for = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="invites")
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+
+    # Status tracking
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    accepted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="accepted_invites")
+    declined_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="declined_invites")
+    responded_at = models.DateTimeField(null=True, blank=True)
+
+    # Roles to assign when invite is accepted
+    roles = models.ManyToManyField("Role", related_name="invites", blank=True)
+
+    def is_valid(self):
+        if self.status != self.Status.PENDING:
+            return False
+        if self.expires_at and self.expires_at < timezone.now():
+            return False
+        return True
+
+    def accept(self, user):
+        self.status = self.Status.ACCEPTED
+        self.accepted_by = user
+        self.responded_at = timezone.now()
+        self.save(update_fields=["status", "accepted_by", "responded_at"])
+
+    def decline(self, user):
+        self.status = self.Status.DECLINED
+        self.declined_by = user
+        self.responded_at = timezone.now()
+        self.save(update_fields=["status", "declined_by", "responded_at"])
+
+    def cancel(self):
+        self.status = self.Status.CANCELLED
+        self.save(update_fields=["status"])
 
 
 from .signals import *

@@ -351,6 +351,7 @@ class Organization:
     active_users: List[User] = strawberry.field(description="The users that are currently active in the organization")
     profile: "OrganizationProfile"
     memberships: List["Membership"] = strawberry_django.field(description="the memberships of people")
+    invites: List["Invite"] = strawberry_django.field(description="the invites for this organization")
 
     @strawberry_django.field(description="The roles that are available in the organization")
     def roles(self) -> List["Role"]:
@@ -369,6 +370,36 @@ class Organization:
 class ComChannel:
     id: strawberry.ID
     user: User
+
+
+@strawberry_django.type(models.Invite, filters=filters.OrganizationFilter, pagination=True, description="""A single-use magic invite link that allows one person to join an organization.""")
+class Invite:
+    id: strawberry.ID
+    token: str
+    email: str | None
+    created_by: User
+    created_for: Organization
+    created_at: datetime.datetime
+    expires_at: datetime.datetime | None
+    status: str
+    accepted_by: User | None
+    declined_by: User | None
+    responded_at: datetime.datetime | None
+    roles: list["Role"]
+
+    @strawberry_django.field(description="Check if the invite is still valid and pending")
+    def valid(self) -> bool:
+        """Check if the invite is still valid"""
+        return self.is_valid()
+
+    @strawberry_django.field(description="Get the full URL for accepting this invite")
+    def invite_url(self, info: Info) -> str:
+        """Generate the full URL for accepting this invite"""
+        from django.urls import reverse
+
+        request = info.context.request
+        path = reverse("accept_invite", kwargs={"token": str(self.token)})
+        return path
 
 
 @strawberry.type

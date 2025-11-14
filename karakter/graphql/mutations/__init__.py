@@ -4,3 +4,5 @@ from .upload import *
 from .profile import *
 from .group_profile import *
 from .com_channel import *
+from .invite import *
+from .organization import *

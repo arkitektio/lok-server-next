@@ -47,6 +47,7 @@ class Query:
     comments: list[komment_types.Comment] = strawberry_django.field()
     services: list[fakts_types.Service] = strawberry_django.field()
     service_instances: list[fakts_types.ServiceInstance] = strawberry_django.field()
+    invites: list[karakter_types.Invite] = strawberry_django.field()
 
     user = strawberry_django.field(resolver=karakter_queries.user)
     me = strawberry_django.field(resolver=karakter_queries.me)
@@ -194,6 +195,26 @@ class Mutation:
     )
     create_group_profile = strawberry_django.mutation(
         resolver=karakter_mutations.create_group_profile,
+    )
+
+    create_invite = strawberry_django.mutation(
+        resolver=karakter_mutations.create_invite,
+    )
+
+    accept_invite = strawberry_django.mutation(
+        resolver=karakter_mutations.accept_invite,
+    )
+
+    decline_invite = strawberry_django.mutation(
+        resolver=karakter_mutations.decline_invite,
+    )
+
+    cancel_invite = strawberry_django.mutation(
+        resolver=karakter_mutations.cancel_invite,
+    )
+
+    update_organization = strawberry_django.mutation(
+        resolver=karakter_mutations.update_organization,
     )
 
     update_compute_node = strawberry_django.mutation(resolver=fakts_mutations.update_compute_node)
