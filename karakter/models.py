@@ -17,6 +17,7 @@ class S3Store(models.Model):
     Attributes mirror essential S3 metadata used elsewhere in the
     codebase.
     """
+
     path = fields.S3Field(null=True, blank=True, help_text="The stodre of the image", unique=True)
     key = models.CharField(max_length=1000)
     bucket = models.CharField(max_length=1000)
@@ -150,6 +151,15 @@ class Profile(models.Model):
     name = models.CharField(max_length=1000, null=True, blank=True)
     bio = models.CharField(max_length=4000, null=True, blank=True)
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
+    avatar = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
+
+
+class OrganizationProfile(models.Model):
+    """A Profile of a User"""
+
+    name = models.CharField(max_length=1000, null=True, blank=True)
+    bio = models.CharField(max_length=4000, null=True, blank=True)
+    organization = models.OneToOneField(Organization, on_delete=models.CASCADE, related_name="profile")
     avatar = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
 
 

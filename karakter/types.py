@@ -123,6 +123,22 @@ class Profile:
 
 
 @strawberry_django.type(
+    models.OrganizationProfile,
+    filters=filters.OrganizationFilter,
+    pagination=True,
+    description="""
+A Profile of a User. A Profile can be used to display personalied information about a user.
+
+""",
+)
+class OrganizationProfile:
+    id: strawberry.ID
+    bio: str | None = strawberry.field(description="A short bio of the user")
+    name: str | None = strawberry.field(description="The name of the user")
+    avatar: MediaStore | None = strawberry.field(description="The avatar of the user")
+
+
+@strawberry_django.type(
     models.GroupProfile,
     filters=filters.GroupProfileFilter,
     pagination=True,
@@ -330,9 +346,11 @@ class Organization:
     id: strawberry.ID
     slug: str
     description: str | None = strawberry.field(description="A short description of the organization")
-    logo: MediaStore | None = strawberry.field(description="The logo of the organization")
+    avatar: MediaStore | None = strawberry.field(description="The logo of the organization")
     users: List[User] = strawberry.field(description="The users that are part of the organization")
     active_users: List[User] = strawberry.field(description="The users that are currently active in the organization")
+    profile: "OrganizationProfile"
+    memberships: List["Membership"] = strawberry_django.field(description="the memberships of people")
 
     @strawberry_django.field(description="The roles that are available in the organization")
     def roles(self) -> List["Role"]:
