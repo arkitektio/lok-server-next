@@ -169,17 +169,10 @@ class Release:
     clients: list["Client"] = strawberry.field(description="The clients of the release")
 
 
-
 @strawberry.type
 class PublicSource:
     kind: str = strawberry.field(description="The kind of the public source. E.g. 'github'")
-    url: str = strawberry.field(description="The url of the public source. E.g. '
-
-
-
-
-
-
+    url: str = strawberry.field(description="The url of the public source")
 
 
 @strawberry_django.type(
@@ -226,8 +219,7 @@ class Client:
                 return source.get("url") + "/issues/new"
 
         return None
-        
-        
+
     @strawberry_django.field(description="The public sources of the client. These are the public sources where users can find more information about the client.")
     def public_sources(self, info) -> list[PublicSource]:
         sources = []
@@ -239,10 +231,6 @@ class Client:
                 )
             )
         return sources
-    
-    
-    
-    
 
 
 @strawberry_django.type(models.ComputeNode, filters=filters.ComputeNodeFilter, pagination=True)
