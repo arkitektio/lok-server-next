@@ -240,7 +240,7 @@ def validate_device_code(literal_device_code: str, user: models.AbstractUser, or
             else:
                 raise Exception("Unknown client kind or no longer supported")
 
-            client = create_client(manifest=manifest, config=config, user=user)
+            client = create_client(manifest=manifest, config=config, user=user, organization=org)
 
         device_code.client = client
         device_code.save()

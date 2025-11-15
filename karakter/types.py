@@ -363,7 +363,7 @@ class Organization:
 
     @classmethod
     def get_queryset(cls, queryset, info: Info):
-        return queryset.filter(memberships__organization=info.context.request.organization)
+        return queryset.filter(memberships__organization=info.context.request.organization).distinct()
 
 
 @strawberry_django.type(models.ComChannel, filters=filters.OrganizationFilter, pagination=True, description="""An Organization is a group of users that can work together on a project.""")

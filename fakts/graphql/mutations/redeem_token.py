@@ -24,12 +24,11 @@ class RedeemTokenInput:
 def create_redeem_token(info: Info, input: RedeemTokenInput) -> types.RedeemToken:
     uuid_token = uuid.uuid4().hex
 
-
     user = info.context.request.user
     org = info.context.request.organization
 
     token, _ = models.RedeemToken.objects.update_or_create(
-        token=input.token or token,
+        token=input.token or uuid_token,
         defaults={
             "user": user,
             "organization": org,
