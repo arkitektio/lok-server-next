@@ -250,6 +250,18 @@ class Release(models.Model):
         return f"{self.app}:{self.version}"
 
 
+class DeviceGroup(models.Model):
+    name = models.CharField(max_length=1000)
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="device_groups",
+    )
+
+    def __str__(self):
+        return f"{self.name} ({self.organization})"
+
+
 class ComputeNode(models.Model):
     node_id = models.CharField(max_length=1000)
     name = models.CharField(max_length=1000, null=True, blank=True)
@@ -258,6 +270,7 @@ class ComputeNode(models.Model):
         on_delete=models.CASCADE,
         related_name="compute_nodes",
     )
+    device_groups = models.ManyToManyField(DeviceGroup, related_name="compute_nodes", blank=True)
 
     class Meta:
         constraints = [

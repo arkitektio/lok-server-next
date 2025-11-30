@@ -233,12 +233,29 @@ class Client:
         return sources
 
 
+@strawberry_django.type(
+    models.DeviceGroup,
+    description="A DeviceGroup is a group of compute nodes that can be used to run clients. DeviceGroups can be used to group compute nodes by location, hardware type, or any other criteria.",
+    pagination=True,
+    filters=filters.DeviceGroupFilter,
+)
+class DeviceGroup:
+    id: strawberry.ID
+    name: str = strawberry.field(description="The name of the device group.")
+    description: str | None = strawberry.field(description="The description of the device group.")
+    compute_nodes: list["ComputeNode"] = strawberry_django.field(description="The compute nodes that belong to this device group.")
+
+    def get_queryset(cls, info) -> models.DeviceGroup:
+        return models.DeviceGroup.objects.filter(organization=info.context.request.organization)
+
+
 @strawberry_django.type(models.ComputeNode, filters=filters.ComputeNodeFilter, pagination=True)
 class ComputeNode:
     id: strawberry.ID
     name: str | None
     node_id: strawberry.ID
     clients: list[Client]
+    device_groups: list[DeviceGroup] = strawberry_django.field(description="The device groups that belong to this compute node.")
 
     def get_queryset(cls, info) -> models.ComputeNode:
         return models.ComputeNode.objects.filter(organization=info.context.request.organization)

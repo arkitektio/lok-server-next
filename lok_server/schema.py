@@ -46,6 +46,7 @@ class Query:
     groups: list[karakter_types.Group] = strawberry_django.field()
     comments: list[komment_types.Comment] = strawberry_django.field()
     services: list[fakts_types.Service] = strawberry_django.field()
+    device_groups: list[fakts_types.DeviceGroup] = strawberry_django.field()
     service_instances: list[fakts_types.ServiceInstance] = strawberry_django.field()
     invites: list[karakter_types.Invite] = strawberry_django.field()
 
@@ -87,6 +88,10 @@ class Query:
     @kante.django_field()
     def compute_node(self, info: Info, id: strawberry.ID) -> fakts_types.ComputeNode:
         return fakts_models.ComputeNode.objects.get(id=id)
+
+    @kante.django_field()
+    def device_group(self, info: Info, id: strawberry.ID) -> fakts_types.DeviceGroup:
+        return fakts_models.DeviceGroup.objects.get(id=id)
 
     @kante.django_field()
     def role(self, info: Info, id: strawberry.ID) -> karakter_types.Role:
