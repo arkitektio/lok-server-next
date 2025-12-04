@@ -58,7 +58,6 @@ def create_or_update_user_profile(sender, instance, created, **kwargs):
 @receiver(user_signed_up)
 def user_signed_up_handler(request, user, **kwargs):
     # Automatically sets the user to inactive until approved
-    user.is_active = False
     user.save()
 
 

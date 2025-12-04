@@ -24,5 +24,22 @@
             </button>
         </form>
     </div>
+
+    <div class="mb-4">
+        <h3 class="text-xl font-semibold mb-2">Organizations</h3>
+        {% if user.memberships.all %}
+            <ul class="list-disc pl-5">
+                {% for membership in user.memberships.all %}
+                    <li>
+                        <a href="{% url 'organization_detail' slug=membership.organization.slug %}" class="text-blue-500 hover:underline">
+                            {{ membership.organization.name|default:membership.organization.slug }}
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="text-gray-600">You are not a member of any organization. Please join an organization through an invite.</p>
+        {% endif %}
+    </div>
 </div>
 {% endblock %}

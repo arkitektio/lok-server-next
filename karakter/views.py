@@ -155,3 +155,25 @@ def accept_invite(request, token):
         "error": None,
     }
     return render(request, "karakter/accept_invite.html", context)
+
+
+@login_required
+def leave_org(request, slug):
+    from karakter.models import Organization, Membership
+
+    if request.method == "POST":
+        try:
+            organization = Organization.objects.get(slug=slug)
+            membership = Membership.objects.get(user=request.user, organization=organization)
+            membership.delete()
+
+            # If the user was active in this org, unset it
+            if request.user.active_organization == organization:
+                request.user.active_organization = None
+                request.user.save()
+
+            return redirect("profile")
+        except (Organization.DoesNotExist, Membership.DoesNotExist):
+            pass
+
+    return redirect("organization_detail", slug=slug)
