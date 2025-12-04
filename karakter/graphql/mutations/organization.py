@@ -1,7 +1,7 @@
 from kante.types import Info
 import strawberry_django
 import strawberry
-from karakter import types, models
+from karakter import types, models, managers
 import logging
 
 logger = logging.getLogger(__name__)
@@ -14,6 +14,16 @@ class UpdateOrganizationInput:
     description: str | None = None
     avatar: strawberry.ID | None = None
     slug: str | None = None
+
+
+def create_random_slug(name: str) -> str:
+    """Generate a random slug based on the organization name."""
+    import random
+    import string
+
+    base_slug = name.lower().replace(" ", "-")
+    random_suffix = "".join(random.choices(string.ascii_lowercase + string.digits, k=6))
+    return f"{base_slug}-{random_suffix}"
 
 
 def update_organization(info: Info, input: UpdateOrganizationInput) -> types.Organization:
@@ -34,4 +44,27 @@ def update_organization(info: Info, input: UpdateOrganizationInput) -> types.Org
 
     organization.save()
     logger.info(f"Updated Organization: {organization.id} with name: {organization.name}")
+    return organization
+
+
+@strawberry.input
+class CreateOrganizationInput:
+    name: str
+    description: str | None = None
+
+
+def create_organization(info: Info, input: CreateOrganizationInput) -> types.Organization:
+    """Create a new organization with the given name, slug, and description."""
+    organization = models.Organization.objects.create(
+        slug=create_random_slug(input.name),
+        name=input.name,
+        description=input.description,
+    )
+    logger.info(f"Created Organization: {organization.id} with name: {organization.name}")
+    managers.create_default_groups_for_org(organization)
+    managers.add_user_roles(
+        user=info.context.request.user,
+        organization=organization,
+        roles=["admin"],
+    )
     return organization

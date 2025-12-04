@@ -4,16 +4,7 @@ from django.core.management.base import BaseCommand
 from django.conf import settings
 from karakter.base_models import UserConfig, OrganizationConfig
 from karakter.models import Organization, Role
-
-
-
-
-
-def create_default_groups_for_org(org):
-    for identifier in ["admin", "guest", "researcher"]:
-        g, _  = Group.objects.get_or_create(name=f"{org.slug}:{identifier}")
-        Role.objects.update_or_create(group=g, identifier=identifier, organization=org)
-
+from karakter.managers import create_default_groups_for_org
 
 
 class Command(BaseCommand):
@@ -40,5 +31,5 @@ class Command(BaseCommand):
                 )
 
                 self.stdout.write(f"Created org {org.slug}")
-                 
+
             create_default_groups_for_org(org)

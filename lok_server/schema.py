@@ -127,6 +127,9 @@ class Mutation:
     add_user_to_organization = strawberry_django.mutation(
         resolver=karakter_mutations.add_user_to_organization,
     )
+    create_organization = strawberry_django.mutation(
+        resolver=karakter_mutations.create_organization,
+    )
 
     create_comment = strawberry_django.mutation(
         resolver=komment_mutations.create_comment,
