@@ -1,44 +1,83 @@
-{% extends "karakter/base.html" %}
+{% extends "base.html" %}
+{% load socialaccount %}
 
 {% block content %}
 <div class="container mx-auto p-4">
     <div class="mb-6">
-        <h2 class="text-3xl font-semibold">Hi <div class="text-3xl inline">{{ user.username }}</div>!</h2>
-        <p class="text-sm font-light">You can tell us a little bit more about yourself here. But really this
-            is just a demo of how to use the profile page. You should use other apps to interact with lok!</p>
-        </p>
+        <h2 class="text-3xl font-semibold text-white">Hi <div class="text-3xl inline">{{ user.username }}</div>!</h2>
+        <p class="text-sm font-light text-gray-400">You can tell us a little bit more about yourself here.</p>
     </div>
 
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-slate-800 p-6 rounded-lg shadow">
+            <h3 class="text-xl font-semibold mb-4 text-white">Profile Information</h3>
+            <form method="POST">
+                {% csrf_token %}
+                {% for field in profile_form %}
+                    <div class="mb-4">
+                        <label class="block text-gray-400 text-sm font-bold mb-2" for="{{ field.id_for_label }}">
+                            {{ field.label }}
+                        </label>
+                        {{ field }}
+                        {% if field.help_text %}
+                            <p class="text-gray-500 text-xs italic">{{ field.help_text }}</p>
+                        {% endif %}
+                        {% for error in field.errors %}
+                            <p class="text-red-500 text-xs italic">{{ error }}</p>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
 
-    <div class="mb-4">
-        <form method="POST">
-            {% csrf_token %}
-            {% for field in profile_form %}
-            {% include "./field.html" %}
-            {% endfor %}
+                <button
+                    class="mt-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition duration-150 ease-in-out"
+                    type="submit">
+                    Save changes
+                </button>
+            </form>
+        </div>
 
-            <button
-                class="mt-2 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
-                type="submit">
-                Save changes
-            </button>
-        </form>
+        <div class="bg-slate-800 p-6 rounded-lg shadow">
+            <h3 class="text-xl font-semibold mb-4 text-white">Social Accounts</h3>
+            {% get_social_accounts user as accounts %}
+            {% if accounts %}
+                <ul class="mb-4">
+                    {% for account in accounts.values %}
+                        {% for a in account %}
+                        <li class="flex items-center justify-between mb-2 p-2 bg-slate-700 rounded">
+                            <span class="text-white">{{ a.provider }} ({{ a.extra_data.login|default:a.uid }})</span>
+                        </li>
+                        {% endfor %}
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="text-gray-400 mb-4">No social accounts connected.</p>
+            {% endif %}
+            
+            <a href="{% url 'socialaccount_connections' %}" class="inline-block bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition duration-150 ease-in-out">
+                Manage Social Connections
+            </a>
+        </div>
     </div>
 
-    <div class="mb-4">
-        <h3 class="text-xl font-semibold mb-2">Organizations</h3>
+    <div class="mt-6 bg-slate-800 p-6 rounded-lg shadow">
+        <h3 class="text-xl font-semibold mb-4 text-white">Organizations</h3>
         {% if user.memberships.all %}
-            <ul class="list-disc pl-5">
+            <ul class="list-disc pl-5 text-gray-300">
                 {% for membership in user.memberships.all %}
-                    <li>
-                        <a href="{% url 'organization_detail' slug=membership.organization.slug %}" class="text-blue-500 hover:underline">
+                    <li class="mb-1">
+                        <a href="{% url 'organization_detail' slug=membership.organization.slug %}" class="text-blue-400 hover:underline hover:text-blue-300">
                             {{ membership.organization.name|default:membership.organization.slug }}
                         </a>
+                        {% if membership.roles.all %}
+                            <span class="text-sm text-gray-500 ml-2">
+                                ({% for role in membership.roles.all %}{{ role.identifier }}{% if not forloop.last %}, {% endif %}{% endfor %})
+                            </span>
+                        {% endif %}
                     </li>
                 {% endfor %}
             </ul>
         {% else %}
-            <p class="text-gray-600">You are not a member of any organization. Please join an organization through an invite.</p>
+            <p class="text-gray-400">You are not a member of any organization. Please join an organization through an invite.</p>
         {% endif %}
     </div>
 </div>

@@ -97,6 +97,8 @@ SUPERUSERS = [
     }
 ]
 
+USE_X_FORWARDED_HOST = conf.django.get("use_x_forwarded_host", True)
+
 SECURE_PROXY_SSL_HEADER = (
     "HTTP_X_FORWARDED_PROTO",
     "https",
