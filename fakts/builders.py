@@ -82,5 +82,5 @@ def create_client(manifest: base_models.Manifest, config: base_models.ClientConf
     else:
         raise ValueError(f"Client kind {config.kind} not supported yet")
 
-    client = logic.auto_compose(client, manifest, user, node=node)
+    client = logic.auto_compose(client, manifest, user, organization, device=node)
     return client

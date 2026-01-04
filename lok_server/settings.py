@@ -63,9 +63,11 @@ INSTALLED_APPS = [
 INSTALLED_APPS += [
     "allauth",
     "allauth.account",
+    "allauth.headless",
     "allauth.socialaccount",
     # "allauth.socialaccount.providers.github",
     "allauth.socialaccount.providers.orcid",
+    "allauth.socialaccount.providers.google",
     # The MFA app:
     "allauth.mfa",
 ]
@@ -74,6 +76,13 @@ FAKTS_LAYERS = conf.get("layers", [])
 
 FAKTS_INSTANCES = conf.get("instances", [])
 
+
+# These are the URLs to be implemented by your single-page application.
+HEADLESS_FRONTEND_URLS = {
+    "account_confirm_email": "https://jhnnsrs-lab.hyena-sole.ts.net/account/verify-email/{key}",
+    "account_reset_password_from_key": "https://jhnnsrs-lab.hyena-sole.ts.net/account/password/reset/key/{key}",
+    "account_signup": "https://jhnnsrs-lab.hyena-sole.ts.net/account/signup",
+}
 
 ACCOUNT_EMAIL_VERIFICATION = "none"  # we don't have an smpt server by default
 
@@ -117,6 +126,9 @@ MIDDLEWARE = [
     "allauth.account.middleware.AccountMiddleware",
 ]
 
+
+ACCOUNT_LOGIN_BY_CODE_ENABLED = True  # Enable login by code
+MFA_TRUST_ENABLED = True  # Allow trusted devices
 
 # S3_PUBLIC_DOMAIN = f"{conf.s3.public.host}:{conf.s3.public.port}"  # TODO: FIx
 AWS_ACCESS_KEY_ID = conf.s3.access_key
@@ -323,7 +335,7 @@ USE_TZ = True
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-CSRF_TRUSTED_ORIGINS = conf.get("csrf_trusted_origins", ["http://localhost", "https://localhost"])
+CSRF_TRUSTED_ORIGINS = conf.get("csrf_trusted_origins", ["http://localhost", "https://localhost", "http://localhost:300"])
 MY_SCRIPT_NAME = conf.get("force_script_name", "lok")
 STATIC_URL = MY_SCRIPT_NAME.lstrip("/") + "/" + "static/"
 

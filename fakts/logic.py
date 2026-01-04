@@ -26,6 +26,8 @@ def render_composition(client: models.Client, context: base_models.LinkingContex
         client_id=client.oauth2_client.client_id,
         client_secret=client.oauth2_client.client_secret,
         scopes=client.release.scopes,
+        client_token=client.token,
+        report_url=f"{context.request.base_url}/f/report/",
         token_url=f"{context.request.base_url}/o/token/",
     )
 
@@ -64,12 +66,28 @@ def find_instance_for_requirement(service: models.Service, requirement: base_mod
     return instance
 
 
+def find_instance_for_requirement_and_organization(requirement: base_models.Requirement, user: models.AbstractUser, organization: models.Organization) -> models.ServiceInstance | None:
+    instance = (
+        models.ServiceInstance.objects.filter(
+            release__service__identifier=requirement.service,
+            organization=organization,
+        )
+        .filter(
+            models.Q(allowed_users__isnull=True)
+            | models.Q(allowed_users=user) & (models.Q(denied_users__isnull=True) | ~models.Q(denied_users=user)) & (models.Q(allowed_groups__isnull=True) | models.Q(allowed_groups__in=user.groups.all())) & (models.Q(denied_groups__isnull=True) | ~models.Q(denied_groups__in=user.groups.all()))
+        )
+        .first()
+    )
+
+    return instance
+
+
 def hash_requirements(requirements: list[base_models.Requirement]) -> str:
     # Order the requirements by service and key and hash them
     return sha256(".".join(sorted([req.service + req.key for req in requirements])).encode()).hexdigest()
 
 
-def auto_compose(client: models.Client, manifest: base_models.Manifest, user: models.AbstractUser, node: models.ComputeNode | None = None) -> models.Client:
+def auto_compose(client: models.Client, manifest: base_models.Manifest, user: models.AbstractUser, organization: models.Organization, device: models.ComputeNode | None = None) -> models.Client:
     requirements = manifest.requirements
 
     if not requirements:
@@ -84,9 +102,7 @@ def auto_compose(client: models.Client, manifest: base_models.Manifest, user: mo
 
         for req in requirements:
             try:
-                service = models.Service.objects.get(identifier=req.service)
-
-                instance = find_instance_for_requirement(service, req, user)
+                instance = find_instance_for_requirement_and_organization(req, user, organization=organization)
 
                 models.ServiceInstanceMapping.objects.get_or_create(
                     client=client,

@@ -54,27 +54,58 @@ class Service(models.Model):
         return errors + warnings
 
 
+class ServiceRelease(models.Model):
+    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name="releases")
+    version = fields.VersionField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["service", "version"],
+                name="Only one per service and version",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.service}:{self.version}"
+
+
 class ServiceInstance(models.Model):
-    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name="instances")
+    release = models.ForeignKey(ServiceRelease, on_delete=models.CASCADE, related_name="instances")
     logo = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
-    identifier = models.CharField(max_length=1000, unique=True, help_text="The identifier of the instance. This is used to identify the instance in the configuration.")
+    instance_id = models.CharField(max_length=1000, default="default")
     steward = models.ForeignKey(
         get_user_model(),
         on_delete=models.CASCADE,
         related_name="stewarded_instances",
-        null=True,
-        blank=True,
         help_text="The user who is responsible for this instance. If null the admin is stewared by admin user.",
     )
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="service_instances",
+        help_text="The organization that owns this instance. If null the instance is global.",
+    )
+    device = models.ForeignKey("ComputeNode", on_delete=models.CASCADE, null=True, blank=True)
     template = models.TextField()
     denied_users = models.ManyToManyField(get_user_model(), related_name="denied_instances")
     denied_groups = models.ManyToManyField(Group, related_name="denied_instances")
     allowed_users = models.ManyToManyField(get_user_model(), related_name="allowed_instances")
     allowed_groups = models.ManyToManyField(Group, related_name="allowed_instances")
     allowed_organizations = models.ManyToManyField(Organization, related_name="allowed_instances")
+    public_key = models.TextField(null=True, blank=True, help_text="The public key of the instance, if applicable.")
+    token = models.CharField(max_length=1000, unique=True, help_text="The token of the instance, used for authentication.")
 
     def __str__(self):
-        return f"{self.service}:{self.identifier}"
+        return f"{self.release}:{self.instance_id}"
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["release", "instance_id", "organization", "device"],
+                name="Only one instance_id per release, organization and device and instance",
+            )
+        ]
 
     def render(self, context: base_models.LinkingContext) -> base_models.InstanceClaim:
         """Render all aliases of the instance into a list of URLs."""
@@ -87,8 +118,8 @@ class ServiceInstance(models.Model):
                 raise errors.InstanceAliasNotFound(f"Error rendering alias {alias}: {str(e)}")
 
         return base_models.InstanceClaim(
-            service=self.service.identifier,
-            identifier=self.identifier,
+            service=self.release.service.identifier,
+            identifier=str(self.id),
             aliases=urls,
         )
 
@@ -107,7 +138,7 @@ class InstancePermission(models.Model):
 class InstanceAlias(models.Model):
     """An alias for a service instance. This is used to provide a more user-friendly name for the instance."""
 
-    layer = models.ForeignKey(Layer, on_delete=models.CASCADE, related_name="aliases")
+    layer = models.ForeignKey(Layer, on_delete=models.CASCADE, related_name="aliases", null=True, blank=True)
     instance = models.ForeignKey(ServiceInstance, on_delete=models.CASCADE, related_name="aliases")
     name = models.CharField(max_length=1000, null=True, blank=True, help_text="The name of the alias")
     host = models.CharField(
@@ -142,7 +173,7 @@ class InstanceAlias(models.Model):
 
         constraints = [
             models.UniqueConstraint(
-                fields=["layer", "instance"],
+                fields=["instance", "host", "port", "ssl", "path", "kind"],
                 name="Only one alias per instance and name",
             )
         ]
@@ -152,6 +183,7 @@ class InstanceAlias(models.Model):
         if self.kind == enums.AliasKindChoices.RELATIVE.value:
             # Relative alias, use the layer's domain
             return base_models.Alias(
+                id=str(self.id),
                 ssl=linking.request.is_secure,
                 host=linking.request.host,
                 port=self.port if self.port else linking.request.port,
@@ -160,6 +192,7 @@ class InstanceAlias(models.Model):
             )
         else:
             return base_models.Alias(
+                id=str(self.id),
                 ssl=self.ssl,
                 host=self.host,
                 port=self.port,
@@ -211,6 +244,30 @@ class DeviceCode(models.Model):
     expires_at = models.DateTimeField()
     denied = models.BooleanField(default=False)
     supported_layers = models.ManyToManyField(Layer, related_name="staging_device_codes")
+
+    @property
+    def manifest_as_model(self) -> base_models.Manifest:
+        return base_models.Manifest(**self.staging_manifest)
+
+
+class ServiceDeviceCode(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    code = models.CharField(max_length=100, unique=True)
+    challenge_code = models.CharField(max_length=100, unique=True)
+    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, null=True)
+    instance = models.ForeignKey(ServiceInstance, on_delete=models.CASCADE, null=True)
+    staging_manifest = models.JSONField(default=dict)
+    staging_aliases = models.JSONField(default=list)
+    expires_at = models.DateTimeField()
+    denied = models.BooleanField(default=False)
+
+    @property
+    def manifest_as_model(self) -> base_models.ServiceManifest:
+        return base_models.ServiceManifest(**self.staging_manifest)
+
+    @property
+    def aliases_as_models(self) -> List[base_models.StagingAlias]:
+        return [base_models.StagingAlias(**alias) for alias in self.staging_aliases]
 
 
 class App(models.Model):
@@ -282,6 +339,7 @@ class ComputeNode(models.Model):
 
 
 class Client(models.Model):
+    functional: bool = models.BooleanField(default=True)
     name = models.CharField(max_length=1000, default="No name")
     release = models.ForeignKey(Release, on_delete=models.CASCADE, related_name="clients", null=True)
     oauth2_client = models.OneToOneField(OAuth2Client, on_delete=models.CASCADE, related_name="client")
@@ -335,3 +393,19 @@ class ServiceInstanceMapping(models.Model):
 
     def __str__(self):
         return f"{self.key}:{self.instance}@{self.client}"
+
+
+class UsedAlias(models.Model):
+    """
+    Docstring for UsedAlias
+    """
+
+    valid = models.BooleanField(default=True)
+    alias = models.ForeignKey(InstanceAlias, on_delete=models.CASCADE, related_name="usages", null=True, blank=True)
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="used_aliases")
+    key = models.CharField(max_length=1000)
+    reason = models.TextField(null=True, blank=True)
+    used_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.alias} used in {self.key} at {self.used_at}"

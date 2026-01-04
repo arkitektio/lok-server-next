@@ -91,7 +91,6 @@ class ServiceInstance:
     id: strawberry.ID
     service: Service = strawberry.field(description="The service that this instance belongs to.")
     name: str = strawberry.field(description="The name of the instance. This is a human readable name of the instance.")
-    identifier: str = strawberry.field(description="The identifier of the instance. This is a unique string that identifies the instance. It is used to identify the instance in the code and in the database.")
     allowed_users: list[types.User] = strawberry_django.field(description="The users that are allowed to use this instance.")
     denied_users: list[types.User] = strawberry_django.field(description="The users that are denied to use this instance.")
     allowed_groups: list[types.Group] = strawberry_django.field(description="The groups that are allowed to use this instance.")
@@ -186,6 +185,7 @@ class PublicSource:
 )
 class Client:
     id: strawberry.ID
+    functional: bool = strawberry_django.field(description="Is this client functional? A functional client is a client that is able to authenticate users. If a client is not functional, it will not be able to authenticate users.")
     release: Release = strawberry_django.field(description="The release that this client belongs to.")
     tenant: types.User = strawberry_django.field(description="The user that manages this release.")
     kind: enums.ClientKind = strawberry_django.field(description="The kind of the client. The kind defines the authentication flow that is used to authenticate users with this client.")

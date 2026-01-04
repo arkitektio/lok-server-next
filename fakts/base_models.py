@@ -61,6 +61,43 @@ class Manifest(BaseModel):
     """ The public_sources are a list of public sources where the client can be found. """
 
 
+class Role(BaseModel):
+    key: str
+    description: Optional[str] = None
+    """ The description is a human readable description of the role. Will be show to the user when asking for the requirement."""
+
+
+class Scope(BaseModel):
+    name: str
+    description: Optional[str] = None
+    """ The description is a human readable description of the scope. Will be show to the user when asking for the requirement."""
+
+
+class ServiceManifest(BaseModel):
+    """A Manifest is a description of a client. It contains all the information
+    necessary to create a set of client, release and app objects in the database.
+    """
+
+    identifier: str
+    """ The identifier is a unique string that identifies the client. """
+    version: str
+    """ The version is a string that identifies the version of the client. """
+    description: Optional[str] = None
+    """ The description is a human readable description of the client. """
+    logo: Optional[str] = None
+    """ The logo is a url to a logo that should be used for the client. """
+    roles: Optional[List[Role]] = Field(default_factory=list)
+    """ The requirements are a list of requirements that the client needs to run on (e.g. needs GPU)"""
+    scopes: Optional[List[Scope]] = Field(default_factory=list)
+    """ The scopes are a list of scopes that the client can request. """
+    node_id: Optional[str] = None
+    """ The node_id is the id of the node that the runs on """
+    instance_id: Optional[str] = "default"
+    """ The instance_id is the id of the instance that the runs on """
+    public_sources: Optional[List[PublicSource]] = None
+    """ The public_sources are a list of public sources where the client can be found. """
+
+
 class CompositionInputModel(BaseModel):
     """A composition is a Jinja2 YAML template that will be rendered
     with the LinkingContext as context. The result of the rendering
@@ -81,6 +118,27 @@ class DeviceCodeStartRequest(BaseModel):
     requested_client_kind: enums.ClientKindVanilla = enums.ClientKindVanilla.DEVELOPMENT
     request_public: bool = False
     supported_layers: List[str] = Field(default_factory=lambda: ["web"])
+
+
+class StagingAlias(BaseModel):
+    id: str
+    name: Optional[str] = None
+    ssl: bool = True
+    host: str
+    port: Optional[int] = None
+    path: Optional[str] = None
+    challenge: Optional[str] = None
+    kind: str = "absolute"
+
+
+class ServiceDeviceCodeStartRequest(BaseModel):
+    """A DeviceCodeStartRequest is used to start the device code flow. It contains
+    the manifest of the client that wants to start the flow and the redirect uris
+    as well as the requested client kind."""
+
+    manifest: ServiceManifest
+    staging_aliases: List[StagingAlias] = Field(default_factory=list)
+    expiration_time_seconds: int = 300
 
 
 class ReedeemTokenRequest(BaseModel):
@@ -108,6 +166,18 @@ class ClaimRequest(BaseModel):
     composition: Optional[str] = None
     requirements: Optional[list[Requirement]] = Field(default_factory=list)
     secure: bool = False
+
+
+class AliasReport(BaseModel):
+    alias_id: str | None = None
+    valid: bool
+    reason: Optional[str] = None
+
+
+class ReportRequest(BaseModel):
+    token: str
+    alias_reports: Dict[str, AliasReport] = Field(default_factory=dict)
+    functional: bool = True
 
 
 class RetrieveRequest(BaseModel):
@@ -200,13 +270,17 @@ class SelfClaim(BaseModel):
 
 
 class AuthClaim(BaseModel):
+    client_token: str
     client_id: str
     client_secret: str
     scopes: List[str] = Field(default_factory=list)
     token_url: str
+    report_url: str
 
 
 class Alias(BaseModel):
+    id: str
+    """The id is a unique string that identifies the alias."""
     ssl: bool = True
     """The ssl flag indicates if the alias is available over SSL or not."""
     host: str

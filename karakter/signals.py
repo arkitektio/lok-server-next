@@ -7,6 +7,7 @@ from allauth.account.signals import user_signed_up
 from .models import Profile, Organization, Role
 from django.core.mail import send_mail
 import logging
+from karakter import managers
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -53,6 +54,12 @@ def create_or_update_user_profile(sender, instance, created, **kwargs):
 
         for i in settings.SYSTEM_MESSAGES:
             instance.notify(i["title"], i["message"])
+
+
+@receiver(post_save, sender=User)
+def create_user_default_organization(sender, instance, created, **kwargs):
+    if created:
+        managers.create_user_default_organization(instance)
 
 
 @receiver(user_signed_up)

@@ -38,3 +38,22 @@ def add_user_roles(user: User, organization: Organization, roles: list[str]):
         user.save()
 
     membership.save()
+
+
+def create_user_default_organization(user: User):
+    """
+    Create a default organization for the user upon signup.
+    """
+    org_slug = f"{user.username}-org"
+    org, created = Organization.objects.get_or_create(
+        slug=org_slug,
+        defaults={
+            "name": f"{user.username}'s Organization",
+            "owner": user,
+        },
+    )
+
+    if created:
+        create_default_groups_for_org(org)
+
+    add_user_roles(user, org, ["admin"])
