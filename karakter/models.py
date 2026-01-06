@@ -81,11 +81,22 @@ class Organization(models.Model):
 
 
 class Role(models.Model):
-    group = models.OneToOneField(Group, on_delete=models.CASCADE, related_name="role")
     identifier = models.CharField(max_length=1000, null=True, blank=True)
     description = models.CharField(max_length=4000, null=True, blank=True)
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="roles")
+    creating_instance = models.ForeignKey("fakts.ServiceInstance", on_delete=models.CASCADE, null=True, blank=True)
     is_builtin = models.BooleanField(default=False, help_text="If this role is a built-in role that cannot be deleted (admin)")
+
+    class Meta:
+        unique_together = ("identifier", "organization")
+
+
+class Scope(models.Model):
+    identifier = models.CharField(max_length=1000, null=True, blank=True)
+    description = models.CharField(max_length=4000, null=True, blank=True)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="scopes")
+    creating_instance = models.ForeignKey("fakts.ServiceInstance", on_delete=models.CASCADE, null=True, blank=True)
+    is_builtin = models.BooleanField(default=False, help_text="If this scope is a built-in scope that cannot be deleted (admin)")
 
     class Meta:
         unique_together = ("identifier", "organization")
@@ -155,6 +166,7 @@ class Profile(models.Model):
     bio = models.CharField(max_length=4000, null=True, blank=True)
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
     avatar = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
+    banner = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True, related_name="profile_banners")
 
 
 class OrganizationProfile(models.Model):
@@ -164,6 +176,7 @@ class OrganizationProfile(models.Model):
     bio = models.CharField(max_length=4000, null=True, blank=True)
     organization = models.OneToOneField(Organization, on_delete=models.CASCADE, related_name="profile")
     avatar = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
+    banner = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True, related_name="organization_banners")
 
 
 class GroupProfile(models.Model):

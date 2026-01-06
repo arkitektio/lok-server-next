@@ -63,6 +63,26 @@ def accept_service_device_code(info: Info, input: AcceptServiceDeviceCodeInput) 
             organization=organization,
         )
 
+    for role in manifest.roles or []:
+        models.Role.objects.update_or_create(
+            identifier=role.key,
+            organization=organization,
+            defaults={
+                "description": role.description or "",
+                "creating_instance": instance,
+            },
+        )
+
+    for scope in manifest.scopes or []:
+        models.Scope.objects.update_or_create(
+            identifier=scope.key,
+            organization=organization,
+            defaults={
+                "description": scope.description or "",
+                "creating_instance": instance,
+            },
+        )
+
     print("Creating aliases:", aliases)
     for alias in aliases:
         fakts_models.InstanceAlias.objects.update_or_create(instance=instance, host=alias.host, port=alias.port, ssl=alias.ssl, path=alias.path, kind=alias.kind)

@@ -68,7 +68,7 @@ class Role(BaseModel):
 
 
 class Scope(BaseModel):
-    name: str
+    key: str
     description: Optional[str] = None
     """ The description is a human readable description of the scope. Will be show to the user when asking for the requirement."""
 

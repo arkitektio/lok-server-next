@@ -363,6 +363,9 @@ class Client(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     requirements_hash = models.CharField(max_length=1000, unique=False)
     logo = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
+    last_reported_at = models.DateTimeField(auto_now=True)
+    manifest = models.JSONField(default=dict)
+    scopes = models.ManyToManyField("karakter.Scope", related_name="clients", blank=True)
 
     class Meta:
         constraints = [

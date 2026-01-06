@@ -63,7 +63,7 @@ def create_organization(info: Info, input: CreateOrganizationInput) -> types.Man
         owner=info.context.request.user,
     )
     logger.info(f"Created Organization: {organization.id} with name: {organization.name}")
-    managers.create_default_groups_for_org(organization)
+    managers.create_default_roles_for_org(organization)
     managers.add_user_roles(
         user=info.context.request.user,
         organization=organization,
@@ -91,3 +91,17 @@ def change_organization_owner(info: Info, organization_id: strawberry.ID, new_ow
 
     logger.info(f"Changed owner of Organization: {organization.id} to User: {new_owner.id}")
     return organization
+
+
+@strawberry.input
+class DeleteOrganizationInput:
+    id: strawberry.ID
+
+
+def delete_organization(info: Info, input: DeleteOrganizationInput) -> strawberry.ID:
+    """Delete an organization by its ID."""
+    organization = models.Organization.objects.get(pk=input.id)
+    assert organization.owner == info.context.request.user, "Only the organization owner can delete the organization."
+    organization.delete()
+    logger.info(f"Deleted Organization: {organization.id}")
+    return input.id

@@ -9,6 +9,8 @@ import api.management.types as types
 import kante
 from karakter import models as karakter_models
 from fakts import models as fakts_models
+from .datalayer import DatalayerExtension
+from allauth.socialaccount import models as smodels
 
 
 @strawberry.type
@@ -28,10 +30,30 @@ class Query:
     used_aliases: list[types.ManagementUsedAlias] = kante.django_field()
     service_releases: list[types.ManagementServiceRelease] = kante.django_field()
     instance_aliases: list[types.ManagementInstanceAlias] = kante.django_field()
+    social_accounts: list[types.ManagementSocialAccount] = kante.django_field()
+    memberships: list[types.ManagementMembership] = kante.django_field()
+    scopes: list[types.ManagementScope] = kante.django_field()
+    roles: list[types.ManagementRole] = kante.django_field()
+
+    @kante.django_field()
+    def social_account(self, info: Info, id: strawberry.ID) -> types.ManagementSocialAccount:
+        return smodels.SocialAccount.objects.get(id=id)
 
     @kante.django_field()
     def me(self, info: Info) -> ManagementUser:
         return info.context.request.user
+
+    @kante.django_field()
+    def role(self, info: Info, id: strawberry.ID) -> types.ManagementRole:
+        return karakter_models.Role.objects.get(id=id)
+
+    @kante.django_field()
+    def membership(self, info: Info, id: strawberry.ID) -> types.ManagementMembership:
+        return karakter_models.Membership.objects.get(id=id)
+
+    @kante.django_field()
+    def scope(self, info: Info, id: strawberry.ID) -> types.ManagementScope:
+        return karakter_models.Scope.objects.get(id=id)
 
     @kante.django_field()
     def organization(self, info: Info, id: strawberry.ID) -> types.ManagementOrganization:
@@ -115,6 +137,12 @@ class Query:
         return karakter_models.Invite.objects.get(token=invite_code)
 
     @kante.django_field()
+    def invite(self, info: Info, id: strawberry.ID) -> types.ManagementInvite:
+        invite = karakter_models.Invite.objects.get(id=id)
+        assert invite.created_for.owner == info.context.request.user, "Not authorized to view this invite."
+        return invite
+
+    @kante.django_field()
     def release(self, info: Info, id: strawberry.ID) -> types.ManagementRelease:
         return fakts_models.Release.objects.get(id=id)
 
@@ -160,6 +188,12 @@ class Mutation:
     create_organization = strawberry_django.mutation(
         resolver=mutations.create_organization,
     )
+    update_organization = strawberry_django.mutation(
+        resolver=mutations.update_organization,
+    )
+    delete_organization = strawberry_django.mutation(
+        resolver=mutations.delete_organization,
+    )
 
     create_invite = strawberry_django.mutation(
         resolver=mutations.create_invite,
@@ -173,6 +207,13 @@ class Mutation:
     )
     cancel_invite = strawberry_django.mutation(
         resolver=mutations.cancel_invite,
+    )
+
+    update_membership = strawberry_django.mutation(
+        resolver=mutations.update_membership,
+    )
+    delete_membership = strawberry_django.mutation(
+        resolver=mutations.delete_membership,
     )
 
     # Device Code Mutations
@@ -204,6 +245,26 @@ class Mutation:
         resolver=mutations.update_alias,
     )
 
+    update_profile = strawberry_django.mutation(
+        resolver=mutations.update_profile,
+    )
+    create_profile = strawberry_django.mutation(
+        resolver=mutations.create_profile,
+    )
+    delete_profile = strawberry_django.mutation(
+        resolver=mutations.delete_profile,
+    )
+
+    update_organization_profile = strawberry_django.mutation(
+        resolver=mutations.update_organization_profile,
+    )
+    create_organization_profile = strawberry_django.mutation(
+        resolver=mutations.create_organization_profile,
+    )
+    delete_organization_profile = strawberry_django.mutation(
+        resolver=mutations.delete_organization_profile,
+    )
+
     delete_device_group = strawberry_django.mutation(
         resolver=mutations.delete_device_group,
     )
@@ -214,9 +275,16 @@ class Mutation:
         resolver=mutations.add_device_to_group,
     )
 
+    request_media_upload = strawberry_django.mutation(
+        resolver=mutations.request_media_upload,
+    )
+
 
 schema = kante.Schema(
     query=Query,
     mutation=Mutation,
-    extensions=[],
+    types=[types.ManagementGithubAccount, types.ManagementGenericAccount, types.ManagementGoogleAccount, types.ManagementOrcidAccount],
+    extensions=[
+        DatalayerExtension,
+    ],
 )
