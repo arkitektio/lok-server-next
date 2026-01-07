@@ -377,6 +377,7 @@ class ManagementMembership:
     user: ManagementUser
     organization: "ManagementOrganization"
     roles: List["ManagementRole"] = strawberry.field(description="The roles that the user has in the organization")
+    created_through: Optional["ManagementInvite"] = strawberry.field(description="The invite that created this membership")
 
 
 @strawberry_django.type(models.Organization, filters=karakter_filters.OrganizationFilter, pagination=True, description="""An Organization is a group of users that can work together on a project.""")
@@ -426,6 +427,7 @@ class ManagementInvite:
     declined_by: ManagementUser | None
     responded_at: datetime.datetime | None
     roles: list["ManagementRole"]
+    created_memberships: list["ManagementMembership"]
 
     @strawberry_django.field(description="Check if the invite is still valid and pending")
     def valid(self) -> bool:

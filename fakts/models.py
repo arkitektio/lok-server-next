@@ -339,7 +339,7 @@ class ComputeNode(models.Model):
 
 
 class Client(models.Model):
-    functional: bool = models.BooleanField(default=True)
+    functional = models.BooleanField(default=True)
     name = models.CharField(max_length=1000, default="No name")
     release = models.ForeignKey(Release, on_delete=models.CASCADE, related_name="clients", null=True)
     oauth2_client = models.OneToOneField(OAuth2Client, on_delete=models.CASCADE, related_name="client")

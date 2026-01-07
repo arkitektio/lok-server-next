@@ -108,6 +108,7 @@ class Membership(models.Model):
     user = models.ForeignKey("User", on_delete=models.CASCADE, related_name="memberships")
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="memberships")
     roles = models.ManyToManyField(Role, related_name="memberships", blank=True)
+    created_through = models.ForeignKey("Invite", on_delete=models.SET_NULL, null=True, related_name="created_memberships")
 
     class Meta:
         unique_together = ("user", "organization")

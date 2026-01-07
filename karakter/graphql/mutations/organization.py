@@ -61,7 +61,7 @@ def create_organization(info: Info, input: CreateOrganizationInput) -> types.Org
         description=input.description,
     )
     logger.info(f"Created Organization: {organization.id} with name: {organization.name}")
-    managers.create_default_groups_for_org(organization)
+    managers.create_default_roles_for_org(organization)
     managers.add_user_roles(
         user=info.context.request.user,
         organization=organization,

@@ -386,6 +386,7 @@ class Invite:
     declined_by: User | None
     responded_at: datetime.datetime | None
     roles: list["Role"]
+    created_membershipts: list["Membership"]
 
     @strawberry_django.field(description="Check if the invite is still valid and pending")
     def valid(self) -> bool:
