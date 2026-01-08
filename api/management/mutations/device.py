@@ -25,49 +25,42 @@ def create_device(info: Info, input: CreateDeviceInput) -> types.ManagementDevic
 
 
 @kante.input
-class UpdateAliasInput:
+class UpdateDeviceInput:
     """Input for creating a single-use magic invite link for an organization"""
 
     id: strawberry.ID
-    port: int
-    host: str
-    kind: str
-    path: str | None = None
+    name: str
 
 
-def update_alias(info: Info, input: UpdateAliasInput) -> types.ManagementInstanceAlias:
+def update_device(info: Info, input: UpdateDeviceInput) -> types.ManagementDevice:
     """ """
 
     user = info.context.request.user
 
-    alias = fakts_models.InstanceAlias.objects.get(id=input.id)
-    alias.port = input.port
-    alias.host = input.host
-    alias.kind = input.kind
-    alias.path = input.path
-    alias.save()
+    device = fakts_models.ComputeNode.objects.get(id=input.id)
+    device.name = input.name
+    device.save()
 
-    return alias
+    return device
 
 
 @kante.input
-class DeleteAliasInput:
+class DeleteDeviceInput:
     """Input for accepting an organization invite"""
 
     id: strawberry.ID
 
 
-def delete_alias(info: Info, input: DeleteAliasInput) -> strawberry.ID:
+def delete_device(info: Info, input: DeleteDeviceInput) -> strawberry.ID:
     """
     Accept an invite to join an organization.
 
     Validates the invite token and adds the user to the organization.
     """
     try:
-        alias = fakts_models.InstanceAlias.objects.get(id=input.id)
-    except fakts_models.InstanceAlias.DoesNotExist:
-        raise Exception("Invalid alias ID")
+        device = fakts_models.ComputeNode.objects.get(id=input.id)
+    except fakts_models.ComputeNode.DoesNotExist:
+        raise Exception("Invalid device ID")
 
-    alias.delete()
-
+    device.delete()
     return input.id

@@ -334,6 +334,7 @@ class ManagementRole:
     organization: "ManagementOrganization"
     creating_instance: Optional["ManagementServiceInstance"]
     memberships: List["ManagementMembership"] = strawberry.django.field(description="The memberships that have this role")
+    used_by: List["ManagementServiceInstance"] = strawberry.django.field(description="The service instances that use this role")
 
     @kante.django_field()
     def description(self, info: Info) -> "str":
@@ -352,6 +353,7 @@ class ManagementScope:
     organization: "ManagementOrganization"
     creating_instance: Optional["ManagementServiceInstance"]
     memberships: List["ManagementMembership"] = strawberry.django.field(description="The memberships that have this role")
+    used_by: List["ManagementServiceInstance"] = strawberry.django.field(description="The service instances that use this scope")
 
     @kante.django_field()
     def description(self, info: Info) -> "str":
@@ -448,8 +450,8 @@ class ManagementInvite:
 class ManagementStagingRequirement:
     service: str
     key: str
-    description: str
-    optional: bool
+    description: str | None = None
+    optional: bool = False
 
 
 @pydantic.type(base_models.PublicSource)
@@ -507,6 +509,28 @@ class ManagementStagingServiceManifest:
     roles: list[StagingRole] | None = None
     instance_id: str
     public_sources: list[ManagementStagingPublicSource]
+
+
+@pydantic.type(base_models.InstanceRequest)
+class ManagementStagingInstanceRequest:
+    manifest: ManagementStagingServiceManifest
+    aliases: list[StagingAlias] | None = None
+    identifier: str
+    description: Optional[str] = None
+
+
+@pydantic.type(base_models.ClientRequest)
+class ManagementStagingClientRequest:
+    manifest: ManagementStagingManifest
+    identifier: str
+    description: Optional[str] = None
+
+
+@pydantic.type(base_models.CompositionManifest)
+class ManagementCompositionManifest:
+    identifier: str
+    instances: list[ManagementStagingInstanceRequest]
+    clients: list[ManagementStagingClientRequest]
 
 
 @strawberry_django.type(
@@ -577,6 +601,8 @@ class ManagementServiceInstance:
     aliases: list["ManagementInstanceAlias"] = strawberry_django.field(
         description="The aliases of the instance. An alias is a way to reach the instance. Clients can use these aliases to check if they can reach the instance. An alias can be an absolute alias (e.g. 'example.com') or a relative alias (e.g. 'example.com/path'). If the alias is relative, it will be relative to the layer's domain, port and path."
     )
+    roles: list["ManagementRole"] = strawberry_django.field(description="The roles that are associated with this instance. These roles will be assigned to users that are allowed to use this instance.")
+    scopes: list["ManagementScope"] = strawberry_django.field(description="The scopes that are associated with this instance. These scopes will be assigned to users that are allowed to use this instance.")
 
     @strawberry_django.field(description="The steward of the instance. The steward is the user who is responsible for this instance.")
     def identifier(self) -> str:
@@ -598,6 +624,29 @@ class ManagementLayer:
     instances: list["ManagementServiceInstance"] = strawberry_django.field(
         description="The instances of the service. A service instance is a configured instance of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."
     )
+
+
+@strawberry_django.type(
+    fakts_models.Composition,
+    description="A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself.",
+    pagination=True,
+    filters=filters.ManagementCompositionFilter,
+    order=filters.ManagementCompositionOrder,
+)
+class ManagementComposition:
+    id: strawberry.ID
+    name: str = strawberry.field(description="The name of the layer")
+    logo: ManagementMediaStore | None = strawberry.field(description="The logo of the service. This should be a url to a logo that can be used to represent the service.")
+    description: str | None = strawberry.field(description="The description of the service. This should be a human readable description of the service.")
+    instances: list["ManagementServiceInstance"] = strawberry_django.field(
+        description="The instances of the service. A service instance is a configured instance of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."
+    )
+    organization: "ManagementOrganization" = strawberry.field(description="The organization that owns this composition.")
+    clients: list["ManagementClient"] = strawberry_django.field(description="The clients that are part of this composition. A client is an application that uses the services in the composition.")
+
+    @classmethod
+    def get_queryset(cls, queryset, info: Info):
+        return queryset.filter(organization__memberships__user=info.context.request.user).distinct()
 
 
 @strawberry_django.type(
@@ -692,6 +741,8 @@ class ManagementDevice:
     name: str | None
     node_id: strawberry.ID
     clients: list["ManagementClient"]
+    organization: "ManagementOrganization" = strawberry.field(description="The organization that owns this compute node.")
+    service_instances: list[ManagementServiceInstance] = strawberry_django.field(description="The service instances that are associated with this compute node.")
     device_groups: list[ManagementDeviceGroup] = strawberry_django.field(description="The device groups that belong to this compute node.")
 
     @classmethod
@@ -826,6 +877,25 @@ class ManagementServiceDeviceCode:
             )
             for alias in self.staging_aliases
         ]
+
+
+@strawberry_django.type(fakts_models.CompositionDeviceCode, filters=karakter_filters.OrganizationFilter, pagination=True, description="""An Organization is a group of users that can work together on a project.""")
+class ManagementCompositionDeviceCode:
+    id: strawberry.ID
+    user: Optional[ManagementUser]
+    created_at: datetime.datetime
+    expires_at: datetime.datetime
+    code: str
+    composition: Optional[ManagementComposition]
+    staging_kind: str
+    denied: bool
+
+    @strawberry_django.field(description="Check if the device code is still valid")
+    def manifest(self, info: Info) -> Optional[ManagementCompositionManifest]:
+        if not self.manifest:
+            return None
+
+        return base_models.CompositionManifest(**self.manifest)
 
 
 @strawberry_django.type(fakts_models.RedeemToken, pagination=True)

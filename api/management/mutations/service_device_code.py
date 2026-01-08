@@ -64,7 +64,7 @@ def accept_service_device_code(info: Info, input: AcceptServiceDeviceCodeInput) 
         )
 
     for role in manifest.roles or []:
-        models.Role.objects.update_or_create(
+        r, _ = models.Role.objects.get_or_create(
             identifier=role.key,
             organization=organization,
             defaults={
@@ -73,8 +73,10 @@ def accept_service_device_code(info: Info, input: AcceptServiceDeviceCodeInput) 
             },
         )
 
+        r.used_by.add(instance)
+
     for scope in manifest.scopes or []:
-        models.Scope.objects.update_or_create(
+        sc, _ = models.Scope.objects.get_or_create(
             identifier=scope.key,
             organization=organization,
             defaults={
@@ -82,6 +84,8 @@ def accept_service_device_code(info: Info, input: AcceptServiceDeviceCodeInput) 
                 "creating_instance": instance,
             },
         )
+
+        sc.used_by.add(instance)
 
     print("Creating aliases:", aliases)
     for alias in aliases:

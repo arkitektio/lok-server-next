@@ -1,4 +1,4 @@
-from .models import Organization, Role, Membership, User
+from .models import Organization, Role, Membership, User, Scope
 from django.contrib.auth.models import Group
 
 
@@ -10,9 +10,22 @@ def create_role(organization: Organization, identifier: str):
     return role
 
 
+def create_scope(organization: Organization, identifier: str):
+    """
+    Create a role for the organization with the given identifier.
+    """
+    role, _ = Scope.objects.update_or_create(identifier=identifier, organization=organization)
+    return role
+
+
 def create_default_roles_for_org(org: Organization):
     for identifier in ["admin", "guest", "user", "bot", "viewer", "editor", "contributor", "manager", "owner", "labeler"]:
         create_role(org, identifier)
+
+
+def create_default_scopes_for_org(org: Organization):
+    for identifier in ["openid", "profile", "email", "roles", "groups"]:
+        create_scope(org, identifier)
 
 
 def ensure_owner_is_admin(org: Organization):

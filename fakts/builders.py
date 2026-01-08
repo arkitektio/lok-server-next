@@ -4,7 +4,7 @@ from fakts import logic
 from authapp.models import generate_client_id, generate_client_secret
 
 
-def create_development_client(release: models.Release, config: base_models.DevelopmentClientConfig, manifest: base_models.Manifest, node: models.ComputeNode | None = None):
+def create_development_client(release: models.Release, config: base_models.DevelopmentClientConfig, manifest: base_models.Manifest, node: models.ComputeNode | None = None, composition: models.Composition | None = None):
     tenant = config.get_tenant()
     user = config.get_user()
     organization = config.get_organization()
@@ -16,6 +16,7 @@ def create_development_client(release: models.Release, config: base_models.Devel
         client.tenant = tenant
         client.node = node
         client.manifest = manifest.model_dump()
+        client.composition = composition
         client.public_sources = [t.dict() for t in manifest.public_sources] if manifest.public_sources else []
         client.save()
 
@@ -43,6 +44,7 @@ def create_development_client(release: models.Release, config: base_models.Devel
             oauth2_client=oauth2_client,
             redirect_uris="",
             public=False,
+            composition=composition,
             manifest=manifest.model_dump(),
             logo=release.logo,
             organization=organization,
@@ -50,7 +52,7 @@ def create_development_client(release: models.Release, config: base_models.Devel
         )
 
 
-def create_client(manifest: base_models.Manifest, config: base_models.ClientConfig, user: models.AbstractUser, organization: models.Organization):
+def create_client(manifest: base_models.Manifest, config: base_models.ClientConfig, user: models.AbstractUser, organization: models.Organization, composition: models.Composition | None = None) -> models.Client:
     from .utils import download_logo
 
     try:
@@ -81,7 +83,7 @@ def create_client(manifest: base_models.Manifest, config: base_models.ClientConf
     print(config)
 
     if config.kind == enums.ClientKindVanilla.DEVELOPMENT.value:
-        client = create_development_client(release, config, manifest, node=node)
+        client = create_development_client(release, config, manifest, node=node, composition=composition)
     else:
         raise ValueError(f"Client kind {config.kind} not supported yet")
 

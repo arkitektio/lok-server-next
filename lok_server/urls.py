@@ -59,7 +59,7 @@ def management_schema(request):
 hallo = "hallsssoss"
 
 urlpatterns = [
-    dynamicpath("", index, name="home"),
+    dynamicpath("", index, name="mainhome"),
     dynamicpath("managementgraphql/", AsyncGraphQLView.as_view(schema=schema)),
     dynamicpath("managementschema/", csrf_exempt(management_schema), name="management_schema"),
     dynamicpath("admin/", admin.site.urls),

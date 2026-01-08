@@ -86,6 +86,7 @@ class Role(models.Model):
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="roles")
     creating_instance = models.ForeignKey("fakts.ServiceInstance", on_delete=models.CASCADE, null=True, blank=True)
     is_builtin = models.BooleanField(default=False, help_text="If this role is a built-in role that cannot be deleted (admin)")
+    used_by = models.ManyToManyField("fakts.ServiceInstance", related_name="roles", blank=True)
 
     class Meta:
         unique_together = ("identifier", "organization")
@@ -97,6 +98,7 @@ class Scope(models.Model):
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="scopes")
     creating_instance = models.ForeignKey("fakts.ServiceInstance", on_delete=models.CASCADE, null=True, blank=True)
     is_builtin = models.BooleanField(default=False, help_text="If this scope is a built-in scope that cannot be deleted (admin)")
+    used_by = models.ManyToManyField("fakts.ServiceInstance", related_name="scopes", blank=True)
 
     class Meta:
         unique_together = ("identifier", "organization")

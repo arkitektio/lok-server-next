@@ -71,6 +71,7 @@ class ServiceRelease(models.Model):
 
 
 class ServiceInstance(models.Model):
+    composition = models.ForeignKey("Composition", on_delete=models.CASCADE, related_name="instances", null=True)
     release = models.ForeignKey(ServiceRelease, on_delete=models.CASCADE, related_name="instances")
     logo = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
     instance_id = models.CharField(max_length=1000, default="default")
@@ -86,7 +87,7 @@ class ServiceInstance(models.Model):
         related_name="service_instances",
         help_text="The organization that owns this instance. If null the instance is global.",
     )
-    device = models.ForeignKey("ComputeNode", on_delete=models.CASCADE, null=True, blank=True)
+    device = models.ForeignKey("ComputeNode", on_delete=models.CASCADE, null=True, blank=True, related_name="service_instances")
     template = models.TextField()
     denied_users = models.ManyToManyField(get_user_model(), related_name="denied_instances")
     denied_groups = models.ManyToManyField(Group, related_name="denied_instances")
@@ -102,7 +103,7 @@ class ServiceInstance(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["release", "instance_id", "organization", "device"],
+                fields=["release", "instance_id", "organization", "device", "composition"],
                 name="Only one instance_id per release, organization and device and instance",
             )
         ]
@@ -227,6 +228,25 @@ class RedeemToken(models.Model):
     )
 
 
+class Composition(models.Model):
+    name = models.CharField(max_length=1000)
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="compositions",
+    )
+    description = models.TextField(default="No description available", null=True, blank=True)
+    creator = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.CASCADE,
+        related_name="created_compositions",
+    )
+    token = models.CharField(max_length=1000, unique=True, default=uuid.uuid4)
+
+    def __str__(self):
+        return f"{self.name} ({self.organization})"
+
+
 class DeviceCode(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     code = models.CharField(max_length=100, unique=True)
@@ -268,6 +288,21 @@ class ServiceDeviceCode(models.Model):
     @property
     def aliases_as_models(self) -> List[base_models.StagingAlias]:
         return [base_models.StagingAlias(**alias) for alias in self.staging_aliases]
+
+
+class CompositionDeviceCode(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    code = models.CharField(max_length=100, unique=True)
+    challenge_code = models.CharField(max_length=100, unique=True)
+    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, null=True)
+    composition = models.ForeignKey(Composition, on_delete=models.CASCADE, null=True)
+    manifest = models.JSONField(default=dict)
+    expires_at = models.DateTimeField()
+    denied = models.BooleanField(default=False)
+
+    @property
+    def manifest_as_model(self) -> base_models.CompositionManifest:
+        return base_models.CompositionManifest(**self.manifest)
 
 
 class App(models.Model):
@@ -339,6 +374,7 @@ class ComputeNode(models.Model):
 
 
 class Client(models.Model):
+    composition = models.ForeignKey(Composition, on_delete=models.CASCADE, related_name="clients", null=True)
     functional = models.BooleanField(default=True)
     name = models.CharField(max_length=1000, default="No name")
     release = models.ForeignKey(Release, on_delete=models.CASCADE, related_name="clients", null=True)
@@ -412,3 +448,29 @@ class UsedAlias(models.Model):
 
     def __str__(self):
         return f"{self.alias} used in {self.key} at {self.used_at}"
+
+
+class TailscaleInspector(models.Model):
+    name = models.CharField(max_length=1000)
+    api_key = models.CharField(max_length=1000)
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="tailscale_inspectors",
+    )
+
+    def __str__(self):
+        return f"{self.name} ({self.organization})"
+
+
+class LinkInspector(models.Model):
+    name = models.CharField(max_length=1000)
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="link_inspectors",
+    )
+    link = models.CharField(max_length=1000)
+
+    def __str__(self):
+        return f"{self.name} ({self.organization})"

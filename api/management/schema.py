@@ -34,6 +34,7 @@ class Query:
     memberships: list[types.ManagementMembership] = kante.django_field()
     scopes: list[types.ManagementScope] = kante.django_field()
     roles: list[types.ManagementRole] = kante.django_field()
+    compositions: list[types.ManagementComposition] = kante.django_field()
 
     @kante.django_field()
     def social_account(self, info: Info, id: strawberry.ID) -> types.ManagementSocialAccount:
@@ -78,6 +79,10 @@ class Query:
     @kante.django_field()
     def service_instance(self, info: Info, id: strawberry.ID) -> types.ManagementServiceInstance:
         return fakts_models.ServiceInstance.objects.get(id=id)
+
+    @kante.django_field()
+    def composition(self, info: Info, id: strawberry.ID) -> types.ManagementComposition:
+        return fakts_models.Composition.objects.get(id=id)
 
     @kante.django_field()
     def validate_device_code(self, info: Info, device_code: strawberry.ID, organization: strawberry.ID) -> types.ValidationResult:
@@ -182,6 +187,14 @@ class Query:
     def service_device_code_by_code(self, info: Info, code: str) -> types.ManagementServiceDeviceCode:
         return fakts_models.ServiceDeviceCode.objects.get(code=code)
 
+    @kante.django_field()
+    def composition_device_code(self, info: Info, id: strawberry.ID) -> types.ManagementCompositionDeviceCode:
+        return fakts_models.CompositionDeviceCode.objects.get(id=id)
+
+    @kante.django_field()
+    def composition_device_code_by_code(self, info: Info, code: str) -> types.ManagementCompositionDeviceCode:
+        return fakts_models.CompositionDeviceCode.objects.get(code=code)
+
 
 @strawberry.type
 class Mutation:
@@ -209,11 +222,38 @@ class Mutation:
         resolver=mutations.cancel_invite,
     )
 
+    # device Mutations
+    create_device = strawberry_django.mutation(
+        resolver=mutations.create_device,
+    )
+    update_device = strawberry_django.mutation(
+        resolver=mutations.update_device,
+    )
+    delete_device = strawberry_django.mutation(
+        resolver=mutations.delete_device,
+    )
+
     update_membership = strawberry_django.mutation(
         resolver=mutations.update_membership,
     )
     delete_membership = strawberry_django.mutation(
         resolver=mutations.delete_membership,
+    )
+
+    # Compsition Device Code Mutations
+    accept_composition_device_code = strawberry_django.mutation(
+        resolver=mutations.accept_composition_device_code,
+    )
+    decline_composition_device_code = strawberry_django.mutation(
+        resolver=mutations.decline_composition_device_code,
+    )
+
+    # Composition
+    update_composition = strawberry_django.mutation(
+        resolver=mutations.update_composition,
+    )
+    delete_composition = strawberry_django.mutation(
+        resolver=mutations.delete_composition,
     )
 
     # Device Code Mutations

@@ -34,6 +34,35 @@ class ManagementDeviceGroupFilter:
         return queryset.filter(organization__id=self.organization)
 
 
+@strawberry_django.order(fakts_models.Composition)
+class ManagementCompositionOrder:
+    name: strawberry.auto
+    created_at: strawberry.auto
+    last_reported_at: strawberry.auto
+
+
+@strawberry_django.filter(fakts_models.Composition)
+class ManagementCompositionFilter:
+    search: str | None
+    ids: list[strawberry.ID] | None
+    organization: strawberry.ID | None
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+
+    def filter_search(self, queryset, info):
+        if self.search is None:
+            return queryset
+        return queryset.filter(name__contains=self.search)
+
+    def filter_organization(self, queryset, info):
+        if self.organization is None:
+            return queryset
+        return queryset.filter(organization__id=self.organization)
+
+
 @strawberry_django.order(fakts_models.ComputeNode)
 class ManagementDeviceOrder:
     name: strawberry.auto

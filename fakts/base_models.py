@@ -19,6 +19,7 @@ class WellKnownFakts(BaseModel):
     description: str | None = None
     claim: str
     base_url: str
+    frontend_url: str
     ca_crt: str | None = None
 
 
@@ -49,9 +50,9 @@ class Manifest(BaseModel):
     """ The version is a string that identifies the version of the client. """
     logo: Optional[str] = None
     """ The logo is a url to a logo that should be used for the client. """
-    scopes: Optional[list[str]] = Field(default_factory=list)
+    scopes: list[str] = Field(default_factory=list)
     """ The scopes are a list of scopes that the client can request. """
-    requirements: Optional[List[Requirement]] = Field(default_factory=list)
+    requirements: list[Requirement] = Field(default_factory=list)
     """ The requirements are a list of requirements that the client needs to run on (e.g. needs GPU)"""
     node_id: Optional[str] = None
     """ The node_id is the id of the node that the runs on """
@@ -139,6 +140,47 @@ class ServiceDeviceCodeStartRequest(BaseModel):
     manifest: ServiceManifest
     staging_aliases: List[StagingAlias] = Field(default_factory=list)
     expiration_time_seconds: int = 300
+
+
+class InstanceRequest(BaseModel):
+    """A ServiceRequest is used to request a service instance from the server.
+    It contains the manifest of the service that is being requested.
+    """
+
+    identifier: str
+    description: Optional[str] = None
+    """A human readable description of the request."""
+    manifest: ServiceManifest
+    aliases: List[StagingAlias] = Field(default_factory=list)
+
+
+class ClientRequest(BaseModel):
+    """A ClientRequest is used to request a client from the server.
+    It contains the manifest of the client that is being requested.
+    """
+
+    identifier: str
+    description: Optional[str] = None
+    """A human readable description of the request."""
+    manifest: Manifest
+
+
+class CompositionManifest(BaseModel):
+    """A Composition Request allows to request seting up a composition of clients and services."""
+
+    identifier: str
+    description: Optional[str] = None
+    """A human readable description of the composition."""
+    logo: Optional[str] = None
+    instances: List[InstanceRequest] = Field(default_factory=list)
+    clients: List[ClientRequest] = Field(default_factory=list)
+
+
+class CompositionStartRequest(BaseModel):
+    """A Composition Start Request allows to start the setup of a composition."""
+
+    composition: CompositionManifest
+    expiration_time_seconds: int = 600
 
 
 class ReedeemTokenRequest(BaseModel):

@@ -47,6 +47,7 @@ class WellKnownFakts(View):
                 description=settings.DEPLOYMENT_DESCRIPTION,
                 claim=request.build_absolute_uri(reverse("fakts:claim")),
                 base_url=request.build_absolute_uri(reverse("fakts:index")),
+                frontend_url=request.build_absolute_uri(reverse("mainhome")).replace(f"/{settings.MY_SCRIPT_NAME}", ""),
                 ca_crt=ca,
             ).dict()
         )
@@ -414,6 +415,119 @@ class ServiceStartChallengeView(View):
                 "status": "granted",
                 "code": device_code.code,
                 "challenge": device_code.challenge_code,
+            }
+        )
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class CompositionStartChallengeView(View):
+    """
+    An endpoint that is challenged in the course of a device code flow.
+    """
+
+    def post(self, request, *args, **kwargs):
+        json_data = json.loads(request.body)
+        try:
+            start_grant = base_models.CompositionStartRequest(**json_data)
+        except Exception as e:
+            logger.error(e, exc_info=True)
+            return JsonResponse(
+                data={
+                    "status": "error",
+                    "error": f"Malformed request: {str(e)}",
+                }
+            )
+
+        manifest = start_grant.composition
+
+        try:
+            logo = download_logo(manifest.logo) if manifest.logo else None
+        except Exception as e:
+            logger.error(f"Error downloading logo: {manifest.logo}", exc_info=True)
+            return JsonResponse(
+                data={
+                    "status": "error",
+                    "error": "Error downloading logo",
+                }
+            )
+
+        logger.info(f"Received start challenge for {manifest.identifier}")
+
+        device_code = models.CompositionDeviceCode.objects.create(
+            code=logic.create_device_code(),
+            challenge_code=logic.create_device_code(),
+            manifest=manifest.model_dump(),
+            expires_at=datetime.datetime.now() + datetime.timedelta(seconds=start_grant.expiration_time_seconds),
+        )
+
+        return JsonResponse(
+            data={
+                "status": "granted",
+                "code": device_code.code,
+                "challenge": device_code.challenge_code,
+            }
+        )
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class CompositionChallengeView(View):
+    """
+    An endpoint that is challenged in the course of a device code flow.
+    """
+
+    def post(self, request, *args, **kwargs):
+        try:
+            json_data = json.loads(request.body)
+            challenge = base_models.DeviceCodeChallengeRequest(**json_data)
+        except Exception as e:
+            logger.error(e, exc_info=True)
+            return JsonResponse(
+                data={
+                    "status": "error",
+                    "error": f"Malformed request: {str(e)}",
+                }
+            )
+        try:
+            device_code = models.CompositionDeviceCode.objects.get(challenge_code=challenge.code)
+        except models.CompositionDeviceCode.DoesNotExist:
+            return JsonResponse(
+                data={
+                    "status": "error",
+                    "error": "Challenge does not exist",
+                }
+            )
+
+        if datetime.datetime.now(datetime.timezone.utc) > device_code.expires_at:
+            device_code.delete()
+            return JsonResponse(
+                data={
+                    "status": "expired",
+                    "message": "The user has not given an answer in enough time",
+                }
+            )
+
+        if device_code.denied:
+            device_code.delete()
+            return JsonResponse(
+                data={
+                    "status": "denied",
+                    "message": "The user has denied the request",
+                }
+            )
+
+        # scopes will only be set if the user has verified the challenge
+        if device_code.composition:
+            return JsonResponse(
+                data={
+                    "status": "granted",
+                    "token": device_code.composition.token,
+                }
+            )
+
+        return JsonResponse(
+            data={
+                "status": "pending",
+                "message": "User  has not verfied the challenge",
             }
         )
 

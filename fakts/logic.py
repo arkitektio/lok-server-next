@@ -93,7 +93,7 @@ def auto_compose(client: models.Client, manifest: base_models.Manifest, user: mo
     if not requirements:
         return client
 
-    if hash_requirements(requirements) != client.requirements_hash:
+    if hash_requirements(requirements) != client.requirements_hash or True:
         errors = []
         warnings = []
 

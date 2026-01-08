@@ -17,6 +17,7 @@ User = get_user_model()
 def ensure_default_roles_for_org(sender, instance, created, **kwargs):
     managers.create_default_roles_for_org(instance)
     managers.ensure_owner_is_admin(instance)
+    managers.create_default_scopes_for_org(instance)
     if created:
         OrganizationProfile.objects.create(organization=instance)
 
