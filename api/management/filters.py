@@ -5,6 +5,35 @@ from allauth.socialaccount import models as smodels
 from karakter import models as karakter_models
 
 
+@strawberry_django.order(fakts_models.Layer)
+class ManagementLayerOrder:
+    name: strawberry.auto
+    created_at: strawberry.auto
+    last_reported_at: strawberry.auto
+
+
+@strawberry_django.filter(fakts_models.Layer)
+class ManagementLayerFilter:
+    search: str | None
+    ids: list[strawberry.ID] | None
+    organization: strawberry.ID | None
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+
+    def filter_search(self, queryset, info):
+        if self.search is None:
+            return queryset
+        return queryset.filter(name__contains=self.search)
+
+    def filter_organization(self, queryset, info):
+        if self.organization is None:
+            return queryset
+        return queryset.filter(organization__id=self.organization)
+
+
 @strawberry_django.order(fakts_models.DeviceGroup)
 class ManagementDeviceGroupOrder:
     name: strawberry.auto

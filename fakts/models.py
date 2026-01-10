@@ -21,18 +21,29 @@ from fakts import base_models, errors
 class Layer(models.Model):
     name = models.CharField(max_length=1000)
     identifier = fields.IdentifierField(unique=True)
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="layers",
+    )
     logo = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
     description = models.TextField(default="No description available", null=True, blank=True)
     dns_probe = models.TextField(default="No probe available", null=True, blank=True)
     get_probe = models.TextField(default="No probe available", null=True, blank=True)
-    kind = TextChoicesField(
-        choices_enum=enums.LayerKindChoices,
-        default=enums.LayerKindChoices.WEB.value,
+    kind = models.CharField(
+        max_length=50,
         help_text="The kind of layer",
     )
 
     def __str__(self):
         return f"{self.identifier}"
+
+
+class IonscaleLayer(Layer):
+    tailnet_name = models.CharField(max_length=1000, unique=True)
+
+    def __str__(self):
+        return f"Ionscale Layer: {self.identifier} ({self.tailnet_name})"
 
 
 class Service(models.Model):

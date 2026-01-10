@@ -35,6 +35,7 @@ class Query:
     scopes: list[types.ManagementScope] = kante.django_field()
     roles: list[types.ManagementRole] = kante.django_field()
     compositions: list[types.ManagementComposition] = kante.django_field()
+    management_layers: list[types.ManagementLayer] = kante.django_field()
 
     @kante.django_field()
     def social_account(self, info: Info, id: strawberry.ID) -> types.ManagementSocialAccount:
@@ -47,6 +48,10 @@ class Query:
     @kante.django_field()
     def role(self, info: Info, id: strawberry.ID) -> types.ManagementRole:
         return karakter_models.Role.objects.get(id=id)
+
+    @kante.django_field()
+    def layer(self, info: Info, id: strawberry.ID) -> types.ManagementLayer:
+        return fakts_models.Layer.objects.get(id=id)
 
     @kante.django_field()
     def membership(self, info: Info, id: strawberry.ID) -> types.ManagementMembership:
@@ -317,6 +322,13 @@ class Mutation:
 
     request_media_upload = strawberry_django.mutation(
         resolver=mutations.request_media_upload,
+    )
+
+    create_ionscale_layer = strawberry_django.mutation(
+        resolver=mutations.create_ionscale_layer,
+    )
+    delete_ionscale_layer = strawberry_django.mutation(
+        resolver=mutations.delete_ionscale_layer,
     )
 
 

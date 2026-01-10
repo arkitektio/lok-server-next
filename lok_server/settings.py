@@ -12,12 +12,16 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 import os
 from pathlib import Path
-
 from omegaconf import OmegaConf
+from lokale.settings_model import Settings
+import yaml
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 conf = OmegaConf.load(os.path.join(BASE_DIR, "config.yaml"))
+
+
+settings = Settings(**yaml.safe_load(open(os.path.join(BASE_DIR, "config.yaml"))))
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
@@ -36,6 +40,9 @@ DEPLOYMENT_NAME = conf.deployment.name
 DEPLOYMENT_DESCRIPTION = conf.deployment.get("description", "A Basic Arkitekt Deployment")
 # Application definition
 
+if conf.get("ionscale", None):
+    IONSCALE_SERVER_URL = conf.ionscale.server_url
+    IONSCALE_ADMIN_KEY = conf.ionscale.admin_key
 
 INSTALLED_APPS = [
     "daphne",

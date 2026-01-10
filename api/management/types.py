@@ -610,23 +610,6 @@ class ManagementServiceInstance:
 
 
 @strawberry_django.type(
-    fakts_models.Layer,
-    description="A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself.",
-    pagination=True,
-    filters=fakts_filters.LayerFilter,
-)
-class ManagementLayer:
-    id: strawberry.ID
-    name: str = strawberry.field(description="The name of the layer")
-    identifier: fakts_scalars.ServiceIdentifier = strawberry.field(description="The identifier of the service. This should be a globally unique string that identifies the service. We encourage you to use the reverse domain name notation. E.g. `com.example.myservice`")
-    logo: ManagementMediaStore | None = strawberry.field(description="The logo of the service. This should be a url to a logo that can be used to represent the service.")
-    description: str | None = strawberry.field(description="The description of the service. This should be a human readable description of the service.")
-    instances: list["ManagementServiceInstance"] = strawberry_django.field(
-        description="The instances of the service. A service instance is a configured instance of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."
-    )
-
-
-@strawberry_django.type(
     fakts_models.Composition,
     description="A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself.",
     pagination=True,
@@ -658,7 +641,8 @@ class ManagementComposition:
 )
 class ManagementInstanceAlias:
     id: strawberry.ID
-    layer: ManagementLayer | None = strawberry.field(description="The layer that this alias belongs to.")
+    organization: "ManagementOrganization" = strawberry.field(description="The organization that owns this alias.")
+    layer: Optional["ManagementLayer"] = strawberry.field(description="The layer that this alias belongs to.")
     instance: ManagementServiceInstance = strawberry.field(description="The instance that this alias belongs to.")
     kind: str = strawberry.field(description="The name of the alias. This is a human readable name of the alias.")
     host: Optional[str] = strawberry.field(description="The host of the alias, if its a ABSOLUTE alias (e.g. 'example.com'). If not set, the alias is relative to the layer's domain.")
@@ -697,6 +681,31 @@ class ManagementApp:
     releases: list["ManagementRelease"] = strawberry.field(description="The releases of the app. A release is a version of the app that can be installed by a user.")
 
     logo: ManagementMediaStore | None = strawberry.field(description="The logo of the app. This should be a url to a logo that can be used to represent the app.")
+
+
+@strawberry_django.type(
+    fakts_models.Layer,
+    description="A Layer is a transport layer that needs to be used to reach an alias. E.g a VPN layer or a Tor layer.",
+    pagination=True,
+    filters=filters.ManagementLayerFilter,
+    order=filters.ManagementLayerOrder,
+)
+class ManagementLayer:
+    id: strawberry.ID
+
+    organization: "ManagementOrganization" = strawberry.field(description="The organization that owns this alias.")
+    kind: enums.LayerKind = strawberry.field(description="The kind of the layer. E.g. `VPN` or `TOR`")
+    name: str = strawberry.field(description="The name of the layer")
+    description: str | None = strawberry.field(description="The description of the layer. This should be a human readable description of the layer.")
+    logo: ManagementMediaStore | None = strawberry.field(description="The logo of the layer. This should be a url to a logo that can be used to represent the layer.")
+    description: str | None = strawberry.field(description="The description of the service. This should be a human readable description of the service.")
+    aliases: list["ManagementInstanceAlias"] = strawberry_django.field(
+        description="The instances of the service. A service instance is a configured instance of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."
+    )
+
+    @classmethod
+    def get_queryset(cls, queryset, info: Info):
+        return queryset.filter(organization__memberships__user=info.context.request.user).distinct()
 
 
 @strawberry_django.type(
