@@ -27,11 +27,13 @@ from django.conf.urls.static import static
 from health_check.views import MainView
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
+from strawberry.django.views import AsyncGraphQLView
+from api.management.schema import schema
 
 
 def fakts_challenge(request):
     """
-    Placeholder view for the .well-known/fakts-challenge endpoint.
+    Placeholdesr view for the .well-known/fakts-challenge endpoint.
     This should be replaced with the actual logic to handle the challenge.
     """
     return HttpResponse("Fakts Challenge Endpoint", status=200)
@@ -46,16 +48,27 @@ def index(request):
     return render(request, "index.html")
 
 
+def management_schema(request):
+    schema_content = schema.as_str().encode("utf-8")
+
+    response = HttpResponse(schema_content, content_type="text/plain")
+    response["Content-Length"] = str(len(schema_content))
+    return response
+
+
 hallo = "hallsssoss"
 
 urlpatterns = [
-    dynamicpath("", index, name="home"),
+    dynamicpath("", index, name="mainhome"),
+    dynamicpath("managementgraphql/", AsyncGraphQLView.as_view(schema=schema)),
+    dynamicpath("managementschema/", csrf_exempt(management_schema), name="management_schema"),
     dynamicpath("admin/", admin.site.urls),
     dynamicpath("f/", include("fakts.urls", namespace="fakts")),
     dynamicpath("o/", include("authapp.urls")),  # /auth/login/, /auth/logout/
     dynamicpath("ht", csrf_exempt(MainView.as_view()), name="health_check"),
     dynamicpath("accounts/", include("allauth.urls")),
     dynamicpath("accounts/", include("karakter.urls")),
+    dynamicpath("_allauth/", include("allauth.headless.urls")),
     dynamicpath(".well-known/fakts-challenge", fakts_challenge, name="fakts-challenge"),
     dynamicpath(".well-known/fakts", WellKnownFakts.as_view()),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

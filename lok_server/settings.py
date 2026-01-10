@@ -12,12 +12,16 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 import os
 from pathlib import Path
-
 from omegaconf import OmegaConf
+from lokale.settings_model import Settings
+import yaml
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 conf = OmegaConf.load(os.path.join(BASE_DIR, "config.yaml"))
+
+
+settings = Settings(**yaml.safe_load(open(os.path.join(BASE_DIR, "config.yaml"))))
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
@@ -36,6 +40,9 @@ DEPLOYMENT_NAME = conf.deployment.name
 DEPLOYMENT_DESCRIPTION = conf.deployment.get("description", "A Basic Arkitekt Deployment")
 # Application definition
 
+if conf.get("ionscale", None):
+    IONSCALE_SERVER_URL = conf.ionscale.server_url
+    IONSCALE_ADMIN_KEY = conf.ionscale.admin_key
 
 INSTALLED_APPS = [
     "daphne",
@@ -63,9 +70,11 @@ INSTALLED_APPS = [
 INSTALLED_APPS += [
     "allauth",
     "allauth.account",
+    "allauth.headless",
     "allauth.socialaccount",
     # "allauth.socialaccount.providers.github",
     "allauth.socialaccount.providers.orcid",
+    "allauth.socialaccount.providers.google",
     # The MFA app:
     "allauth.mfa",
 ]
@@ -74,6 +83,13 @@ FAKTS_LAYERS = conf.get("layers", [])
 
 FAKTS_INSTANCES = conf.get("instances", [])
 
+
+# These are the URLs to be implemented by your single-page application.
+HEADLESS_FRONTEND_URLS = {
+    "account_confirm_email": "https://jhnnsrs-lab.hyena-sole.ts.net/account/verify-email/{key}",
+    "account_reset_password_from_key": "https://jhnnsrs-lab.hyena-sole.ts.net/account/password/reset/key/{key}",
+    "account_signup": "https://jhnnsrs-lab.hyena-sole.ts.net/account/signup",
+}
 
 ACCOUNT_EMAIL_VERIFICATION = "none"  # we don't have an smpt server by default
 
@@ -97,6 +113,8 @@ SUPERUSERS = [
     }
 ]
 
+USE_X_FORWARDED_HOST = conf.django.get("use_x_forwarded_host", True)
+
 SECURE_PROXY_SSL_HEADER = (
     "HTTP_X_FORWARDED_PROTO",
     "https",
@@ -115,6 +133,9 @@ MIDDLEWARE = [
     "allauth.account.middleware.AccountMiddleware",
 ]
 
+
+ACCOUNT_LOGIN_BY_CODE_ENABLED = True  # Enable login by code
+MFA_TRUST_ENABLED = True  # Allow trusted devices
 
 # S3_PUBLIC_DOMAIN = f"{conf.s3.public.host}:{conf.s3.public.port}"  # TODO: FIx
 AWS_ACCESS_KEY_ID = conf.s3.access_key
@@ -321,7 +342,7 @@ USE_TZ = True
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-CSRF_TRUSTED_ORIGINS = conf.get("csrf_trusted_origins", ["http://localhost", "https://localhost"])
+CSRF_TRUSTED_ORIGINS = conf.get("csrf_trusted_origins", ["http://localhost", "https://localhost", "http://localhost:300"])
 MY_SCRIPT_NAME = conf.get("force_script_name", "lok")
 STATIC_URL = MY_SCRIPT_NAME.lstrip("/") + "/" + "static/"
 
@@ -393,33 +414,7 @@ SYSTEM_MESSAGES = conf.get(
 
 STATIC_ROOT = os.path.join(BASE_DIR, "static")
 
-SOCIALACCOUNT_PROVIDERS = {
-    "github": {
-        # For each provider, you can choose whether or not the
-        # email address(es) retrieved from the provider are to be
-        # interpreted as verified.
-        "VERIFIED_EMAIL": True
-    },
-    "orcid": {
-        # For each OAuth based provider, either add a ``SocialApp``
-        # (``socialaccount`` app) containing the required client
-        # credentials, or list them here:
-        "APPS": [
-            {
-                "client_id": "APP-AGTOUJHZGVNFR157",
-                "secret": "e135b12b-fe4f-4c7a-a9ee-1c283ad41013",
-            },
-        ],
-        # These are provider-specific settings that can only be
-        # listed here:
-        "SCOPE": [
-            "openid",
-        ],
-        "AUTH_PARAMS": {
-            "access_type": "online",
-        },
-    },
-}
+SOCIALACCOUNT_PROVIDERS = conf.get("socialaccount_providers", {})
 
 
 MY_SCRIPT_NAME = conf.get("force_script_name", "lok")

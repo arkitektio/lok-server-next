@@ -25,9 +25,7 @@ from typing import Any, Optional
 
 # Load RSA private key (used for signing). The settings.PRIVATE_KEY must
 # contain the PEM-encoded private key string.
-private_key = serialization.load_pem_private_key(
-    settings.PRIVATE_KEY.encode("utf-8"), password=None, backend=default_backend()
-)
+private_key = serialization.load_pem_private_key(settings.PRIVATE_KEY.encode("utf-8"), password=None, backend=default_backend())
 
 # Generate a JWK representation from the private key. We expose the
 # public part (is_private=False) as the published JWK set.
@@ -86,6 +84,11 @@ class MyJWTBearerTokenGenerator(JWTBearerTokenGenerator):
         if not membership:
             raise ValueError("User is not a member of the organization (anymore)")
 
+        if client.client:
+            fakts_client = client.client
+        else:
+            fakts_client = None
+
         # TODO: Implement correct scoping rules; for now expose roles and
         # some basic user identifiers used by resource servers.
         return {
@@ -94,6 +97,9 @@ class MyJWTBearerTokenGenerator(JWTBearerTokenGenerator):
             "sub": user.id,
             "scope": scope,
             "active_org": client.organization.slug,
+            "client_app": fakts_client.release.app.identifier if fakts_client and fakts_client.release and fakts_client.release.app else None,
+            "client_release": fakts_client.release.version if fakts_client and fakts_client.release else None,
+            "client_device": fakts_client.node.node_id if fakts_client and fakts_client.node else None,
         }
 
     def get_audiences(self, client: Any, user: Any, scope: Optional[str]) -> str | list[str]:

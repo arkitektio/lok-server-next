@@ -34,6 +34,7 @@ class ServiceInstanceModel(BaseModel):
     service: str
     identifier: str
     aliases: List[AliasModel]
+    
 
 
 class YamlConfigModel(BaseModel):

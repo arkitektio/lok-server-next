@@ -9,6 +9,24 @@ from karakter import enums, filters, models, scalars
 from strawberry import LazyType
 from allauth.socialaccount import models as smodels
 import kante
+from .type_gen import create_stats_type
+
+
+def build_prescoped_queryset(info, queryset, field="organization"):
+    print(info)
+    if info.variable_values.get("filters", {}).get("scope") is None:
+        queryset = queryset.filter(**{field: info.context.request.organization})
+        return queryset
+
+    else:
+        raise Exception("Custom scopes not implemented yet")
+
+
+def build_prescoper(field="organization"):
+    def prescoper(queryset, info):
+        return build_prescoped_queryset(info, queryset, field=field)
+
+    return prescoper
 
 
 @strawberry_django.type(
@@ -72,6 +90,21 @@ class User:
     managed_clients: strawberry.auto
     com_channels: list["ComChannel"] = strawberry_django.field(description="The communication channels that the user has")
 
+    @classmethod
+    def get_queryset(cls, queryset, info: Info):
+        return build_prescoped_queryset(info, queryset, field="memberships__organization")
+
+
+UserStats, UserStatsResolver = create_stats_type(
+    model=models.User,
+    filters=filters.UserFilter,
+    allowed_fields={
+        "created_at": "created_at",
+    },
+    allowed_datetime_fields={"created_at": "created_at"},
+    prescope=build_prescoper(field="memberships__organization"),
+)
+
 
 @strawberry_django.type(
     models.Profile,
@@ -83,6 +116,22 @@ A Profile of a User. A Profile can be used to display personalied information ab
 """,
 )
 class Profile:
+    id: strawberry.ID
+    bio: str | None = strawberry.field(description="A short bio of the user")
+    name: str | None = strawberry.field(description="The name of the user")
+    avatar: MediaStore | None = strawberry.field(description="The avatar of the user")
+
+
+@strawberry_django.type(
+    models.OrganizationProfile,
+    filters=filters.OrganizationFilter,
+    pagination=True,
+    description="""
+A Profile of a User. A Profile can be used to display personalied information about a user.
+
+""",
+)
+class OrganizationProfile:
     id: strawberry.ID
     bio: str | None = strawberry.field(description="A short bio of the user")
     name: str | None = strawberry.field(description="The name of the user")
@@ -264,6 +313,10 @@ class Role:
     def description(self, info: Info) -> "str":
         return self.description or self.identifier
 
+    @classmethod
+    def get_queryset(cls, queryset, info: Info):
+        return build_prescoped_queryset(info, queryset, field="organization")
+
 
 @strawberry_django.type(
     models.Membership,
@@ -283,16 +336,22 @@ class Membership:
     def groups(self) -> List[Group]:
         return [role.group for role in self.roles]
 
+    @classmethod
+    def get_queryset(cls, queryset, info: Info):
+        return build_prescoped_queryset(info, queryset, field="organization")
+
 
 @strawberry_django.type(models.Organization, filters=filters.OrganizationFilter, pagination=True, description="""An Organization is a group of users that can work together on a project.""")
 class Organization:
     id: strawberry.ID
-
     slug: str
     description: str | None = strawberry.field(description="A short description of the organization")
-    logo: MediaStore | None = strawberry.field(description="The logo of the organization")
+    avatar: MediaStore | None = strawberry.field(description="The logo of the organization")
     users: List[User] = strawberry.field(description="The users that are part of the organization")
     active_users: List[User] = strawberry.field(description="The users that are currently active in the organization")
+    profile: "OrganizationProfile"
+    memberships: List["Membership"] = strawberry_django.field(description="the memberships of people")
+    invites: List["Invite"] = strawberry_django.field(description="the invites for this organization")
 
     @strawberry_django.field(description="The roles that are available in the organization")
     def roles(self) -> List["Role"]:
@@ -302,11 +361,46 @@ class Organization:
     def name(self) -> str:
         return self.name or self.slug
 
+    @classmethod
+    def get_queryset(cls, queryset, info: Info):
+        return queryset.filter(memberships__organization=info.context.request.organization).distinct()
+
 
 @strawberry_django.type(models.ComChannel, filters=filters.OrganizationFilter, pagination=True, description="""An Organization is a group of users that can work together on a project.""")
 class ComChannel:
     id: strawberry.ID
     user: User
+
+
+@strawberry_django.type(models.Invite, filters=filters.OrganizationFilter, pagination=True, description="""A single-use magic invite link that allows one person to join an organization.""")
+class Invite:
+    id: strawberry.ID
+    token: str
+    email: str | None
+    created_by: User
+    created_for: Organization
+    created_at: datetime.datetime
+    expires_at: datetime.datetime | None
+    status: str
+    accepted_by: User | None
+    declined_by: User | None
+    responded_at: datetime.datetime | None
+    roles: list["Role"]
+    created_membershipts: list["Membership"]
+
+    @strawberry_django.field(description="Check if the invite is still valid and pending")
+    def valid(self) -> bool:
+        """Check if the invite is still valid"""
+        return self.is_valid()
+
+    @strawberry_django.field(description="Get the full URL for accepting this invite")
+    def invite_url(self, info: Info) -> str:
+        """Generate the full URL for accepting this invite"""
+        from django.urls import reverse
+
+        request = info.context.request
+        path = reverse("accept_invite", kwargs={"token": str(self.token)})
+        return path
 
 
 @strawberry.type

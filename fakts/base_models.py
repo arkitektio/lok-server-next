@@ -19,6 +19,7 @@ class WellKnownFakts(BaseModel):
     description: str | None = None
     claim: str
     base_url: str
+    frontend_url: str
     ca_crt: str | None = None
 
 
@@ -33,6 +34,11 @@ class Requirement(BaseModel):
     """ The description is a human readable description of the requirement. Will be show to the user when asking for the requirement."""
 
 
+class PublicSource(BaseModel):
+    kind: Literal["github", "website"]
+    url: str
+
+
 class Manifest(BaseModel):
     """A Manifest is a description of a client. It contains all the information
     necessary to create a set of client, release and app objects in the database.
@@ -44,10 +50,53 @@ class Manifest(BaseModel):
     """ The version is a string that identifies the version of the client. """
     logo: Optional[str] = None
     """ The logo is a url to a logo that should be used for the client. """
-    scopes: Optional[list[str]] = Field(default_factory=list)
+    scopes: list[str] = Field(default_factory=list)
     """ The scopes are a list of scopes that the client can request. """
-    requirements: Optional[List[Requirement]] = Field(default_factory=list)
+    requirements: list[Requirement] = Field(default_factory=list)
     """ The requirements are a list of requirements that the client needs to run on (e.g. needs GPU)"""
+    node_id: Optional[str] = None
+    """ The node_id is the id of the node that the runs on """
+    repo_url: Optional[str] = None
+    """ The repo_url is the url to track issues and get more information about the client. """
+    public_sources: Optional[List[PublicSource]] = None
+    """ The public_sources are a list of public sources where the client can be found. """
+
+
+class Role(BaseModel):
+    key: str
+    description: Optional[str] = None
+    """ The description is a human readable description of the role. Will be show to the user when asking for the requirement."""
+
+
+class Scope(BaseModel):
+    key: str
+    description: Optional[str] = None
+    """ The description is a human readable description of the scope. Will be show to the user when asking for the requirement."""
+
+
+class ServiceManifest(BaseModel):
+    """A Manifest is a description of a client. It contains all the information
+    necessary to create a set of client, release and app objects in the database.
+    """
+
+    identifier: str
+    """ The identifier is a unique string that identifies the client. """
+    version: str
+    """ The version is a string that identifies the version of the client. """
+    description: Optional[str] = None
+    """ The description is a human readable description of the client. """
+    logo: Optional[str] = None
+    """ The logo is a url to a logo that should be used for the client. """
+    roles: Optional[List[Role]] = Field(default_factory=list)
+    """ The requirements are a list of requirements that the client needs to run on (e.g. needs GPU)"""
+    scopes: Optional[List[Scope]] = Field(default_factory=list)
+    """ The scopes are a list of scopes that the client can request. """
+    node_id: Optional[str] = None
+    """ The node_id is the id of the node that the runs on """
+    instance_id: Optional[str] = "default"
+    """ The instance_id is the id of the instance that the runs on """
+    public_sources: Optional[List[PublicSource]] = None
+    """ The public_sources are a list of public sources where the client can be found. """
 
 
 class CompositionInputModel(BaseModel):
@@ -70,6 +119,68 @@ class DeviceCodeStartRequest(BaseModel):
     requested_client_kind: enums.ClientKindVanilla = enums.ClientKindVanilla.DEVELOPMENT
     request_public: bool = False
     supported_layers: List[str] = Field(default_factory=lambda: ["web"])
+
+
+class StagingAlias(BaseModel):
+    id: str
+    name: Optional[str] = None
+    ssl: bool = True
+    host: str
+    port: Optional[int] = None
+    path: Optional[str] = None
+    challenge: Optional[str] = None
+    kind: str = "absolute"
+
+
+class ServiceDeviceCodeStartRequest(BaseModel):
+    """A DeviceCodeStartRequest is used to start the device code flow. It contains
+    the manifest of the client that wants to start the flow and the redirect uris
+    as well as the requested client kind."""
+
+    manifest: ServiceManifest
+    staging_aliases: List[StagingAlias] = Field(default_factory=list)
+    expiration_time_seconds: int = 300
+
+
+class InstanceRequest(BaseModel):
+    """A ServiceRequest is used to request a service instance from the server.
+    It contains the manifest of the service that is being requested.
+    """
+
+    identifier: str
+    description: Optional[str] = None
+    """A human readable description of the request."""
+    manifest: ServiceManifest
+    aliases: List[StagingAlias] = Field(default_factory=list)
+
+
+class ClientRequest(BaseModel):
+    """A ClientRequest is used to request a client from the server.
+    It contains the manifest of the client that is being requested.
+    """
+
+    identifier: str
+    description: Optional[str] = None
+    """A human readable description of the request."""
+    manifest: Manifest
+
+
+class CompositionManifest(BaseModel):
+    """A Composition Request allows to request seting up a composition of clients and services."""
+
+    identifier: str
+    description: Optional[str] = None
+    """A human readable description of the composition."""
+    logo: Optional[str] = None
+    instances: List[InstanceRequest] = Field(default_factory=list)
+    clients: List[ClientRequest] = Field(default_factory=list)
+
+
+class CompositionStartRequest(BaseModel):
+    """A Composition Start Request allows to start the setup of a composition."""
+
+    composition: CompositionManifest
+    expiration_time_seconds: int = 600
 
 
 class ReedeemTokenRequest(BaseModel):
@@ -97,6 +208,18 @@ class ClaimRequest(BaseModel):
     composition: Optional[str] = None
     requirements: Optional[list[Requirement]] = Field(default_factory=list)
     secure: bool = False
+
+
+class AliasReport(BaseModel):
+    alias_id: str | None = None
+    valid: bool
+    reason: Optional[str] = None
+
+
+class ReportRequest(BaseModel):
+    token: str
+    alias_reports: Dict[str, AliasReport] = Field(default_factory=dict)
+    functional: bool = True
 
 
 class RetrieveRequest(BaseModel):
@@ -189,13 +312,17 @@ class SelfClaim(BaseModel):
 
 
 class AuthClaim(BaseModel):
+    client_token: str
     client_id: str
     client_secret: str
     scopes: List[str] = Field(default_factory=list)
     token_url: str
+    report_url: str
 
 
 class Alias(BaseModel):
+    id: str
+    """The id is a unique string that identifies the alias."""
     ssl: bool = True
     """The ssl flag indicates if the alias is available over SSL or not."""
     host: str

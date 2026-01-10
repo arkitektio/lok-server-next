@@ -1,10 +1,11 @@
 import strawberry
 from strawberry.experimental import pydantic
-from fakts.base_models import Manifest, LinkingContext, LinkingRequest
+from fakts.base_models import Manifest, LinkingContext, LinkingRequest, PublicSource
 from typing import Optional
 from pydantic import BaseModel, Field
 import uuid
 from fakts import enums
+import enum
 
 
 class RequirementModel(BaseModel):
@@ -22,12 +23,27 @@ class Requirement:
     key: str
 
 
+@strawberry.enum
+class PublicSourceKind(str, enum.Enum):
+    GITHUB = "github"
+    WEBSITE = "website"
+
+
+@pydantic.input(PublicSource)
+class PublicSourceInput:
+    kind: PublicSourceKind
+    url: str
+
+
 @pydantic.input(Manifest)
 class ManifestInput:
     identifier: str
     version: str
     logo: Optional[str] = None
     scopes: list[str]
+    node_id: Optional[str] = None
+    requirements: list[Requirement] = Field(default_factory=list)
+    public_sources: list[PublicSourceInput] | None = None
 
 
 class DevelopmentClientInputModel(BaseModel):
@@ -41,7 +57,6 @@ class DevelopmentClientInputModel(BaseModel):
 class DevelopmentClientInput:
     manifest: ManifestInput
     composition: strawberry.ID | None = None
-    requirements: list[Requirement]
     layers: list[str] | None = None
 
 
@@ -117,6 +132,17 @@ class UpdateServiceInstanceInput:
     allowed_groups: list[strawberry.ID] | None = None
     denied_groups: list[strawberry.ID] | None = None
     denied_users: list[strawberry.ID] | None = None
+
+
+class UpdateComputeNodeInputModel(BaseModel):
+    id: str
+    name: str | None
+
+
+@pydantic.input(UpdateComputeNodeInputModel)
+class UpdateComputeNodeInput:
+    id: strawberry.ID
+    name: str | None
 
 
 class CreateServiceInstanceInputModel(BaseModel):

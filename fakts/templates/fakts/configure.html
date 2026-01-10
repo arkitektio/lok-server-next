@@ -5,13 +5,23 @@
 {% block content %}
 
 <div class="flex dark:text-white text-slate-900 h-full w-full justify-center align-center flex-col">
-    {% if success %}
-        <div class="flex flex-col">
-            <span class="text-3xl"> Successfully {% if authorized %}authorized!{% else %} denied! {%endif %}</span> <p
-                class="text-xl font-light"> You can close this
-                page now</p>
+    {% if not request.user.active_organization %}
+        <div class="flex flex-col items-center justify-center h-full p-8">
+            <h1 class="text-3xl font-bold text-red-500">No Active Organization</h1>
+            <p class="text-xl mt-4 text-center">You need to be part of an organization to configure apps.</p>
+            <p class="mt-2 text-center">Please go to your profile and join an organization or ask an admin to invite you.</p>
+            <a href="{% url 'profile' %}" class="mt-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                Go to Profile
+            </a>
         </div>
     {% else %}
+        {% if success %}
+            <div class="flex flex-col">
+                <span class="text-3xl"> Successfully {% if authorized %}authorized!{% else %} denied! {%endif %}</span> <p
+                    class="text-xl font-light"> You can close this
+                    page now</p>
+            </div>
+        {% else %}
 
         
         {% if staging_kind == "development" %}
@@ -273,8 +283,31 @@
         </div>
 
 
+           
+
+
+
     
         {% endif %}
+         {% if staging_node %}
+                <div class="my-auto flex border-1 border-gray-700 dark:border-gray-700 rounded-lg flex-row h-10" >
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/3/3b/Eo_circle_green_checkmark.svg"  class="h-6 w-6 my-auto"/><div class="ml-2 my-auto font-light text-muted text-green-500">New Node </div>
+                </div>
+                
+
+                <h1 class="text-xs font-light">This app apears to be installed on a new compute resource (Laptop, Robot etc). We will create one for your Organization</h1>
+
+            {% endif %}
+
+            {% if on_node %}
+                <div class="my-auto flex border-1 border-gray-700 dark:border-gray-700 rounded-lg flex-row h-10" >
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/3/3b/Eo_circle_green_checkmark.svg"  class="h-6 w-6 my-auto"/><div class="ml-2 my-auto font-light text-muted text-green-500">Existing Node </div>
+                </div>
+                
+
+                <h1 class="text-xs font-light">This app apears to be installed on {{on_node}}</h1>
+
+            {% endif %}
         {% if composition_valid %}
         <div class="mt-2 mb-2 text-sm font-light">
             <span> Please check if all of the claims are correct. Only allow them if you understand
@@ -304,6 +337,7 @@
         </div>
 
 
+        {% endif %}
     {% endif %}
 </div>
 

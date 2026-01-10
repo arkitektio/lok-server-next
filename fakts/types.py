@@ -15,6 +15,16 @@ from karakter.datalayer import get_current_datalayer
 from authapp import types as atypes
 
 
+def build_prescoped_queryset(info, queryset, field="organization"):
+    print(info)
+    if info.variable_values.get("filters", {}).get("scope") is None:
+        queryset = queryset.filter(**{field: info.context.request.organization})
+        return queryset
+
+    else:
+        raise Exception("Custom scopes not implemented yet")
+
+
 @strawberry.type(description="Temporary Credentials for a file upload that can be used by a Client (e.g. in a python datalayer)")
 class PresignedPostCredentials:
     """Temporary Credentials for a a file upload."""
@@ -81,7 +91,6 @@ class ServiceInstance:
     id: strawberry.ID
     service: Service = strawberry.field(description="The service that this instance belongs to.")
     name: str = strawberry.field(description="The name of the instance. This is a human readable name of the instance.")
-    identifier: str = strawberry.field(description="The identifier of the instance. This is a unique string that identifies the instance. It is used to identify the instance in the code and in the database.")
     allowed_users: list[types.User] = strawberry_django.field(description="The users that are allowed to use this instance.")
     denied_users: list[types.User] = strawberry_django.field(description="The users that are denied to use this instance.")
     allowed_groups: list[types.Group] = strawberry_django.field(description="The groups that are allowed to use this instance.")
@@ -91,6 +100,7 @@ class ServiceInstance:
     aliases: list["InstanceAlias"] = strawberry_django.field(
         description="The aliases of the instance. An alias is a way to reach the instance. Clients can use these aliases to check if they can reach the instance. An alias can be an absolute alias (e.g. 'example.com') or a relative alias (e.g. 'example.com/path'). If the alias is relative, it will be relative to the layer's domain, port and path."
     )
+
 
 @strawberry_django.type(
     models.InstanceAlias,
@@ -106,6 +116,7 @@ class InstanceAlias:
     path: Optional[str] = strawberry.field(description="The path of the alias, if its a ABSOLUTE alias (e.g. 'example.com/path'). If not set, the alias is relative to the layer's path.")
     ssl: bool = strawberry.field(description="Is this alias using SSL? If true, the alias will be accessed via https:// instead of http://. This is used to indicate that the alias is secure and should be accessed via SSL")
     challenge: str = strawberry.field(description="The challenge of the alias. This is used to verify that the alias is reachable. If set, the alias will be accessed via the challenge URL (e.g. 'example.com/.well-known/challenge'). If not set, the alias will be accessed via the instance's URL.")
+
 
 @strawberry_django.type(
     models.ServiceInstanceMapping,
@@ -157,6 +168,12 @@ class Release:
     clients: list["Client"] = strawberry.field(description="The clients of the release")
 
 
+@strawberry.type
+class PublicSource:
+    kind: str = strawberry.field(description="The kind of the public source. E.g. 'github'")
+    url: str = strawberry.field(description="The url of the public source")
+
+
 @strawberry_django.type(
     models.Client,
     description="""A client is a way of authenticating users with a release.
@@ -168,6 +185,7 @@ class Release:
 )
 class Client:
     id: strawberry.ID
+    functional: bool = strawberry_django.field(description="Is this client functional? A functional client is a client that is able to authenticate users. If a client is not functional, it will not be able to authenticate users.")
     release: Release = strawberry_django.field(description="The release that this client belongs to.")
     tenant: types.User = strawberry_django.field(description="The user that manages this release.")
     kind: enums.ClientKind = strawberry_django.field(description="The kind of the client. The kind defines the authentication flow that is used to authenticate users with this client.")
@@ -176,6 +194,8 @@ class Client:
     user: types.User | None = strawberry_django.field(description="If the client is a DEVELOPMENT client, which requires no further authentication, this is the user that is authenticated with the client.")
     logo: types.MediaStore | None = strawberry_django.field(description="The logo of the release. This should be a url to a logo that can be used to represent the release.")
     name: str = strawberry_django.field(description="The name of the client. This is a human readable name of the client.")
+    node: Optional["ComputeNode"] = strawberry_django.field(description="The node this runs on")
+    mappings: list["ServiceInstanceMapping"] = strawberry_django.field(description="The mappings of the client. A mapping is a mapping of a service to a service instance. This is used to configure the composition.")
 
     @strawberry_django.field(description="The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information.")
     def kind(self, info) -> enums.ClientKind:
@@ -191,7 +211,54 @@ class Client:
         # TODO: Implement only tenant should be able to see the token
         return self.token
 
-    mappings: list["ServiceInstanceMapping"] = strawberry_django.field(description="The mappings of the client. A mapping is a mapping of a service to a service instance. This is used to configure the composition.")
+    @strawberry_django.field(description="The issue url of the client. This is the url where users can report issues and get more information about the client.")
+    def issue_url(self, info) -> str | None:
+        for source in self.public_sources:
+            print(source)
+            if source.get("kind").lower() == "github":
+                return source.get("url") + "/issues/new"
+
+        return None
+
+    @strawberry_django.field(description="The public sources of the client. These are the public sources where users can find more information about the client.")
+    def public_sources(self, info) -> list[PublicSource]:
+        sources = []
+        for source in self.public_sources:
+            sources.append(
+                PublicSource(
+                    kind=source.get("kind"),
+                    url=source.get("url"),
+                )
+            )
+        return sources
+
+
+@strawberry_django.type(
+    models.DeviceGroup,
+    description="A DeviceGroup is a group of compute nodes that can be used to run clients. DeviceGroups can be used to group compute nodes by location, hardware type, or any other criteria.",
+    pagination=True,
+    filters=filters.DeviceGroupFilter,
+)
+class DeviceGroup:
+    id: strawberry.ID
+    name: str = strawberry.field(description="The name of the device group.")
+    description: str | None = strawberry.field(description="The description of the device group.")
+    compute_nodes: list["ComputeNode"] = strawberry_django.field(description="The compute nodes that belong to this device group.")
+
+    def get_queryset(cls, info) -> models.DeviceGroup:
+        return models.DeviceGroup.objects.filter(organization=info.context.request.organization)
+
+
+@strawberry_django.type(models.ComputeNode, filters=filters.ComputeNodeFilter, pagination=True)
+class ComputeNode:
+    id: strawberry.ID
+    name: str | None
+    node_id: strawberry.ID
+    clients: list[Client]
+    device_groups: list[DeviceGroup] = strawberry_django.field(description="The device groups that belong to this compute node.")
+
+    def get_queryset(cls, info) -> models.ComputeNode:
+        return models.ComputeNode.objects.filter(organization=info.context.request.organization)
 
 
 @strawberry_django.type(models.RedeemToken, filters=filters.RedeemTokenFilter, pagination=True)
@@ -200,3 +267,6 @@ class RedeemToken:
     token: str = strawberry.field(description="The token of the redeem token")
     client: Client | None = strawberry.field(description="The client that this redeem token belongs to.")
     user: types.User = strawberry.field(description="The user that this redeem token belongs to.")
+
+    def get_queryset(cls, info) -> models.RedeemToken:
+        return models.RedeemToken.objects.filter(user=info.context.request.user, organization=info.context.request.organization)

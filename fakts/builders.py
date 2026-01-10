@@ -1,21 +1,23 @@
 from fakts import base_models, models, enums
+from karakter import models as karakter_models
 from fakts import logic
 from authapp.models import generate_client_id, generate_client_secret
 
 
-def create_development_client(
-    release: models.Release,
-    config: base_models.DevelopmentClientConfig,
-):
+def create_development_client(release: models.Release, config: base_models.DevelopmentClientConfig, manifest: base_models.Manifest, node: models.ComputeNode | None = None, composition: models.Composition | None = None):
     tenant = config.get_tenant()
     user = config.get_user()
     organization = config.get_organization()
 
     try:
-        client = models.Client.objects.get(user=user, release=release, organization=organization, kind=enums.ClientKindVanilla.DEVELOPMENT.value)
+        client = models.Client.objects.get(user=user, release=release, organization=organization, node=node, kind=enums.ClientKindVanilla.DEVELOPMENT.value)
         if client.token != config.token:
             client.token = config.token
         client.tenant = tenant
+        client.node = node
+        client.manifest = manifest.model_dump()
+        client.composition = composition
+        client.public_sources = [t.dict() for t in manifest.public_sources] if manifest.public_sources else []
         client.save()
 
         return client
@@ -36,17 +38,21 @@ def create_development_client(
             release=release,
             user=user,
             tenant=user,
+            node=node,
             token=config.token,
             kind=enums.ClientKindVanilla.DEVELOPMENT.value,
             oauth2_client=oauth2_client,
             redirect_uris="",
             public=False,
+            composition=composition,
+            manifest=manifest.model_dump(),
             logo=release.logo,
             organization=organization,
+            public_sources=[t.dict() for t in manifest.public_sources] if manifest.public_sources else [],
         )
 
 
-def create_client(manifest: base_models.Manifest, config: base_models.ClientConfig, user):
+def create_client(manifest: base_models.Manifest, config: base_models.ClientConfig, user: models.AbstractUser, organization: models.Organization, composition: models.Composition | None = None) -> models.Client:
     from .utils import download_logo
 
     try:
@@ -69,16 +75,21 @@ def create_client(manifest: base_models.Manifest, config: base_models.ClientConf
         },
     )
 
+    if manifest.node_id:
+        node = models.ComputeNode.objects.get_or_create(organization=organization, node_id=manifest.node_id)[0]
+    else:
+        node = None
+
     print(config)
 
-    if config.kind == enums.ClientKindVanilla.WEBSITE.value:
-        raise Exception("Not supported anymore")
-
     if config.kind == enums.ClientKindVanilla.DEVELOPMENT.value:
-        client = create_development_client(release, config)
+        client = create_development_client(release, config, manifest, node=node, composition=composition)
+    else:
+        raise ValueError(f"Client kind {config.kind} not supported yet")
 
-    if config.kind == enums.ClientKindVanilla.DESKTOP.value:
-        raise Exception("Not supported anymore")
+    client = logic.auto_compose(client, manifest, user, organization, device=node)
 
-    client = logic.auto_compose(client, manifest, user)
+    for scope in manifest.scopes or []:
+        client.scopes.add(karakter_models.Scope.objects.get(identifier=scope, organization=organization))
+
     return client

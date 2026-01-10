@@ -37,6 +37,7 @@ class Query:
 
     mycontext = strawberry_django.field(resolver=karakter_queries.mycontext)
 
+    compute_nodes: list[fakts_types.ComputeNode] = strawberry_django.field()
     apps: list[fakts_types.App] = strawberry_django.field()
     releases: list[fakts_types.Release] = strawberry_django.field()
     clients: list[fakts_types.Client] = strawberry_django.field()
@@ -45,7 +46,9 @@ class Query:
     groups: list[karakter_types.Group] = strawberry_django.field()
     comments: list[komment_types.Comment] = strawberry_django.field()
     services: list[fakts_types.Service] = strawberry_django.field()
+    device_groups: list[fakts_types.DeviceGroup] = strawberry_django.field()
     service_instances: list[fakts_types.ServiceInstance] = strawberry_django.field()
+    invites: list[karakter_types.Invite] = strawberry_django.field()
 
     user = strawberry_django.field(resolver=karakter_queries.user)
     me = strawberry_django.field(resolver=karakter_queries.me)
@@ -70,6 +73,9 @@ class Query:
     my_active_messages = strawberry_django.field(resolver=karakter_queries.my_active_messages)
     message = strawberry_django.field(resolver=karakter_queries.message)
 
+    # Stats
+    user_stats: karakter_types.UserStats = strawberry_django.field(resolver=karakter_types.UserStatsResolver)
+
     @kante.django_field()
     def hallo(self, info: Info) -> str:
         print("hallosss")
@@ -80,12 +86,28 @@ class Query:
         return fakts_models.Service.objects.get(id=id)
 
     @kante.django_field()
+    def compute_node(self, info: Info, id: strawberry.ID) -> fakts_types.ComputeNode:
+        return fakts_models.ComputeNode.objects.get(id=id)
+
+    @kante.django_field()
+    def device_group(self, info: Info, id: strawberry.ID) -> fakts_types.DeviceGroup:
+        return fakts_models.DeviceGroup.objects.get(id=id)
+
+    @kante.django_field()
     def role(self, info: Info, id: strawberry.ID) -> karakter_types.Role:
         return karakter_models.Role.objects.get(id=id)
 
     @kante.django_field()
     def organization(self, info: Info, id: strawberry.ID) -> karakter_types.Organization:
         return karakter_models.Organization.objects.get(id=id)
+
+    @kante.django_field()
+    def redeem_token(self, info: Info, id: strawberry.ID) -> fakts_types.RedeemToken:
+        return fakts_models.RedeemToken.objects.get(id=id)
+
+    @kante.django_field()
+    def my_redeem_tokens(self, info: Info) -> list[fakts_types.RedeemToken]:
+        return fakts_models.RedeemToken.objects.filter(user=info.context.request.user, organization=info.context.request.organization)
 
     @kante.django_field()
     def layer(self, info: Info, id: strawberry.ID) -> fakts_types.Layer:
@@ -105,6 +127,9 @@ class Mutation:
     add_user_to_organization = strawberry_django.mutation(
         resolver=karakter_mutations.add_user_to_organization,
     )
+    create_organization = strawberry_django.mutation(
+        resolver=karakter_mutations.create_organization,
+    )
 
     create_comment = strawberry_django.mutation(
         resolver=komment_mutations.create_comment,
@@ -114,6 +139,10 @@ class Mutation:
     )
     notify_user = strawberry_django.mutation(
         resolver=karakter_mutations.notify_user,
+    )
+
+    create_redeem_token = strawberry_django.mutation(
+        resolver=fakts_mutations.create_redeem_token,
     )
 
     reply_to = strawberry_django.mutation(
@@ -175,6 +204,28 @@ class Mutation:
     create_group_profile = strawberry_django.mutation(
         resolver=karakter_mutations.create_group_profile,
     )
+
+    create_invite = strawberry_django.mutation(
+        resolver=karakter_mutations.create_invite,
+    )
+
+    accept_invite = strawberry_django.mutation(
+        resolver=karakter_mutations.accept_invite,
+    )
+
+    decline_invite = strawberry_django.mutation(
+        resolver=karakter_mutations.decline_invite,
+    )
+
+    cancel_invite = strawberry_django.mutation(
+        resolver=karakter_mutations.cancel_invite,
+    )
+
+    update_organization = strawberry_django.mutation(
+        resolver=karakter_mutations.update_organization,
+    )
+
+    update_compute_node = strawberry_django.mutation(resolver=fakts_mutations.update_compute_node)
 
 
 @strawberry.type

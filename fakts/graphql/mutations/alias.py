@@ -10,8 +10,6 @@ from kante.types import Info
 from django.contrib.auth import get_user_model
 
 from fakts import enums, inputs, models, scalars, types
-from fakts.base_models import DevelopmentClientConfig, Manifest, Requirement
-from fakts.builders import create_client
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
