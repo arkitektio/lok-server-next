@@ -401,6 +401,12 @@ class Client(models.Model):
         on_delete=models.CASCADE,
         related_name="clients",
     )
+    membership = models.ForeignKey(
+        "karakter.Membership",
+        on_delete=models.CASCADE,
+        related_name="clients",
+        null=True,
+    )
     redirect_uris = models.CharField(max_length=1000, default=" ")
     public = models.BooleanField(default=False)
     token = models.CharField(default=uuid.uuid4, unique=True, max_length=10000)

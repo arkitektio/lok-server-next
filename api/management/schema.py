@@ -11,6 +11,7 @@ from karakter import models as karakter_models
 from fakts import models as fakts_models
 from .datalayer import DatalayerExtension
 from allauth.socialaccount import models as smodels
+from authapp.models import OAuth2Client
 
 
 @strawberry.type
@@ -88,6 +89,10 @@ class Query:
     @kante.django_field()
     def composition(self, info: Info, id: strawberry.ID) -> types.ManagementComposition:
         return fakts_models.Composition.objects.get(id=id)
+
+    @kante.django_field()
+    def oauth2_client_by_client_id(self, info: Info, client_id: str) -> types.ManagementOAuth2Client:
+        return OAuth2Client.objects.get(client_id=client_id)
 
     @kante.django_field()
     def validate_device_code(self, info: Info, device_code: strawberry.ID, organization: strawberry.ID) -> types.ValidationResult:
@@ -267,6 +272,13 @@ class Mutation:
     )
     decline_device_code = strawberry_django.mutation(
         resolver=mutations.decline_device_code,
+    )
+    # Authorize Connect Mutations
+    accept_authorize_code = strawberry_django.mutation(
+        resolver=mutations.accept_authorize_code,
+    )
+    decline_authorize_code = strawberry_django.mutation(
+        resolver=mutations.decline_authorize_code,
     )
     # Service Device Code Mutations
     accept_service_device_code = strawberry_django.mutation(

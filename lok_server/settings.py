@@ -40,6 +40,17 @@ DEPLOYMENT_NAME = conf.deployment.name
 DEPLOYMENT_DESCRIPTION = conf.deployment.get("description", "A Basic Arkitekt Deployment")
 # Application definition
 
+ENSURED_OPENID_APPS = [
+    {
+        "client_name": "Frankon Lok Frontend",
+        "client_id": "lok-frontend",
+        "client_secret": "in0929sd0fn039j02n309n2309rn099n09n0s9n",
+        "redirect_uris": [
+            "http://localhost:3000/auth/callback",
+        ],
+    }
+]
+
 if conf.get("ionscale", None):
     IONSCALE_SERVER_URL = conf.ionscale.server_url
     IONSCALE_ADMIN_KEY = conf.ionscale.admin_key

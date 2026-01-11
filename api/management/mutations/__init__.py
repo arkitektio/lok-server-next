@@ -10,6 +10,10 @@ from .device_code import (
     accept_device_code,
     decline_device_code,
 )
+from .authorize_code import (
+    accept_authorize_code,
+    decline_authorize_code,
+)
 from .alias import (
     create_alias,
     update_alias,

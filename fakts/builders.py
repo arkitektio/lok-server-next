@@ -16,6 +16,7 @@ def create_development_client(release: models.Release, config: base_models.Devel
         client.tenant = tenant
         client.node = node
         client.manifest = manifest.model_dump()
+        client.membership = karakter_models.Membership.objects.get(user=user, organization=organization)
         client.composition = composition
         client.public_sources = [t.dict() for t in manifest.public_sources] if manifest.public_sources else []
         client.save()
@@ -28,16 +29,15 @@ def create_development_client(release: models.Release, config: base_models.Devel
         client_id = generate_client_id()
 
         oauth2_client = models.OAuth2Client.objects.create(
-            user=user,
             client_id=client_id,
             client_secret=client_secret,
-            organization=config.get_organization(),
         )
 
         return models.Client.objects.create(
             release=release,
             user=user,
             tenant=user,
+            membership=karakter_models.Membership.objects.get(user=user, organization=organization),
             node=node,
             token=config.token,
             kind=enums.ClientKindVanilla.DEVELOPMENT.value,

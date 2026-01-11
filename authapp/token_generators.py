@@ -22,6 +22,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 from django.conf import settings
 from typing import Any, Optional
+from django.core.exceptions import ObjectDoesNotExist
 
 # Load RSA private key (used for signing). The settings.PRIVATE_KEY must
 # contain the PEM-encoded private key string.
@@ -66,37 +67,36 @@ class MyJWTBearerTokenGenerator(JWTBearerTokenGenerator):
         - scope: the resolved scope string
         - active_org: the client's organization slug
         """
-        if not user:
-            user = client.user
+        # actually resolve user and scope
+        # user is actually a membership object
+        membership = user
+
+        if not membership:
+            membership = client.client.membership
 
         if not scope:
             # fall back to the client's configured scope
             scope = client.scope
 
-        if not user:
-            raise ValueError("User not found")
-
-        if not client.organization:
-            raise ValueError("Client organization not found")
-
-        membership = user.memberships.filter(organization=client.organization).first()
+        if not membership:
+            raise ValueError("Membership not found")
 
         if not membership:
             raise ValueError("User is not a member of the organization (anymore)")
 
-        if client.client:
+        try:
             fakts_client = client.client
-        else:
+        except ObjectDoesNotExist:
             fakts_client = None
 
         # TODO: Implement correct scoping rules; for now expose roles and
         # some basic user identifiers used by resource servers.
         return {
             "roles": [role.identifier for role in membership.roles.all()],
-            "preferred_username": user.username,
-            "sub": user.id,
+            "preferred_username": membership.user.username,
+            "sub": membership.user.id,
             "scope": scope,
-            "active_org": client.organization.slug,
+            "active_org": membership.organization.slug,
             "client_app": fakts_client.release.app.identifier if fakts_client and fakts_client.release and fakts_client.release.app else None,
             "client_release": fakts_client.release.version if fakts_client and fakts_client.release else None,
             "client_device": fakts_client.node.node_id if fakts_client and fakts_client.node else None,
