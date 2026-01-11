@@ -115,6 +115,9 @@ class Membership(models.Model):
     class Meta:
         unique_together = ("user", "organization")
 
+    def get_user_id(self):
+        return str(self.user.pk)
+
 
 class User(AbstractUser):
     """A User of the System
@@ -134,6 +137,9 @@ class User(AbstractUser):
         blank=True,
         help_text="The organization that the user is currently active in",
     )
+
+    def get_user_id(self):
+        return str(self.pk)
 
     @property
     def is_faktsadmin(self):

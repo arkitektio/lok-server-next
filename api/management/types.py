@@ -17,6 +17,7 @@ from api.management import filters, enums, scalars
 from karakter import models as karakter_models
 from karakter import filters as karakter_filters
 from strawberry.experimental import pydantic
+from authapp.models import OAuth2Client
 
 
 def build_prescoper(field="organization"):
@@ -840,6 +841,17 @@ class ManagementClient:
     @classmethod
     def get_queryset(cls, queryset, info: Info):
         return queryset.filter(organization__memberships__user=info.context.request.user).distinct()
+
+
+@strawberry_django.type(OAuth2Client, filters=karakter_filters.OrganizationFilter, pagination=True, description="""An Organization is a group of users that can work together on a project.""")
+class ManagementOAuth2Client:
+    id: strawberry.ID
+    name: str
+    client_id: str
+    client_type: str
+    authorization_grant_type: str
+    redirect_uris: str
+    skip_authorization: bool
 
 
 @strawberry_django.type(fakts_models.DeviceCode, filters=karakter_filters.OrganizationFilter, pagination=True, description="""An Organization is a group of users that can work together on a project.""")
