@@ -55,10 +55,12 @@ class OAuth2Client(models.Model, ClientMixin):
     @property
     def user_id(self):
         """Return the membership associated with this authorization code."""
+        if not self.client:
+            raise ValueError("This is a bug in the logic of this server, we better fix it")
         return self.client.membership.id
 
     def __str__(self):
-        return f"{self.client_id} ({self.membership.user.username} @ {self.membership.organization.slug})"
+        return f"{self.client_id}"
 
     def get_client_id(self):
         return self.client_id
