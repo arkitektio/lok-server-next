@@ -139,6 +139,22 @@ class OAuth2Token(models.Model, TokenMixin):
     def get_expires_at(self):
         return self.issued_at + self.expires_in
 
+    def validate(self):
+        if self.revoked:
+            return False
+        if self.get_expires_at() < now_timestamp():
+            return False
+        return True
+
+    def is_revoked(self) -> bool:
+        return self.revoked
+
+    def is_expired(self) -> bool:
+        return self.get_expires_at() < now_timestamp()
+
+    def get(self, key: str, default=None):
+        return getattr(self, key, default)
+
 
 class AuthorizationCode(models.Model, AuthorizationCodeMixin):
     membership = models.ForeignKey(Membership, on_delete=models.CASCADE)
@@ -174,3 +190,9 @@ class AuthorizationCode(models.Model, AuthorizationCodeMixin):
 
     def get_nonce(self):
         return self.nonce
+
+    def get_acr(self):
+        return "1"  # Authentication Context Class Reference (check what this should be)
+
+    def get_amr(self):
+        return ["pwd"]  # Authentication Methods References (check what this should be)

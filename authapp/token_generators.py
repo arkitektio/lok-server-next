@@ -16,7 +16,7 @@ Notes:
   signing and must remain secret in settings.
 """
 
-from authlib.oauth2.rfc9068 import JWTBearerTokenGenerator
+from authlib.oauth2.rfc9068 import JWTBearerTokenGenerator, JWTBearerTokenValidator
 from joserfc.jwk import RSAKey
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend

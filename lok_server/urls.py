@@ -29,6 +29,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from strawberry.django.views import AsyncGraphQLView
 from api.management.schema import schema
+from authapp.views import open_id_configuration
 
 
 def fakts_challenge(request):
@@ -71,4 +72,5 @@ urlpatterns = [
     dynamicpath("_allauth/", include("allauth.headless.urls")),
     dynamicpath(".well-known/fakts-challenge", fakts_challenge, name="fakts-challenge"),
     dynamicpath(".well-known/fakts", WellKnownFakts.as_view()),
+    dynamicpath(".well-known/openid-configuration", open_id_configuration, name="openid_configuration"),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
