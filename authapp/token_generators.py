@@ -31,7 +31,7 @@ private_key = serialization.load_pem_private_key(settings.PRIVATE_KEY.encode("ut
 # Generate a JWK representation from the private key. We expose the
 # public part (is_private=False) as the published JWK set.
 jwk = RSAKey.import_key(settings.PRIVATE_KEY)
-jwk_dict = jwk.as_dict(is_private=False, kid="1")  # use True for full private JWK
+jwk_dict = jwk.as_dict(is_private=False, kid="1", use="sig")  # use True for full private JWK
 
 
 class MyJWTBearerTokenGenerator(JWTBearerTokenGenerator):

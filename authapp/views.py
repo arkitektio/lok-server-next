@@ -78,6 +78,7 @@ def open_id_configuration(request: HttpRequest) -> JsonResponse:
             "client_secret_basic",
             "client_secret_post",
         ],
+        "grant_types_supported": ["authorization_code", "client_credentials", "refresh_token"],
     }
     return JsonResponse(metadata)
 

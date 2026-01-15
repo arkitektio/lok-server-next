@@ -51,6 +51,7 @@ class OAuth2Client(models.Model, ClientMixin):
     token_endpoint_auth_method = models.CharField(max_length=48, default="client_secret_post")
     grant_types = models.TextField()
     response_types = models.TextField(blank=True)
+    id_token_signed_response_alg = models.CharField(max_length=48, default="RS256")
 
     @property
     def user_id(self):
@@ -127,6 +128,9 @@ class OAuth2Token(models.Model, TokenMixin):
     issued_at = models.IntegerField(null=False, default=now_timestamp)
     expires_in = models.IntegerField(null=False, default=0)
 
+    def check_client(self, client):
+        return self.client_id == client.client_id
+
     def get_client_id(self):
         return self.client_id
 
@@ -143,6 +147,15 @@ class OAuth2Token(models.Model, TokenMixin):
         if self.revoked:
             return False
         if self.get_expires_at() < now_timestamp():
+            return False
+        return True
+
+    def is_refresh_token_active(self) -> bool:
+        if self.revoked:
+            return False
+        # Assuming refresh tokens expire in 30 days (2592000 seconds)
+        refresh_token_lifetime = 2592000
+        if self.issued_at + refresh_token_lifetime < now_timestamp():
             return False
         return True
 

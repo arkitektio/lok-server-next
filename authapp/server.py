@@ -11,7 +11,7 @@ generator used to produce JWT bearer tokens. Other modules should import
 
 from authlib.integrations.django_oauth2 import AuthorizationServer, BearerTokenValidator, ResourceProtector
 from .models import OAuth2Client, OAuth2Token
-from .grants import ClientCredentialsGrant, AuthorizationCodeGrant, OpenIDCode
+from .grants import ClientCredentialsGrant, AuthorizationCodeGrant, OpenIDCode, RefreshTokenGrant
 from .token_generators import MyJWTBearerTokenGenerator
 from authlib.oidc.core import grants as oidcgrants, UserInfo
 from .token_generators import jwk_dict
@@ -29,6 +29,7 @@ server = AuthorizationServer(OAuth2Client, OAuth2Token)
 # needed (authorization_code, refresh_token, etc.).
 server.register_grant(ClientCredentialsGrant)
 server.register_grant(AuthorizationCodeGrant, [OpenIDCode(require_nonce=True)])
+server.register_grant(RefreshTokenGrant)
 # Register a JWT bearer token generator under the default key. The
 # generator is used to emit signed JWTs for access tokens.
 
@@ -59,9 +60,16 @@ class Oauth2TokenValidator(BearerTokenValidator):
     pass
 
 
+class RefreshTokenGenerator:
+    def __call__(self, client, grant_type, user, scope):
+        import secrets
+
+        return secrets.token_urlsafe(48)
+
+
 server.register_token_generator(
     "default",
-    MyJWTBearerTokenGenerator(issuer="lok"),
+    MyJWTBearerTokenGenerator(issuer="lok", refresh_token_generator=RefreshTokenGenerator()),
 )
 
 resource_protector = ResourceProtector()
