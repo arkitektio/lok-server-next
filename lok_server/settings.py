@@ -45,9 +45,7 @@ ENSURED_OPENID_APPS = [
         "client_name": "Frankon Lok Frontend",
         "client_id": "lok-frontend",
         "client_secret": "in0929sd0fn039j02n309n2309rn099n09n0s9n",
-        "redirect_uris": [
-            "http://localhost:3000/auth/callback",
-        ],
+        "redirect_uris": ["http://localhost:3000/auth/callback", "https://ionscale.arkitekt.live/auth/callback"],
     }
 ]
 
