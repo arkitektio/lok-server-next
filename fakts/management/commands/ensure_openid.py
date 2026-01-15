@@ -38,8 +38,6 @@ class Command(BaseCommand):
                     client_secret=config.client_secret,
                     redirect_uris=" ".join(config.redirect_uris),
                     scope="openid profile email",
-                    user=None,
-                    organization=None,
                 )
 
                 self.stdout.write(f"Created OpenID client {client.client_id}")
