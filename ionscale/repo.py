@@ -2,7 +2,8 @@ import subprocess
 import os
 import shutil
 import re
-from typing import List
+import json
+from typing import List, Dict, Any, Union
 from pathlib import Path
 from .base_models import Tailnet, TailnetCreate
 from django.conf import settings
@@ -24,15 +25,17 @@ class IonscaleRepository:
         if not self.binary:
             raise FileNotFoundError(f"Ionscale binary not found at: {binary_path}")
 
-    def _run_command(self, args: List[str]) -> str:
+    def _run_command(self, args: List[str], command_type: str = "tailnet") -> str:
         """
         Executes the ionscale CLI command securely.
+        :param args: Command arguments
+        :param command_type: The command type (e.g. 'tailnet', 'iam')
         """
         # We inject the key as an env var to avoid it showing up in process lists,
         # assuming the CLI can read it or we pass it via stdin.
         # Ionscale CLI requires the flag, so we pass it in the args but execute carefully.
 
-        base_cmd = [self.binary, "tailnet", *args]
+        base_cmd = [self.binary, command_type, *args]
 
         try:
             result = subprocess.run(
@@ -77,6 +80,62 @@ class IonscaleRepository:
             name=tailnet_input.name,
             dns_name=f"{tailnet_input.name}.{self.server_url.split('://')[1]}",
         )
+
+    def update_policy(self, tailnet: str, policy: Union[Dict[str, Any], str, Path]) -> str:
+        """
+        Updates the policy for a tailnet.
+
+        :param tailnet: The name of the tailnet
+        :param policy: Policy data as a dict, JSON string, or path to a JSON file
+        :return: CLI output message
+
+        Example:
+            # Using a dictionary
+            repo.update_policy("my-tailnet", {"acls": [...]})
+
+            # Using a file path
+            repo.update_policy("my-tailnet", "/path/to/policy.json")
+
+            # Using a JSON string
+            repo.update_policy("my-tailnet", '{"acls": [...]}')
+        """
+        import tempfile
+
+        # Determine if we need to create a temporary file
+        if isinstance(policy, dict):
+            # Convert dict to JSON and write to temp file
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+                json.dump(policy, f, indent=2)
+                temp_file = f.name
+
+            try:
+                output = self._run_command(["update-policy", "--tailnet", tailnet, "--file", temp_file], command_type="iam")
+                return output
+            finally:
+                # Clean up temp file
+                os.unlink(temp_file)
+
+        elif isinstance(policy, (str, Path)):
+            # Check if it's a file path
+            policy_path = Path(policy)
+            if policy_path.exists():
+                # It's a file path
+                output = self._run_command(["update-policy", "--tailnet", tailnet, "--file", str(policy_path)], command_type="iam")
+                return output
+            else:
+                # Assume it's a JSON string, write to temp file
+                with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
+                    f.write(policy)
+                    temp_file = f.name
+
+                try:
+                    output = self._run_command(["update-policy", "--tailnet", tailnet, "--file", temp_file], command_type="iam")
+                    return output
+                finally:
+                    # Clean up temp file
+                    os.unlink(temp_file)
+        else:
+            raise ValueError("policy must be a dict, JSON string, or file path")
 
     def _parse_list_output(self, cli_output: str) -> List[Tailnet]:
         """
