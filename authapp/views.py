@@ -62,7 +62,7 @@ def user_info(request: HttpRequest) -> JsonResponse:
 @csrf_exempt
 def open_id_configuration(request: HttpRequest) -> JsonResponse:
     """OpenID Configuration."""
-    issuer = "lok"  # or settings.OIDC_ISSUER
+    issuer = settings.OIDC_ISSUER
     # construct metadata
     metadata = {
         "issuer": issuer,

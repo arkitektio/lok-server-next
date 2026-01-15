@@ -51,6 +51,9 @@ ENSURED_OPENID_APPS = [
     }
 ]
 
+OIDC_ISSUER = conf.issuer.get("oidc_issuer", "https://go.arkitekt.live")
+
+
 if conf.get("ionscale", None):
     IONSCALE_SERVER_URL = conf.ionscale.server_url
     IONSCALE_ADMIN_KEY = conf.ionscale.admin_key

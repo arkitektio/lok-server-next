@@ -9,6 +9,7 @@ generator used to produce JWT bearer tokens. Other modules should import
 ``server.create_token_response``) to handle protocol endpoints.
 """
 
+from django.conf import settings
 from authlib.integrations.django_oauth2 import AuthorizationServer, BearerTokenValidator, ResourceProtector
 from .models import OAuth2Client, OAuth2Token
 from .grants import ClientCredentialsGrant, AuthorizationCodeGrant, OpenIDCode, RefreshTokenGrant
@@ -36,7 +37,7 @@ server.register_grant(RefreshTokenGrant)
 
 class MyUserInfoEndpoint(UserInfoEndpoint):
     def get_issuer(self):
-        return "https://jhnnsrs-server.hyena-sole.ts.net"
+        return settings.OIDC_ISSUER
 
     def generate_user_info(self, user, scope):
         return UserInfo(
@@ -69,7 +70,7 @@ class RefreshTokenGenerator:
 
 server.register_token_generator(
     "default",
-    MyJWTBearerTokenGenerator(issuer="lok", refresh_token_generator=RefreshTokenGenerator()),
+    MyJWTBearerTokenGenerator(issuer=settings.OIDC_ISSUER, refresh_token_generator=RefreshTokenGenerator()),
 )
 
 resource_protector = ResourceProtector()
