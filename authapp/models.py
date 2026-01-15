@@ -43,13 +43,13 @@ def now_timestamp():
 
 
 class OAuth2Client(models.Model, ClientMixin):
-    membership = models.ForeignKey(Membership, on_delete=models.CASCADE, related_name="oauth2_clients", null=True)
+    membership = models.ForeignKey(Membership, on_delete=models.CASCADE, related_name="oauth2_clients", null=True, blank=True)
     client_id = models.CharField(max_length=48, unique=True)
     client_secret = models.CharField(max_length=120)
     redirect_uris = models.TextField(blank=True)
-    scope = models.TextField(blank=True)
+    scope = models.TextField(blank=True, default="openid email profile")
     token_endpoint_auth_method = models.CharField(max_length=48, default="client_secret_post")
-    grant_types = models.TextField()
+    grant_types = models.TextField(default="authorization_code refresh_token client_credentials")
     response_types = models.TextField(blank=True)
     id_token_signed_response_alg = models.CharField(max_length=48, default="RS256")
 
