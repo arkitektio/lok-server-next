@@ -49,7 +49,7 @@ ENSURED_OPENID_APPS = [
     }
 ]
 
-OIDC_ISSUER = conf.issuer.get("oidc_issuer", "https://go.arkitekt.live")
+OIDC_ISSUER = conf.get("oidc_issuer", "https://go.arkitekt.live")
 
 
 if conf.get("ionscale", None):
