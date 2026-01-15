@@ -260,6 +260,8 @@ OAUTH2_PROVIDER_REFRESH_TOKEN_MODEL = "oauth2_provider.RefreshToken"
 OAUTH2_PROVIDER_ID_TOKEN_MODEL = "oauth2_provider.IDtoken"
 
 PRIVATE_KEY = conf.private_key
+PUBLIC_KEY = conf.lok.get("public_key", None)
+
 
 AUTHENTIKATE = {
     "ISSUERS": [

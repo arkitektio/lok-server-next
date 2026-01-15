@@ -35,7 +35,7 @@ class IonscaleRepository:
         # assuming the CLI can read it or we pass it via stdin.
         # Ionscale CLI requires the flag, so we pass it in the args but execute carefully.
 
-        base_cmd = [self.binary, command_type, *args]
+        base_cmd = [self.binary,  *args]
 
         try:
             result = subprocess.run(
@@ -60,7 +60,8 @@ class IonscaleRepository:
         """
         Runs `ionscale tailnet list` and parses the output.
         """
-        output = self._run_command(["list"])
+        output = self._run_command(["tailnet", "list"])
+        print(output)
         return self._parse_list_output(output)
 
     def create_tailnet(self, tailnet_input: TailnetCreate) -> Tailnet:
@@ -68,7 +69,7 @@ class IonscaleRepository:
         Runs `ionscale tailnet create` and returns the created object.
         """
         # Ionscale create usually returns "Tailnet created: {id}" or similar
-        self._run_command(["create", "--name", tailnet_input.name])
+        self._run_command(["tailnet", "create", "--name", tailnet_input.name])
 
         # Since create command output might be sparse, we fetch the specific tailnet
         # to return a full object. This is a "read-your-writes" pattern.
@@ -109,7 +110,7 @@ class IonscaleRepository:
                 temp_file = f.name
 
             try:
-                output = self._run_command(["update-policy", "--tailnet", tailnet, "--file", temp_file], command_type="iam")
+                output = self._run_command(["tailnets", "set-iam-policy", "--tailnet", tailnet, "--file", temp_file], command_type="iam")
                 return output
             finally:
                 # Clean up temp file
@@ -120,7 +121,7 @@ class IonscaleRepository:
             policy_path = Path(policy)
             if policy_path.exists():
                 # It's a file path
-                output = self._run_command(["update-policy", "--tailnet", tailnet, "--file", str(policy_path)], command_type="iam")
+                output = self._run_command(["tailnets", "set-iam-policy", "--tailnet", tailnet, "--file", str(policy_path)], command_type="iam")
                 return output
             else:
                 # Assume it's a JSON string, write to temp file
@@ -169,6 +170,14 @@ class IonscaleRepository:
                 tailnets.append(Tailnet(id=t_id, name=name, dns_name=dns_name))
 
         return tailnets
+    
+    
+    def help(self, *preargs) -> str:
+        """
+        Returns the help text of the ionscale CLI.
+        """
+        output = self._run_command(list(preargs) + ["--help"], command_type="")
+        return output
 
 
 django_repo = IonscaleRepository(

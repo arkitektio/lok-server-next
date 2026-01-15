@@ -186,6 +186,9 @@ class AuthorizationCode(models.Model, AuthorizationCodeMixin):
     def user(self):
         """Return the membership associated with this authorization code."""
         return self.membership
+    
+    def get_user_id(self):
+        return str(self.membership.id)
 
     def is_expired(self):
         # Authorization code is valid for 10 minutes

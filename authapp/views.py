@@ -28,10 +28,15 @@ from django.views.decorators.http import require_http_methods
 from authapp.server import server, resource_protector
 from authlib.oauth2 import OAuth2Error
 from django.views.decorators.csrf import csrf_exempt
-from .token_generators import jwk_dict
 from .models import OAuth2Token
 from django.conf import settings
+from joserfc.jwk import RSAKey
 
+
+# Generate a JWK representation from the private key. We expose the
+# public part (is_private=False) as the published JWK set.
+jwk = RSAKey.import_key(settings.PUBLIC_KEY)
+jwk_dict = jwk.as_dict(is_private=False, kid="1", use="sig")  # use True for full private JWK
 
 @csrf_exempt
 def jwks(request: HttpRequest) -> JsonResponse:
@@ -48,10 +53,9 @@ def user_info(request: HttpRequest) -> JsonResponse:
             "sub": str(membership.user.id),
             "name": membership.user.username,
             "preferred_username": membership.user.username,
-            "email": membership.user.email,
+            "email": membership.user.email or "jhnnsrs@gmail.com",
             "roles": [role.identifier for role in membership.roles.all()],
             "preferred_username": membership.user.username,
-            "sub": membership.user.id,
             "scope": "scope",
             "active_org": membership.organization.slug,
         }

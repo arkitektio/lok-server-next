@@ -94,7 +94,7 @@ class MyJWTBearerTokenGenerator(JWTBearerTokenGenerator):
         return {
             "roles": [role.identifier for role in membership.roles.all()],
             "preferred_username": membership.user.username,
-            "sub": membership.user.id,
+            "sub": str(membership.user.id),
             "scope": scope,
             "active_org": membership.organization.slug,
             "client_app": fakts_client.release.app.identifier if fakts_client and fakts_client.release and fakts_client.release.app else None,
