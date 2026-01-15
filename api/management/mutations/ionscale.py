@@ -8,6 +8,8 @@ import kante
 from fakts import models as fakts_models
 from ionscale.repo import django_repo
 from ionscale import base_models as ionscale_models
+from ionscale import manager
+from karakter import models as karakter_models
 
 
 @kante.input
@@ -41,7 +43,35 @@ def create_ionscale_layer(info: Info, input: CreateIonscaleLayerInput) -> types.
         tailnet_name=tailnet_name,
     )
 
-    return layer.layer
+    return layer
+
+
+@kante.input
+class UpdateIonscaleLayerInput:
+    """Input for creating a single-use magic invite link for an organization"""
+    id: strawberry.ID = strawberry.field(description="The ID of the Ionscale layer to update.")
+    name: str | None = strawberry.field(description="The name of the tailnet layer.")
+    description: str | None = strawberry.field(description="The description of the tailnet layer.")
+    blocked_for: list[strawberry.ID] | None = strawberry.field(default=None, description="List of membership IDs to block from accessing this layer.")
+
+
+def update_ionscale_layer(info: Info, input: UpdateIonscaleLayerInput) -> types.ManagementLayer:
+    """ """
+
+    layer = fakts_models.IonscaleLayer.objects.get(
+        id=input.id
+    )
+    if input.blocked_for is not None:
+        memberships = karakter_models.Membership.objects.filter(id__in=input.blocked_for)
+        layer.blocked_for.set(memberships)
+        layer.save()
+    
+    manager.sync(layer)
+    
+    
+
+    return layer
+
 
 
 @kante.input

@@ -93,6 +93,7 @@ class MyJWTBearerTokenGenerator(JWTBearerTokenGenerator):
         # some basic user identifiers used by resource servers.
         return {
             "roles": [role.identifier for role in membership.roles.all()],
+            "nickname": membership.user.username,
             "preferred_username": membership.user.username,
             "sub": str(membership.user.id),
             "scope": scope,

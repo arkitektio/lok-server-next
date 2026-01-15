@@ -5,14 +5,14 @@ from allauth.socialaccount import models as smodels
 from karakter import models as karakter_models
 
 
-@strawberry_django.order(fakts_models.Layer)
+@strawberry_django.order(fakts_models.IonscaleLayer)
 class ManagementLayerOrder:
     name: strawberry.auto
     created_at: strawberry.auto
     last_reported_at: strawberry.auto
 
 
-@strawberry_django.filter(fakts_models.Layer)
+@strawberry_django.filter(fakts_models.IonscaleLayer)
 class ManagementLayerFilter:
     search: str | None
     ids: list[strawberry.ID] | None

@@ -17,19 +17,15 @@ class Command(BaseCommand):
         #print(django_repo.create_tailnet(TailnetCreate(name="test-tailnet",)))
 
             
-        print(django_repo.help("tailnets", "set-iam-policy"))
+        print(django_repo.run("machines", "get", "--machine-id", "196503777216299015" ))
+        raise
         print(django_repo.list_tailnets())
         
-        for i in django_repo.list_tailnets():
-            
-            policy = {
-                "subs": ["1","2","3","4","5"]
-            }
-            
-            
-            django_repo.update_policy(i.name, policy)
-            
-            
-            print(i)
+        for t in django_repo.list_tailnets():
+            print(f"Machines in tailnet {t.name}:")
+            machines = django_repo.list_machines(t.name)
+            for m in machines:
+                print(f" - {m.name} (id: {m.id}, ipv4: {m.ipv4}, ipv6: {m.ipv6})")
+        
         
         

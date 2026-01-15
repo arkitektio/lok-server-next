@@ -52,10 +52,10 @@ def user_info(request: HttpRequest) -> JsonResponse:
         {
             "sub": str(membership.user.id),
             "name": membership.user.username,
+            "nickname": membership.user.username,
             "preferred_username": membership.user.username,
-            "email": membership.user.email or "jhnnsrs@gmail.com",
+            "email": membership.user.email,
             "roles": [role.identifier for role in membership.roles.all()],
-            "preferred_username": membership.user.username,
             "scope": "scope",
             "active_org": membership.organization.slug,
         }

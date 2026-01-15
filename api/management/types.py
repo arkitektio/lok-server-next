@@ -18,6 +18,8 @@ from karakter import models as karakter_models
 from karakter import filters as karakter_filters
 from strawberry.experimental import pydantic
 from authapp.models import OAuth2Client
+from ionscale.base_models import Machine, MachineDetail
+from ionscale.repo import django_repo
 
 
 def build_prescoper(field="organization"):
@@ -684,8 +686,57 @@ class ManagementApp:
     logo: ManagementMediaStore | None = strawberry.field(description="The logo of the app. This should be a url to a logo that can be used to represent the app.")
 
 
+@strawberry.type
+class ManagementMachine:
+    instance: strawberry.Private[Machine]
+    tailnet: strawberry.Private[str]
+    layer_id: strawberry.Private[strawberry.ID]
+
+    def __init__(self, instance: Machine, tailnet: str, layer_id: strawberry.ID):
+         self.instance = instance
+         self.tailnet = tailnet
+         self.layer_id = layer_id
+
+    @strawberry.field
+    def id(self) -> strawberry.ID:
+        return strawberry.ID(self.instance.id)
+
+    @strawberry.field
+    def local_id(self) -> str:
+        return self.instance.id
+
+    @strawberry.field
+    def name(self) -> str:
+        return self.instance.name
+
+    @strawberry.field
+    def ipv4(self) -> Optional[str]:
+        return self.instance.ipv4
+
+    @strawberry.field
+    def ipv6(self) -> Optional[str]:
+        return self.instance.ipv6
+
+    @strawberry.field
+    def ephemeral(self) -> bool:
+        return self.instance.ephemeral
+
+    @strawberry.field
+    def connected(self) -> bool:
+        return self.instance.connected
+
+    @strawberry.field
+    def last_seen(self) -> Optional[datetime.datetime]:
+        return self.instance.last_seen
+    
+    @strawberry.field
+    def tags(self) -> List[str]:
+        return self.instance.tags
+
+
+
 @strawberry_django.type(
-    fakts_models.Layer,
+    fakts_models.IonscaleLayer,
     description="A Layer is a transport layer that needs to be used to reach an alias. E.g a VPN layer or a Tor layer.",
     pagination=True,
     filters=filters.ManagementLayerFilter,
@@ -693,7 +744,6 @@ class ManagementApp:
 )
 class ManagementLayer:
     id: strawberry.ID
-
     organization: "ManagementOrganization" = strawberry.field(description="The organization that owns this alias.")
     kind: enums.LayerKind = strawberry.field(description="The kind of the layer. E.g. `VPN` or `TOR`")
     name: str = strawberry.field(description="The name of the layer")
@@ -703,6 +753,24 @@ class ManagementLayer:
     aliases: list["ManagementInstanceAlias"] = strawberry_django.field(
         description="The instances of the service. A service instance is a configured instance of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."
     )
+    tailnet_name: Optional[str] = strawberry.field(description="The tailnet name of the layer. This is only set for Ionscale layers.")
+
+    @strawberry.field(description="The machines associated with this layer (only works for IonscaleLayers)")
+    def machines(self, info: Info) -> List[ManagementMachine]:
+        if hasattr(self, "tailnet_name"):
+             machines = django_repo.list_machines(self.tailnet_name)
+             return [ManagementMachine(instance=m, tailnet=self.tailnet_name, layer_id=self.id) for m in machines]
+        return []
+
+    @strawberry.field(description="A specific machine associated with this layer (only works for IonscaleLayers)")
+    def machine(self, info: Info, id: str) -> Optional[ManagementMachine]:
+        if hasattr(self, "tailnet_name"):
+             try:
+                machine = django_repo.get_machine(int(id))
+                return ManagementMachine(instance=machine, tailnet=self.tailnet_name, layer_id=self.id)
+             except Exception:
+                 return None
+        return None
 
     @classmethod
     def get_queryset(cls, queryset, info: Info):

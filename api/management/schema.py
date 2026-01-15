@@ -50,9 +50,6 @@ class Query:
     def role(self, info: Info, id: strawberry.ID) -> types.ManagementRole:
         return karakter_models.Role.objects.get(id=id)
 
-    @kante.django_field()
-    def layer(self, info: Info, id: strawberry.ID) -> types.ManagementLayer:
-        return fakts_models.Layer.objects.get(id=id)
 
     @kante.django_field()
     def membership(self, info: Info, id: strawberry.ID) -> types.ManagementMembership:
@@ -163,7 +160,25 @@ class Query:
 
     @kante.django_field()
     def layer(self, info: Info, id: strawberry.ID) -> types.ManagementLayer:
-        return fakts_models.Layer.objects.get(id=id)
+        return fakts_models.IonscaleLayer.objects.get(id=id)
+
+    @kante.django_field()
+    def machine(self, info: Info, id: strawberry.ID) -> types.ManagementMachine:
+        from ionscale.repo import django_repo
+        machine = django_repo.get_machine(str(id))
+
+        if machine.tailnet:
+            try:
+                layer = fakts_models.IonscaleLayer.objects.get(tailnet_name=machine.tailnet)
+                if not layer.organization.memberships.filter(user=info.context.request.user).exists():
+                     raise PermissionError("You are not a member of the organization that owns this layer.")
+                return types.ManagementMachineDetail(instance=machine, tailnet=machine.tailnet, layer_id=layer.id)
+            except fakts_models.IonscaleLayer.DoesNotExist:
+                 # What if the machine belongs to a tailnet that is not managed by lok?
+                 # For now we fail
+                 pass
+        
+        raise PermissionError("Could not find the layer associated with this machine.")
 
     @kante.django_field()
     def client(self, info: Info, id: strawberry.ID) -> types.ManagementClient:
@@ -341,6 +356,9 @@ class Mutation:
     )
     delete_ionscale_layer = strawberry_django.mutation(
         resolver=mutations.delete_ionscale_layer,
+    )
+    update_ionscale_layer = strawberry_django.mutation(
+        resolver=mutations.update_ionscale_layer,
     )
 
 

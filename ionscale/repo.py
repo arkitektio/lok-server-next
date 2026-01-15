@@ -5,7 +5,7 @@ import re
 import json
 from typing import List, Dict, Any, Union
 from pathlib import Path
-from .base_models import Tailnet, TailnetCreate
+from .base_models import Tailnet, TailnetCreate, Machine, MachineDetail
 from django.conf import settings
 
 
@@ -63,6 +63,20 @@ class IonscaleRepository:
         output = self._run_command(["tailnet", "list"])
         print(output)
         return self._parse_list_output(output)
+
+    def list_machines(self, tailnet: str) -> List[Machine]:
+        """
+        Runs `ionscale machines list --tailnet <tailnet>` and parses the output.
+        """
+        output = self._run_command(["machines", "list", "--tailnet", tailnet])
+        return self._parse_machine_list_output(output)
+
+    def get_machine(self, machine_id: str) -> MachineDetail:
+        """
+        Runs `ionscale machines get --machine-id <machine_id>` and parses the output.
+        """
+        output = self._run_command(["machines", "get", "--machine-id", machine_id])
+        return self._parse_machine_detail_output(output)
 
     def create_tailnet(self, tailnet_input: TailnetCreate) -> Tailnet:
         """
@@ -170,7 +184,89 @@ class IonscaleRepository:
                 tailnets.append(Tailnet(id=t_id, name=name, dns_name=dns_name))
 
         return tailnets
+
+    def _parse_machine_list_output(self, cli_output: str) -> List[Machine]:
+        """
+        Parses the ASCII table output from Ionscale into Pydantic models.
+        """
+        lines = cli_output.splitlines()
+        machines = []
+
+        # Skip header line
+        if not lines:
+            return []
+
+        for line in lines[1:]:
+            parts = line.split()
+            if len(parts) >= 2:
+                m_id = parts[0]
+                name = parts[1]
+                
+                # Heuristic mapping
+                ipv4 = parts[2] if len(parts) > 2 else None
+                ipv6 = parts[3] if len(parts) > 3 else None
+                
+                connected = False
+                if "true" in line.lower():
+                    connected = True
+                    
+                machines.append(Machine(
+                    id=m_id, 
+                    name=name,
+                    ipv4=ipv4,
+                    ipv6=ipv6,
+                    connected=connected
+                ))
+
+        return machines
+
+    def _parse_machine_detail_output(self, cli_output: str) -> MachineDetail:
+        """
+        Parses the output from `ionscale machines get` into a MachineDetail model.
+        Supports both "Key: Value" and column-aligned formats.
+        """
+        lines = cli_output.splitlines()
+        data = {}
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+                
+            # Try splitting by 2 or more spaces first (column format)
+            parts = re.split(r'\s{2,}', line)
+            if len(parts) >= 2:
+                key = parts[0].strip().lower().replace(" ", "_")
+                value = parts[1].strip()
+                data[key] = value
+                continue
+                
+            # Fallback to colon separation
+            if ":" in line:
+                key, value = line.split(":", 1)
+                data[key.strip().lower().replace(" ", "_")] = value.strip()
+
+        return MachineDetail(
+            id=data.get("id", ""),
+            name=data.get("machine_name", data.get("name", "")),
+            tailnet=data.get("tailnet"),
+            ipv4=data.get("tailscale_ipv4", data.get("ipv4")),
+            ipv6=data.get("tailscale_ipv6", data.get("ipv6")),
+            connected=False, # Not present in detail view usually
+            ephemeral=data.get("ephemeral", "false").lower() == "true",
+            last_seen=None, # "a few seconds ago" is not easily parsable to datetime without logic
+            os=data.get("os"),
+            key_expiry=None, # "in 6 months"
+            authorized=False, # Not explicitly in sample
+            is_external=False, # Not explicitly in sample
+        )
     
+    def run(self, *preargs) -> str:
+        """
+        Runs arbitrary ionscale CLI commands.
+        """
+        output = self._run_command(list(preargs), command_type="")
+        return output
     
     def help(self, *preargs) -> str:
         """
