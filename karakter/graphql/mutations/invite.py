@@ -104,10 +104,7 @@ def accept_invite(info: Info, input: AcceptInviteInput) -> types.Membership:
         return existing_membership
 
     # Create membership
-    membership = models.Membership.objects.create(
-        user=user,
-        organization=organization,
-    )
+    membership = models.Membership.objects.create(user=user, organization=organization, created_through=invite)
 
     # Assign roles from the invite
     invite_roles = invite.roles.all()

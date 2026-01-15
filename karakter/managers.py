@@ -1,4 +1,4 @@
-from .models import Organization, Role, Membership, User
+from .models import Organization, Role, Membership, User, Scope
 from django.contrib.auth.models import Group
 
 
@@ -6,16 +6,35 @@ def create_role(organization: Organization, identifier: str):
     """
     Create a role for the organization with the given identifier.
     """
-    group_name = f"{organization.identifier}:{identifier}"
-    group, _ = Group.objects.get_or_create(name=group_name)
-    role, _ = Role.objects.update_or_create(group=group, defaults={"organization": organization, "identifier": identifier})
+    role, _ = Role.objects.update_or_create(identifier=identifier, organization=organization)
     return role
 
 
-def create_default_groups_for_org(org):
-    for identifier in ["admin", "guest", "researcher"]:
-        g, _ = Group.objects.get_or_create(name=f"{org.slug}:{identifier}")
-        Role.objects.update_or_create(group=g, identifier=identifier, organization=org)
+def create_scope(organization: Organization, identifier: str):
+    """
+    Create a role for the organization with the given identifier.
+    """
+    role, _ = Scope.objects.update_or_create(identifier=identifier, organization=organization)
+    return role
+
+
+def create_default_roles_for_org(org: Organization):
+    for identifier in ["admin", "guest", "user", "bot", "viewer", "editor", "contributor", "manager", "owner", "labeler"]:
+        create_role(org, identifier)
+
+
+def create_default_scopes_for_org(org: Organization):
+    for identifier in ["openid", "profile", "email", "roles", "groups"]:
+        create_scope(org, identifier)
+
+
+def ensure_owner_is_admin(org: Organization):
+    """
+    Ensure that the admin user is added to the admin group of the organization.
+    """
+    membership, _ = Membership.objects.get_or_create(user=org.owner, organization=org)
+    membership.roles.add(Role.objects.get(identifier="admin", organization=org))
+    membership.save()
 
 
 def add_user_roles(user: User, organization: Organization, roles: list[str]):
@@ -29,12 +48,25 @@ def add_user_roles(user: User, organization: Organization, roles: list[str]):
 
     for srole in roles:
         role = Role.objects.get(organization=organization, identifier=srole)
-
         membership.roles.add(role)
 
-        group_name = f"{organization.slug}:{srole}"
-        group, _ = Group.objects.get_or_create(name=group_name)
-        user.groups.add(group)
-        user.save()
-
     membership.save()
+
+
+def create_user_default_organization(user: User):
+    """
+    Create a default organization for the user upon signup.
+    """
+    org_slug = f"{user.username}-org"
+    org, created = Organization.objects.get_or_create(
+        slug=org_slug,
+        defaults={
+            "name": f"{user.username}'s Organization",
+            "owner": user,
+        },
+    )
+
+    if created:
+        create_default_roles_for_org(org)
+
+    add_user_roles(user, org, ["admin"])

@@ -74,17 +74,31 @@ class Organization(models.Model):
     name = models.CharField(max_length=1000, null=True, blank=True)
     description = models.CharField(max_length=4000, null=True, blank=True)
     avatar = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
+    owner = models.ForeignKey("User", on_delete=models.CASCADE, related_name="owned_organizations")
 
     def __str__(self):
         return self.name or self.slug or "Unnamed Organization"
 
 
 class Role(models.Model):
-    group = models.OneToOneField(Group, on_delete=models.CASCADE, related_name="role")
     identifier = models.CharField(max_length=1000, null=True, blank=True)
     description = models.CharField(max_length=4000, null=True, blank=True)
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="roles")
+    creating_instance = models.ForeignKey("fakts.ServiceInstance", on_delete=models.CASCADE, null=True, blank=True)
     is_builtin = models.BooleanField(default=False, help_text="If this role is a built-in role that cannot be deleted (admin)")
+    used_by = models.ManyToManyField("fakts.ServiceInstance", related_name="roles", blank=True)
+
+    class Meta:
+        unique_together = ("identifier", "organization")
+
+
+class Scope(models.Model):
+    identifier = models.CharField(max_length=1000, null=True, blank=True)
+    description = models.CharField(max_length=4000, null=True, blank=True)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="scopes")
+    creating_instance = models.ForeignKey("fakts.ServiceInstance", on_delete=models.CASCADE, null=True, blank=True)
+    is_builtin = models.BooleanField(default=False, help_text="If this scope is a built-in scope that cannot be deleted (admin)")
+    used_by = models.ManyToManyField("fakts.ServiceInstance", related_name="scopes", blank=True)
 
     class Meta:
         unique_together = ("identifier", "organization")
@@ -96,9 +110,13 @@ class Membership(models.Model):
     user = models.ForeignKey("User", on_delete=models.CASCADE, related_name="memberships")
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="memberships")
     roles = models.ManyToManyField(Role, related_name="memberships", blank=True)
+    created_through = models.ForeignKey("Invite", on_delete=models.SET_NULL, null=True, related_name="created_memberships")
 
     class Meta:
         unique_together = ("user", "organization")
+
+    def get_user_id(self):
+        return str(self.user.pk)
 
 
 class User(AbstractUser):
@@ -119,6 +137,9 @@ class User(AbstractUser):
         blank=True,
         help_text="The organization that the user is currently active in",
     )
+
+    def get_user_id(self):
+        return str(self.pk)
 
     @property
     def is_faktsadmin(self):
@@ -154,6 +175,7 @@ class Profile(models.Model):
     bio = models.CharField(max_length=4000, null=True, blank=True)
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
     avatar = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
+    banner = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True, related_name="profile_banners")
 
 
 class OrganizationProfile(models.Model):
@@ -163,6 +185,7 @@ class OrganizationProfile(models.Model):
     bio = models.CharField(max_length=4000, null=True, blank=True)
     organization = models.OneToOneField(Organization, on_delete=models.CASCADE, related_name="profile")
     avatar = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
+    banner = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True, related_name="organization_banners")
 
 
 class GroupProfile(models.Model):

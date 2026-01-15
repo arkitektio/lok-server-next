@@ -20,6 +20,7 @@ class Command(BaseCommand):
         config = YamlConfigModel(layers=layers, instances=instances)
 
         layer_lookup = {}
+        return
 
         # Create or update layers
         for layer in config.layers:
@@ -39,13 +40,13 @@ class Command(BaseCommand):
             service, _ = Service.objects.get_or_create(identifier=instance.service, defaults={"name": instance.service})
 
             inst, created = ServiceInstance.objects.update_or_create(
-                identifier=instance.identifier,
+                token=instance.identifier,
                 defaults={
                     "steward": None,  # Optionally set to a default user
                     "service": service,
                 },
             )
-            self.stdout.write(self.style.SUCCESS(f"{'Created' if created else 'Updated'} instance: {inst.identifier}"))
+            self.stdout.write(self.style.SUCCESS(f"{'Created' if created else 'Updated'} instance: {inst.token}"))
 
             # Create aliases
             for alias in instance.aliases:

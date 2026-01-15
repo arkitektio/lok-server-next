@@ -1,7 +1,9 @@
 import time
 from django.db import models
 from django.contrib.auth import get_user_model
-from authlib.oauth2.rfc6749 import ClientMixin, TokenMixin
+from authlib.oauth2.rfc6749 import ClientMixin, TokenMixin, AuthorizationCodeMixin
+
+from karakter.models import Membership
 
 User = get_user_model()
 
@@ -41,19 +43,25 @@ def now_timestamp():
 
 
 class OAuth2Client(models.Model, ClientMixin):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    organization = models.ForeignKey("karakter.Organization", on_delete=models.CASCADE, related_name="oauth2_clients")
+    membership = models.ForeignKey(Membership, on_delete=models.CASCADE, related_name="oauth2_clients", null=True, blank=True)
     client_id = models.CharField(max_length=48, unique=True)
     client_secret = models.CharField(max_length=120)
     redirect_uris = models.TextField(blank=True)
-    scope = models.TextField(blank=True)
+    scope = models.TextField(blank=True, default="openid email profile")
     token_endpoint_auth_method = models.CharField(max_length=48, default="client_secret_post")
-    grant_types = models.TextField()
+    grant_types = models.TextField(default="authorization_code refresh_token client_credentials")
     response_types = models.TextField(blank=True)
-    
-    
+    id_token_signed_response_alg = models.CharField(max_length=48, default="RS256")
+
+    @property
+    def user_id(self):
+        """Return the membership associated with this authorization code."""
+        if not self.client:
+            raise ValueError("This is a bug in the logic of this server, we better fix it")
+        return self.client.membership.id
+
     def __str__(self):
-        return f"{self.client_id} ({self.user.username} @ {self.organization.slug})"
+        return f"{self.client_id}"
 
     def get_client_id(self):
         return self.client_id
@@ -68,8 +76,7 @@ class OAuth2Client(models.Model, ClientMixin):
         return list_to_scope([s for s in scope.split() if s in allowed])
 
     def check_redirect_uri(self, redirect_uri):
-        if redirect_uri == self.default_redirect_uri:
-            return True
+        return True  # TODO: implement proper check when
         return redirect_uri in self.redirect_uris
 
     def check_client_secret(self, client_secret):
@@ -97,8 +104,13 @@ class OAuth2Client(models.Model, ClientMixin):
         if grant_type == "client_credentials":
             return True
 
-        raise ValueError(f"Invalid grant type: {grant_type}")
+        if grant_type == "refresh_token":
+            return True
 
+        if grant_type == "authorization_code":
+            return True
+
+        raise ValueError(f"Invalid grant type: {grant_type}")
         allowed = self.grant_type.split()
         return grant_type in allowed
 
@@ -106,7 +118,7 @@ class OAuth2Client(models.Model, ClientMixin):
 class OAuth2Token(models.Model, TokenMixin):
     """Model representing an OAuth2 token."""
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(Membership, on_delete=models.CASCADE)  # membership
     client_id = models.CharField(max_length=48, db_index=True)
     token_type = models.CharField(max_length=40)
     access_token = models.CharField(max_length=10000, unique=True, null=False)
@@ -115,6 +127,9 @@ class OAuth2Token(models.Model, TokenMixin):
     revoked = models.BooleanField(default=False)
     issued_at = models.IntegerField(null=False, default=now_timestamp)
     expires_in = models.IntegerField(null=False, default=0)
+
+    def check_client(self, client):
+        return self.client_id == client.client_id
 
     def get_client_id(self):
         return self.client_id
@@ -127,3 +142,70 @@ class OAuth2Token(models.Model, TokenMixin):
 
     def get_expires_at(self):
         return self.issued_at + self.expires_in
+
+    def validate(self):
+        if self.revoked:
+            return False
+        if self.get_expires_at() < now_timestamp():
+            return False
+        return True
+
+    def is_refresh_token_active(self) -> bool:
+        if self.revoked:
+            return False
+        # Assuming refresh tokens expire in 30 days (2592000 seconds)
+        refresh_token_lifetime = 2592000
+        if self.issued_at + refresh_token_lifetime < now_timestamp():
+            return False
+        return True
+
+    def is_revoked(self) -> bool:
+        return self.revoked
+
+    def is_expired(self) -> bool:
+        return self.get_expires_at() < now_timestamp()
+
+    def get(self, key: str, default=None):
+        return getattr(self, key, default)
+
+
+class AuthorizationCode(models.Model, AuthorizationCodeMixin):
+    membership = models.ForeignKey(Membership, on_delete=models.CASCADE)
+    client_id = models.CharField(max_length=48, db_index=True)
+    code = models.CharField(max_length=120, unique=True, null=False)
+    redirect_uri = models.TextField(default="", null=True)
+    response_type = models.TextField(default="")
+    scope = models.TextField(default="", null=True)
+    auth_time = models.IntegerField(null=False, default=now_timestamp)
+
+    # add nonce
+    nonce = models.CharField(max_length=120, default="", null=True)
+    # ... other fields and methods ...
+
+    @property
+    def user(self):
+        """Return the membership associated with this authorization code."""
+        return self.membership
+
+    def is_expired(self):
+        # Authorization code is valid for 10 minutes
+        expiration_time = self.auth_time + 600
+        return now_timestamp() > expiration_time
+
+    def get_redirect_uri(self):
+        return self.redirect_uri
+
+    def get_scope(self):
+        return self.scope or ""
+
+    def get_auth_time(self):
+        return self.auth_time
+
+    def get_nonce(self):
+        return self.nonce
+
+    def get_acr(self):
+        return "1"  # Authentication Context Class Reference (check what this should be)
+
+    def get_amr(self):
+        return ["pwd"]  # Authentication Methods References (check what this should be)
