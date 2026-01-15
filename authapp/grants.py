@@ -22,7 +22,7 @@ class OpenIDCode(oidcgrants.OpenIDCode):
         return {
             "key": settings.PRIVATE_KEY,
             "alg": "RS256",
-            "iss": "lok",
+            "iss": settings.OIDC_ISSUER,
             "exp": 3600,
             "kid": "1",
         }
