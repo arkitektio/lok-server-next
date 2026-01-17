@@ -28,30 +28,53 @@ class AliasModel(BaseModel):
     challenge: str = Field(default="ht", description="A challenge url to verify the alias on the client. If it returns a 200 OK, the alias is valid. It can additionally return a JSON object with a `challenge` key that contains the challenge to be solved by the client.")
 
 
+class RoleConfig(BaseModel):
+    """Model representing a role assigned to a service instance."""
+
+    identifier: str
+    description: Optional[str] = None
+
+
+class ScopeConfig(BaseModel):
+    """Model representing a scope assigned to a service instance."""
+
+    identifier: str
+    description: Optional[str] = None
+
+
 class ServiceInstanceModel(BaseModel):
     """Model representing a service instance. Belong its to a service and has multiple aliases."""
+
     organization: Optional[str] = None
     service: str
     version: Optional[str] = "1.0.0"
     identifier: str
+    roles: List[RoleConfig] = []
+    scopes: List[ScopeConfig] = []
     aliases: List[AliasModel]
-    
+
+
+class ClientInstanceModel(BaseModel):
+    organization: Optional[str] = None
+    client: str
+    version: Optional[str] = "1.0.0"
+    identifier: str
+
+
+class CompositionsConfigModel(BaseModel):
+    instances: List[ServiceInstanceModel] = []
+    clients: List[ClientInstanceModel] = []
+    name: str
+    description: Optional[str] = None
+    organization: str
+    identifier: Optional[str] = None  # Using identifier as slug
 
 
 class YamlConfigModel(BaseModel):
     """Model representing the YAML configuration."""
 
-    layers: List[LayerModel]
-    instances: List[ServiceInstanceModel]
+    compositions: List[CompositionsConfigModel] = []
 
     @model_validator(mode="after")
-    def validate_aliases_layers(self) -> "YamlConfigModel":
-        """Validate that all alias layers reference existing layers."""
-        layer_ids = {layer.identifier for layer in self.layers}
-
-        for instance in self.instances:
-            for alias in instance.aliases:
-                if alias.layer not in layer_ids:
-                    raise ValueError(f"Alias layer '{alias.layer}' in instance '{instance.identifier}' does not exist in defined layers. Allowed Layers: {', '.join(layer_ids)}")
-
+    def validate_args(self):
         return self

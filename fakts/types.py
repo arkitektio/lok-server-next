@@ -188,7 +188,6 @@ class Client:
     functional: bool = strawberry_django.field(description="Is this client functional? A functional client is a client that is able to authenticate users. If a client is not functional, it will not be able to authenticate users.")
     release: Release = strawberry_django.field(description="The release that this client belongs to.")
     tenant: types.User = strawberry_django.field(description="The user that manages this release.")
-    kind: enums.ClientKind = strawberry_django.field(description="The kind of the client. The kind defines the authentication flow that is used to authenticate users with this client.")
     oauth2_client: atypes.Oauth2Client = strawberry_django.field(description="The real oauth2 client that is used to authenticate users with this client.")
     public: bool = strawberry_django.field(description="Is this client public? If a client is public ")
     user: types.User | None = strawberry_django.field(description="If the client is a DEVELOPMENT client, which requires no further authentication, this is the user that is authenticated with the client.")
