@@ -369,3 +369,37 @@ class ManagementScopeFilter:
         if self.creating_instance is None:
             return queryset
         return queryset.filter(creating_instance__id=self.creating_instance)
+
+
+@strawberry_django.order(fakts_models.IonscaleAuthKey)
+class ManagementIonscaleAuthKeyOrder:
+    created_at: strawberry.auto
+    ephemeral: strawberry.auto
+
+
+@strawberry_django.filter(fakts_models.IonscaleAuthKey)
+class ManagementIonscaleAuthKeyFilter:
+    search: str | None
+    ids: list[strawberry.ID] | None
+    layer: strawberry.ID | None
+    ephemeral: bool | None
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+
+    def filter_search(self, queryset, info):
+        if self.search is None:
+            return queryset
+        return queryset.filter(key__contains=self.search)
+
+    def filter_layer(self, queryset, info):
+        if self.layer is None:
+            return queryset
+        return queryset.filter(layer__id=self.layer)
+
+    def filter_ephemeral(self, queryset, info):
+        if self.ephemeral is None:
+            return queryset
+        return queryset.filter(ephemeral=self.ephemeral)

@@ -95,3 +95,35 @@ def delete_ionscale_layer(info: Info, input: DeleteIonscaleLayerInput) -> strawb
     alias.delete()
 
     return input.id
+
+
+@kante.input
+class CreateIonscaleAuthKeyInput:
+    """Input for creating an auth key for an Ionscale layer"""
+    layer_id: strawberry.ID = strawberry.field(description="The ID of the Ionscale layer to create the key for.")
+    ephemeral: bool = strawberry.field(default=True, description="When enabled, machines authenticated by this key will be automatically removed after going offline.")
+    tags: list[str] | None = strawberry.field(default=None, description="Machines authenticated by this key will be automatically tagged with these tags.")
+
+
+def create_ionscale_auth_key(info: Info, input: CreateIonscaleAuthKeyInput) -> types.ManagementIonscaleAuthKey:
+    """ """
+    layer = fakts_models.IonscaleLayer.objects.get(id=input.layer_id)
+    if not layer.organization.memberships.filter(user=info.context.request.user).exists():
+        raise PermissionError("You are not a member of the organization that owns this layer.")
+
+    key = django_repo.create_auth_key(
+        tailnet=layer.tailnet_name,
+        ephemeral=input.ephemeral,
+        pre_authorized=True,
+        tags=input.tags
+    )
+
+    key = fakts_models.IonscaleAuthKey.objects.create(
+        layer=layer,
+        key=key,
+        creator=info.context.request.user,
+        ephemeral=input.ephemeral,
+        tags=input.tags or []
+    )
+    
+    return key

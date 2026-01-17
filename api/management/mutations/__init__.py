@@ -40,5 +40,6 @@ from .composition import update_composition, delete_composition
 from .ionscale import (
     create_ionscale_layer,
     delete_ionscale_layer,
-    update_ionscale_layer
+    update_ionscale_layer,
+    create_ionscale_auth_key,
 )

@@ -37,6 +37,7 @@ class Query:
     roles: list[types.ManagementRole] = kante.django_field()
     compositions: list[types.ManagementComposition] = kante.django_field()
     management_layers: list[types.ManagementLayer] = kante.django_field()
+    ionscale_auth_keys: list[types.ManagementIonscaleAuthKey] = kante.django_field()
 
     @kante.django_field()
     def social_account(self, info: Info, id: strawberry.ID) -> types.ManagementSocialAccount:
@@ -161,6 +162,11 @@ class Query:
     @kante.django_field()
     def layer(self, info: Info, id: strawberry.ID) -> types.ManagementLayer:
         return fakts_models.IonscaleLayer.objects.get(id=id)
+
+    @kante.django_field()
+    def ionscale_auth_key(self, info: Info, id: strawberry.ID) -> types.ManagementIonscaleAuthKey:
+        return fakts_models.IonscaleAuthKey.objects.get(id=id)
+
 
     @kante.django_field()
     def machine(self, info: Info, id: strawberry.ID) -> types.ManagementMachine:
@@ -359,6 +365,10 @@ class Mutation:
     )
     update_ionscale_layer = strawberry_django.mutation(
         resolver=mutations.update_ionscale_layer,
+    )
+
+    create_ionscale_auth_key = strawberry_django.mutation(
+        resolver=mutations.create_ionscale_auth_key,
     )
 
 

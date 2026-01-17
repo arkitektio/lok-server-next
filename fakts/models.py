@@ -46,6 +46,18 @@ class IonscaleLayer(Layer):
         return f"Ionscale Layer: {self.identifier} ({self.tailnet_name})"
 
 
+class IonscaleAuthKey(models.Model):
+    layer = models.ForeignKey(IonscaleLayer, on_delete=models.CASCADE, related_name="auth_keys")
+    key = models.CharField(max_length=1000)
+    created_at = models.DateTimeField(auto_now_add=True)
+    creator = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="created_ionscale_auth_keys")
+    ephemeral = models.BooleanField(default=False)
+    tags = models.JSONField(default=list)
+
+    def __str__(self):
+        return f"Auth Key for {self.layer.tailnet_name} ({self.created_at})"
+
+
 class Service(models.Model):
     name = models.CharField(max_length=1000)
     identifier = fields.IdentifierField()

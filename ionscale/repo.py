@@ -261,6 +261,25 @@ class IonscaleRepository:
             is_external=False, # Not explicitly in sample
         )
     
+    def create_auth_key(self, tailnet: str, ephemeral: bool = False, pre_authorized: bool = True, tags: List[str] = None) -> str:
+        """
+        Runs `ionscale auth-keys create` and returns the key.
+        """
+        args = ["auth-keys", "create", "--tailnet", tailnet]
+        
+        if ephemeral:
+            args.append("--ephemeral")
+        
+        if pre_authorized:
+            args.append("--pre-authorized")
+            
+        if tags:
+            for tag in tags:
+                args.extend(["--tag", tag])
+
+        output = self._run_command(args, command_type="auth-keys")
+        return output.strip()
+
     def run(self, *preargs) -> str:
         """
         Runs arbitrary ionscale CLI commands.

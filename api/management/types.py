@@ -753,8 +753,11 @@ class ManagementLayer:
     aliases: list["ManagementInstanceAlias"] = strawberry_django.field(
         description="The instances of the service. A service instance is a configured instance of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."
     )
-    tailnet_name: Optional[str] = strawberry.field(description="The tailnet name of the layer. This is only set for Ionscale layers.")
-
+    tailnet_name: str = strawberry.field(description="The tailnet name of the layer. This is only set for Ionscale layers.")
+    auth_keys: list["ManagementIonscaleAuthKey"] = strawberry_django.field(description="The auth keys that are associated with this layer.")
+    
+    
+    
     @strawberry.field(description="The machines associated with this layer (only works for IonscaleLayers)")
     def machines(self, info: Info) -> List[ManagementMachine]:
         if hasattr(self, "tailnet_name"):
@@ -766,7 +769,7 @@ class ManagementLayer:
     def machine(self, info: Info, id: str) -> Optional[ManagementMachine]:
         if hasattr(self, "tailnet_name"):
              try:
-                machine = django_repo.get_machine(int(id))
+                machine = django_repo.get_machine(str(id))
                 return ManagementMachine(instance=machine, tailnet=self.tailnet_name, layer_id=self.id)
              except Exception:
                  return None
@@ -775,6 +778,26 @@ class ManagementLayer:
     @classmethod
     def get_queryset(cls, queryset, info: Info):
         return queryset.filter(organization__memberships__user=info.context.request.user).distinct()
+
+
+@strawberry_django.type(
+    fakts_models.IonscaleAuthKey,
+    filters=filters.ManagementIonscaleAuthKeyFilter,
+    order=filters.ManagementIonscaleAuthKeyOrder,
+    pagination=True,
+)
+class ManagementIonscaleAuthKey:
+    id: strawberry.ID
+    key: str
+    created_at: datetime.datetime
+    ephemeral: bool
+    tags: list[str]
+    creator: "ManagementUser"
+    layer: ManagementLayer
+
+    @classmethod
+    def get_queryset(cls, queryset, info: Info):
+        return queryset.filter(layer__organization__memberships__user=info.context.request.user).distinct()
 
 
 @strawberry_django.type(
