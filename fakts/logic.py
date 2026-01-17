@@ -9,7 +9,7 @@ from typing import Optional
 from fakts import fields, errors
 from django.http import HttpRequest
 from uuid import uuid4
-from fakts.base_models import Manifest, ClaimAnswer, InstanceClaim, SelfClaim, AuthClaim
+from fakts.base_models import Alias, Manifest, ClaimAnswer, InstanceClaim, SelfClaim, AuthClaim
 from hashlib import sha256
 from django.conf import settings
 from typing import Dict
@@ -20,6 +20,15 @@ def render_composition(client: models.Client, context: base_models.LinkingContex
 
     self_claim = SelfClaim(
         deployment_name=context.deployment_name,
+        alias=Alias(
+            id="self",
+            host=context.request.host,
+            port=context.request.port,
+            is_secure=context.request.is_secure,
+            path="lok",
+            challenge="ht"
+        ),
+        
     )
 
     auth_claim = AuthClaim(

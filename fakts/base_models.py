@@ -307,10 +307,6 @@ class AppConfig(Manifest):
     clients: list[ClientUnion]
 
 
-class SelfClaim(BaseModel):
-    deployment_name: str = Field(default=settings.DEPLOYMENT_NAME)
-
-
 class AuthClaim(BaseModel):
     client_token: str
     client_id: str
@@ -347,6 +343,13 @@ class InstanceClaim(BaseModel):
     identifier: str
     """The identifier is a unique string that identifies the instance."""
     aliases: List[Alias] = Field(default_factory=list)
+
+
+
+class SelfClaim(BaseModel):
+    deployment_name: str = Field(default=settings.DEPLOYMENT_NAME)
+    alias: Alias
+
 
 
 class ClaimAnswer(BaseModel):

@@ -29,9 +29,10 @@ class AliasModel(BaseModel):
 
 
 class ServiceInstanceModel(BaseModel):
-    """Model representing a service instance."""
-
+    """Model representing a service instance. Belong its to a service and has multiple aliases."""
+    organization: Optional[str] = None
     service: str
+    version: Optional[str] = "1.0.0"
     identifier: str
     aliases: List[AliasModel]
     

@@ -1,6 +1,6 @@
 import yaml
 from django.core.management.base import BaseCommand
-from fakts.models import Layer, Service, ServiceInstance, InstanceAlias
+from fakts.models import Layer, Service, ServiceInstance, InstanceAlias, ServiceRelease
 from fakts.config_models import YamlConfigModel  # <-- Your validated Pydantic schema
 from django.contrib.auth import get_user_model
 from django.conf import settings
@@ -20,24 +20,14 @@ class Command(BaseCommand):
         config = YamlConfigModel(layers=layers, instances=instances)
 
         layer_lookup = {}
-        return
-
-        # Create or update layers
-        for layer in config.layers:
-            obj, created = Layer.objects.update_or_create(
-                identifier=layer.identifier,
-                defaults={
-                    "name": layer.name or layer.identifier,
-                    "kind": layer.kind,
-                    "description": layer.description,
-                },
-            )
-            layer_lookup[layer.identifier] = obj
-            self.stdout.write(self.style.SUCCESS(f"{'Created' if created else 'Updated'} layer: {obj.identifier}"))
-
+        
         # Create or update services and instances
         for instance in config.instances:
             service, _ = Service.objects.get_or_create(identifier=instance.service, defaults={"name": instance.service})
+
+            release, _ = ServiceRelease.objects.get_or_create(version=instance.version)
+
+
 
             inst, created = ServiceInstance.objects.update_or_create(
                 token=instance.identifier,
