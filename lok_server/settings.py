@@ -91,9 +91,8 @@ INSTALLED_APPS += [
     "allauth.mfa",
 ]
 
-FAKTS_LAYERS = conf.get("layers", [])
 
-FAKTS_INSTANCES = conf.get("instances", [])
+FAKTS_COMPOSITIONS = conf.get("compositions", [])
 
 
 # These are the URLs to be implemented by your single-page application.
