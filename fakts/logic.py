@@ -1,20 +1,89 @@
 from fakts import base_models
 from fakts import models, inputs, enums
-import re
-from string import Template
-import yaml
 from pydantic import BaseModel, Field
 import re
 from typing import Optional
 from fakts import fields, errors
 from django.http import HttpRequest
 from uuid import uuid4
-from fakts.base_models import Alias, Manifest, ClaimAnswer, InstanceClaim, SelfClaim, AuthClaim
+from fakts.base_models import Alias, Manifest, ClaimAnswer, InstanceClaim, SelfClaim, AuthClaim, CompositionAuthClaim, CompositionInstanceClaim, CompositionClientClaim, CompositionClaimAnswer
 from hashlib import sha256
 from django.conf import settings
 from typing import Dict
+from ionscale.repo import django_repo
 
 
+def create_composition_auth_key(composition: models.Composition) -> models.IonscaleAuthKey:
+    
+    layer = models.IonscaleLayer.objects.filter(
+        organization=composition.organization,
+    ).first()
+    
+    if not layer:
+        raise Exception("No Ionscale layer found for organization")
+    
+    key = django_repo.create_auth_key(
+        tailnet=layer.tailnet_name,
+        ephemeral=input.ephemeral,
+        pre_authorized=True,
+        tags=input.tags
+    )
+    key = models.IonscaleAuthKey.objects.create(
+        organization=composition.organization,
+        name=f"Auth Key for Composition {composition.name}",
+        key=str(uuid4()).replace("-", ""),
+    )
+    return key
+
+def render_server_fakts(composition: models.Composition, context: base_models.LinkingContext) -> CompositionClaimAnswer:
+    
+    
+    self_claim = SelfClaim(
+        deployment_name=context.deployment_name,
+        alias=Alias(
+            id="self",
+            host=context.request.host,
+            port=context.request.port,
+            is_secure=context.request.is_secure,
+            path="lok",
+            challenge="ht"
+        ),
+    )
+    
+    auth_claim = CompositionAuthClaim(
+        jwks_url=f"{context.request.base_url}/.well-known/jwks.json",
+        ionscale_auth_key=composition.auth_key.key if composition.auth_key else None,
+    )
+
+    instance_claims: Dict[str, CompositionInstanceClaim] = {}
+    client_claims: Dict[str, CompositionClientClaim] = {}
+    
+    
+    for instance in composition.instances.all():
+        instance_claims[instance.token] = CompositionInstanceClaim(
+            identifier=instance.token,
+            private_key=instance.private_key,
+        )
+        
+    for client in composition.clients.all():
+        client_claims[client.token] = CompositionClientClaim(
+            token=client.token,
+        )
+        
+    claim = CompositionClaimAnswer(
+        auth=auth_claim,
+        self=self_claim,
+        instances=instance_claims,
+        clients=client_claims,
+    )
+    
+    return claim
+        
+        
+    
+    
+
+#TODO: Rename to render_fakts
 def render_composition(client: models.Client, context: base_models.LinkingContext) -> dict:
     config_dict = {}
 
@@ -196,6 +265,27 @@ def create_linking_context(request: HttpRequest, client: models.Client, claim: b
             authorization_grant_type="client-credentials",
             name=client.name,
             redirect_uris=client.oauth2_client.redirect_uris.split(" "),
+        ),
+    )
+    
+    
+def create_serverlinking_context(request: HttpRequest, composition: models.Composition, claim: base_models.ClaimRequest) -> base_models.LinkingContext:
+    host_string = request.get_host().split(":")
+    if len(host_string) == 2:
+        host = host_string[0]
+        port = host_string[1]
+    else:
+        host = host_string[0]
+        port = None
+
+    base_url = request.build_absolute_uri("/") + settings.MY_SCRIPT_NAME
+
+    return base_models.ServerLinkingContext(
+        request=base_models.LinkingRequest(
+            host=host,
+            port=port,
+            base_url=base_url,
+            is_secure=request.is_secure(),
         ),
     )
 

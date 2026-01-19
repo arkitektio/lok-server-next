@@ -15,6 +15,7 @@ class AcceptCompositionDeviceCodeInput:
 
     device_code: strawberry.ID
     organization: strawberry.ID
+    allow_ionscale: bool = True
 
 
 def accept_composition_device_code(info: Info, input: AcceptCompositionDeviceCodeInput) -> types.ManagementComposition:
@@ -118,6 +119,10 @@ def accept_composition_device_code(info: Info, input: AcceptCompositionDeviceCod
             manifest=client_manifest,
             composition=composition,
         )
+        
+        
+    if input.allow_ionscale and manifest.request_auth_key:
+        logic.create_composition_auth_key(composition=composition)
 
     device_code.composition = composition
     device_code.save()

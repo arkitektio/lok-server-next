@@ -47,6 +47,7 @@ class IonscaleLayer(Layer):
 
 
 class IonscaleAuthKey(models.Model):
+    composition = models.ForeignKey("Composition", on_delete=models.CASCADE, related_name="ionscale_auth_keys", null=True, blank=True)
     layer = models.ForeignKey(IonscaleLayer, on_delete=models.CASCADE, related_name="auth_keys")
     key = models.CharField(max_length=1000)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -98,6 +99,8 @@ class ServiceInstance(models.Model):
     release = models.ForeignKey(ServiceRelease, on_delete=models.CASCADE, related_name="instances")
     logo = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
     instance_id = models.CharField(max_length=1000, default="default")
+    private_key = models.TextField(help_text="The private key of the instance, used for signing claims.", null=True, blank=True)
+    public_key = models.TextField(help_text="The public key of the instance, used for verifying claims.", null=True, blank=True )
     steward = models.ForeignKey(
         get_user_model(),
         on_delete=models.CASCADE,
@@ -265,6 +268,12 @@ class Composition(models.Model):
         related_name="created_compositions",
     )
     token = models.CharField(max_length=1000, unique=True, default=uuid.uuid4)
+    auth_key = models.ForeignKey(
+        IonscaleAuthKey,
+        on_delete=models.SET_NULL,
+        related_name="compositions",
+        null=True, blank=True,
+    )
 
     def __str__(self):
         return f"{self.name} ({self.organization})"

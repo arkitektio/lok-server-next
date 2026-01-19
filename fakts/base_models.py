@@ -174,6 +174,7 @@ class CompositionManifest(BaseModel):
     logo: Optional[str] = None
     instances: List[InstanceRequest] = Field(default_factory=list)
     clients: List[ClientRequest] = Field(default_factory=list)
+    request_auth_key: bool = False
 
 
 class CompositionStartRequest(BaseModel):
@@ -205,9 +206,6 @@ class ConfigurationRequest(BaseModel):
 
 class ClaimRequest(BaseModel):
     token: str
-    composition: Optional[str] = None
-    requirements: Optional[list[Requirement]] = Field(default_factory=list)
-    secure: bool = False
 
 
 class AliasReport(BaseModel):
@@ -249,6 +247,13 @@ class LinkingContext(BaseModel):
     manifest: Manifest
     client: LinkingClient
     secure: bool = False
+
+class ServerLinkingContext(BaseModel):
+    deployment_name: str = Field(default=settings.DEPLOYMENT_NAME)
+    request: LinkingRequest
+    secure: bool = False
+
+
 
 
 class ClientConfig(BaseModel):
@@ -308,6 +313,7 @@ class AppConfig(Manifest):
 
 
 class AuthClaim(BaseModel):
+    ionscale_auth_key: str | None = None
     client_token: str
     client_id: str
     client_secret: str
@@ -360,3 +366,39 @@ class ClaimAnswer(BaseModel):
     self: SelfClaim
     auth: AuthClaim
     instances: Dict[str, InstanceClaim] = Field(default_factory=dict)
+
+
+
+class CompositionAuthClaim(BaseModel):
+    jwks_url: str
+    ionscale_auth_key: str | None = None
+
+class CompositionInstanceClaim(BaseModel):
+    """InstancesClaim is a claim that contains the instances that are available
+    for the client. It is used to link the client to the server and to provide
+    the client with the necessary information to connect to the server.
+    """
+    identifier: str
+    private_key: str | None = None
+
+
+class CompositionClientClaim(BaseModel):
+    """InstancesClaim is a claim that contains the instances that are available
+    for the client. It is used to link the client to the server and to provide
+    the client with the necessary information to connect to the server.
+    """
+    token: str | None = None
+
+
+class CompositionClaimAnswer(BaseModel):
+    """A ClaimAnswer is the answer to a claim request. It contains the
+    linking context that should be used to link the client to the server.
+    """
+
+    self: SelfClaim
+    auth: CompositionAuthClaim
+    instances: Dict[str, CompositionInstanceClaim] = Field(default_factory=dict)
+    clients: Dict[str, CompositionClientClaim] = Field(default_factory=dict)
+    
+
+
