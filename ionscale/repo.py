@@ -278,7 +278,13 @@ class IonscaleRepository:
                 args.extend(["--tag", tag])
 
         output = self._run_command(args, command_type="auth-keys")
-        return output.strip()
+        
+        match = re.search(r"Generated new auth key.*?again\.\s+(\S+)", output, re.DOTALL)
+        if match:
+            return match.group(1).strip()
+        else:
+            raise RuntimeError("Failed to parse auth key from output")
+        
 
     def run(self, *preargs) -> str:
         """

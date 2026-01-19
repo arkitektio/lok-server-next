@@ -372,6 +372,7 @@ class ClaimAnswer(BaseModel):
 class CompositionAuthClaim(BaseModel):
     jwks_url: str
     ionscale_auth_key: str | None = None
+    ionscale_coord_url: str | None = None
 
 class CompositionInstanceClaim(BaseModel):
     """InstancesClaim is a claim that contains the instances that are available

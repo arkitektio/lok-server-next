@@ -122,8 +122,10 @@ def accept_composition_device_code(info: Info, input: AcceptCompositionDeviceCod
         
         
     if input.allow_ionscale and manifest.request_auth_key:
-        logic.create_composition_auth_key(composition=composition)
-
+        composition.auth_key = logic.create_composition_auth_key(user=info.context.request.user, composition=composition)
+        composition.save()
+        
+        
     device_code.composition = composition
     device_code.save()
 

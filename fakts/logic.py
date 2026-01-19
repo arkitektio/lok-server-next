@@ -1,4 +1,5 @@
 from fakts import base_models
+from karakter import models as karakter_models
 from fakts import models, inputs, enums
 from pydantic import BaseModel, Field
 import re
@@ -13,7 +14,7 @@ from typing import Dict
 from ionscale.repo import django_repo
 
 
-def create_composition_auth_key(composition: models.Composition) -> models.IonscaleAuthKey:
+def create_composition_auth_key(user: karakter_models.User, composition: models.Composition, ephemeral: bool = False, tags: list[str] = None) -> models.IonscaleAuthKey:
     
     layer = models.IonscaleLayer.objects.filter(
         organization=composition.organization,
@@ -22,16 +23,21 @@ def create_composition_auth_key(composition: models.Composition) -> models.Ionsc
     if not layer:
         raise Exception("No Ionscale layer found for organization")
     
+    tags = ["tag:composition-"+str(composition.pk)] if tags is None else tags
+    
+    
     key = django_repo.create_auth_key(
         tailnet=layer.tailnet_name,
-        ephemeral=input.ephemeral,
+        ephemeral=ephemeral,
         pre_authorized=True,
-        tags=input.tags
+        tags=tags
     )
     key = models.IonscaleAuthKey.objects.create(
-        organization=composition.organization,
-        name=f"Auth Key for Composition {composition.name}",
-        key=str(uuid4()).replace("-", ""),
+        layer=layer,
+        key=key,
+        creator=user,
+        ephemeral=ephemeral,
+        tags=tags
     )
     return key
 
@@ -53,6 +59,7 @@ def render_server_fakts(composition: models.Composition, context: base_models.Li
     auth_claim = CompositionAuthClaim(
         jwks_url=f"{context.request.base_url}/.well-known/jwks.json",
         ionscale_auth_key=composition.auth_key.key if composition.auth_key else None,
+        ionscale_coord_url=settings.IONSCALE_COORD_URL,
     )
 
     instance_claims: Dict[str, CompositionInstanceClaim] = {}

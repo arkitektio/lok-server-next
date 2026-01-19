@@ -55,6 +55,7 @@ OIDC_ISSUER = conf.get("oidc_issuer", "https://go.arkitekt.live")
 if conf.get("ionscale", None):
     IONSCALE_SERVER_URL = conf.ionscale.server_url
     IONSCALE_ADMIN_KEY = conf.ionscale.admin_key
+    IONSCALE_COORD_URL = conf.ionscale.coord_url # thats the public coord url
 
 INSTALLED_APPS = [
     "daphne",
