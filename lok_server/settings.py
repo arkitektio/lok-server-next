@@ -49,6 +49,24 @@ ENSURED_OPENID_APPS = [
     }
 ]
 
+
+KOMMUNITY_PARTNERS = conf.get("kommunity_partners", [
+    {
+        "description": "A fun little demo instance of Arkitekt to try out some features. Attention: Data will be deleted every 24 hours!",
+        "name": "Arkitekt Demo",
+        "identifier": "arkitekt-demo",
+        "website_url": "https://demo.arkitekt.live",
+        "auth_url": "https://demo.arkitekt.live/authorize",
+        "logo_url": "https://arkitekt.live/img/apps.png",
+        "oauth2": {
+            "client_name": "Frankon Lok Frontend",
+            "client_id": "lok-frontend",
+            "client_secret": "in0929sd0fn039j02n309n2309rn099n09n0s9n",
+            "redirect_uris": ["https://demo.arkitekt.live/auth/callback", "https://demo.arkitekt.live/auth/callback"],
+        }
+    }
+])
+
 OIDC_ISSUER = conf.get("oidc_issuer", "https://go.arkitekt.live")
 
 

@@ -862,7 +862,7 @@ class ClaimCompositionView(View):
     def post(self, request, *args, **kwargs):
         try:
             json_data = json.loads(request.body)
-            claim = base_models.ClaimRequest(**json_data)
+            claim = base_models.ServerClaimRequest(**json_data)
         except Exception as e:
             logger.error(e)
             return JsonResponse(

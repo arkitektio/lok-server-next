@@ -78,3 +78,34 @@ class YamlConfigModel(BaseModel):
     @model_validator(mode="after")
     def validate_args(self):
         return self
+
+
+
+
+class Oauth2ClientModel(BaseModel):
+    """Model representing an OAuth2 client."""
+    client_id: str
+    client_secret: str
+    redirect_uris: List[str] = []
+    scopes: List[str] = []
+
+
+
+class KommunityPartnerModel(BaseModel):
+    """Model representing a Kommunity partner."""
+    name: str
+    identifier: str
+    auth_url: str
+    website_url: Optional[str] = None
+    description: Optional[str] = None
+    logo_url: Optional[str] = None
+    oauth2: Oauth2ClientModel
+
+class KommunityPartnerConfigModel(BaseModel):
+    """Model representing the Kommunity YAML configuration."""
+
+    partners: List[KommunityPartnerModel] = []
+
+    @model_validator(mode="after")
+    def validate_args(self):
+        return self

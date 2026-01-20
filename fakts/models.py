@@ -18,6 +18,21 @@ from authapp.models import OAuth2Client
 from fakts import base_models, errors
 
 
+
+
+class KommunityPartner(models.Model):
+    name = models.CharField(max_length=1000)
+    description = models.TextField(default="No description available", null=True, blank=True)
+    logo_url = models.CharField(max_length=1000, null=True, blank=True)
+    website_url = models.CharField(max_length=1000, null=True, blank=True)
+    identifier = fields.IdentifierField(unique=True)
+    auth_url = models.CharField(max_length=1000)
+    oauth_client = models.ForeignKey(OAuth2Client, on_delete=models.CASCADE, null=True)
+
+    def __str__(self):
+        return f"{self.identifier}"
+
+
 class Layer(models.Model):
     name = models.CharField(max_length=1000)
     identifier = fields.IdentifierField(unique=True)

@@ -206,6 +206,10 @@ class ConfigurationRequest(BaseModel):
 
 class ClaimRequest(BaseModel):
     token: str
+    secure: bool = False
+
+class ServerClaimRequest(BaseModel):
+    token: str
 
 
 class AliasReport(BaseModel):

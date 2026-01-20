@@ -276,7 +276,7 @@ def create_linking_context(request: HttpRequest, client: models.Client, claim: b
     )
     
     
-def create_serverlinking_context(request: HttpRequest, composition: models.Composition, claim: base_models.ClaimRequest) -> base_models.LinkingContext:
+def create_serverlinking_context(request: HttpRequest, composition: models.Composition, claim: base_models.ServerClaimRequest) -> base_models.LinkingContext:
     host_string = request.get_host().split(":")
     if len(host_string) == 2:
         host = host_string[0]
