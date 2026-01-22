@@ -2,8 +2,7 @@ from kante.types import Info
 import strawberry_django
 import strawberry
 from karakter import types, models, managers
-from fakts.models import KommunityPartner
-from fakts.logic import create_composition_from_partner
+from fakts.logic import auto_configure_kommunity_partners
 import logging
 
 logger = logging.getLogger(__name__)
@@ -54,47 +53,6 @@ class CreateOrganizationInput:
     name: str
     description: str | None = None
     setup_kommunity_partners: bool = True
-
-
-def auto_configure_kommunity_partners(
-    organization: models.Organization,
-    user: models.User,
-) -> list[str]:
-    """
-    Scan kommunity partners and auto-configure those that apply to the user.
-    
-    Returns a list of partner identifiers that were applied.
-    """
-    applied_partners = []
-    
-    # Find auto-configure partners that apply to this user
-    auto_configure_partners = KommunityPartner.objects.filter(auto_configure=True)
-    
-    for partner in auto_configure_partners:
-        # Check if this partner applies to the user based on filter conditions
-        if not partner.applies_to_user(user):
-            logger.debug(f"Partner '{partner.identifier}' does not apply to user '{user.username}'")
-            continue
-        
-        # Check if partner has a preconfigured composition
-        if not partner.preconfigured_composition:
-            logger.debug(f"Partner '{partner.identifier}' has no preconfigured composition")
-            continue
-        
-        logger.info(f"Applying auto-configure partner '{partner.identifier}' to org '{organization.slug}'")
-        
-        try:
-            create_composition_from_partner(
-                partner=partner,
-                organization=organization,
-                creator=user,
-                log=lambda msg: logger.info(f"  {msg}"),
-            )
-            applied_partners.append(partner.identifier)
-        except Exception as e:
-            logger.error(f"Failed to apply partner '{partner.identifier}': {e}")
-    
-    return applied_partners
 
 
 def create_organization(info: Info, input: CreateOrganizationInput) -> types.Organization:

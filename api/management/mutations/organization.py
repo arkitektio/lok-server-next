@@ -4,6 +4,7 @@ import strawberry
 from api.management import types
 from karakter import models, managers
 import logging
+from fakts.logic import auto_configure_kommunity_partners
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +16,7 @@ class UpdateOrganizationInput:
     description: str | None = None
     avatar: strawberry.ID | None = None
     slug: str | None = None
+    setup_kommunity_partners: bool = True
 
 
 def create_random_slug(name: str) -> str:
@@ -45,6 +47,10 @@ def update_organization(info: Info, input: UpdateOrganizationInput) -> types.Man
 
     organization.save()
     logger.info(f"Updated Organization: {organization.id} with name: {organization.name}")
+
+    if input.setup_kommunity_partners:
+        auto_configure_kommunity_partners(organization)
+
     return organization
 
 
@@ -52,6 +58,7 @@ def update_organization(info: Info, input: UpdateOrganizationInput) -> types.Man
 class CreateOrganizationInput:
     name: str
     description: str | None = None
+    setup_kommunity_partners: bool = True
 
 
 def create_organization(info: Info, input: CreateOrganizationInput) -> types.ManagementOrganization:
@@ -69,6 +76,8 @@ def create_organization(info: Info, input: CreateOrganizationInput) -> types.Man
         organization=organization,
         roles=["admin"],
     )
+    if input.setup_kommunity_partners:
+        auto_configure_kommunity_partners(organization)
     return organization
 
 

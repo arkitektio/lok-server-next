@@ -73,6 +73,7 @@ def accept_device_code(info: Info, input: AcceptDeviceCodeInput) -> types.Manage
             config=config,
             user=user,
             organization=organization,
+            composition=composition,
         )
 
     device_code.client = client
