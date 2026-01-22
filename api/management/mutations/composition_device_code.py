@@ -98,7 +98,7 @@ def accept_composition_device_code(info: Info, input: AcceptCompositionDeviceCod
             sc.used_by.add(instance)
 
         for alias in servicer.aliases:
-            fakts_models.InstanceAlias.objects.update_or_create(instance=instance, host=alias.host, port=alias.port, ssl=alias.ssl, path=alias.path, kind=alias.kind)
+            fakts_models.InstanceAlias.objects.update_or_create(instance=instance, host=alias.host, port=alias.port, ssl=alias.ssl, path=alias.path, kind=alias.kind, scope=alias.scope)
 
     for clr in manifest.clients:
         user = info.context.request.user

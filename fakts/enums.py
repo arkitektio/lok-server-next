@@ -108,3 +108,18 @@ class FaktsGrantKindChoices(TextChoices):
 class FaktsGrantKind(str, Enum):
     RETRIEVE = "retrieve"
     DEVICE_CODE = "device_code"
+
+
+
+@strawberry.enum
+class KommunityKind(str, Enum):
+    OPEN = "open"
+    RESTRICTED = "restricted"
+    PRIVATE = "private"
+    
+    
+@strawberry.enum
+class PartnerKind(str, Enum):
+    PREAUTHORIZED = "preauthorized"
+    OAUTH_FLOW = "oauth2"
+    

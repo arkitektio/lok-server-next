@@ -130,6 +130,7 @@ class StagingAlias(BaseModel):
     path: Optional[str] = None
     challenge: Optional[str] = None
     kind: str = "absolute"
+    scope: Literal["local", "network", "public", "ionscale"] = "local"
 
 
 class ServiceDeviceCodeStartRequest(BaseModel):

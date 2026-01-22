@@ -16,8 +16,7 @@ from karakter.models import MediaStore, Organization
 from django.conf import settings
 from authapp.models import OAuth2Client
 from fakts import base_models, errors
-
-
+from fakts import enums
 
 
 class KommunityPartner(models.Model):
@@ -26,11 +25,29 @@ class KommunityPartner(models.Model):
     logo_url = models.CharField(max_length=1000, null=True, blank=True)
     website_url = models.CharField(max_length=1000, null=True, blank=True)
     identifier = fields.IdentifierField(unique=True)
-    auth_url = models.CharField(max_length=1000)
+    auth_url = models.CharField(max_length=1000, null=True, blank=True)
     oauth_client = models.ForeignKey(OAuth2Client, on_delete=models.CASCADE, null=True)
+    partner_kind=models.CharField(
+        max_length=50,
+        choices=[(e.value, e.name) for e in enums.PartnerKind],
+        help_text="The kind of partner",
+    )
+    kommunity_kind=models.CharField(
+        max_length=50,
+        choices=[(e.value, e.name) for e in enums.KommunityKind],
+        help_text="The kind of kommunity",
+    )
+    auto_configure = models.BooleanField(default=False)
+    preconfigured_composition = models.JSONField( help_text="A preconfigured composition that gets created when a user redeems a token from this partner.", null=True, blank=True)
 
     def __str__(self):
         return f"{self.identifier}"
+    
+    @property
+    def preconfigured_composition_as_model(self) -> Optional[base_models.CompositionManifest]:
+        if not self.preconfigured_composition:
+            return None
+        return base_models.CompositionManifest(**self.preconfigured_composition)
 
 
 class Layer(models.Model):
@@ -209,7 +226,11 @@ class InstanceAlias(models.Model):
         key that contains the challenge to be solved by the client.""",
     )
     path = models.CharField(max_length=1000, null=True, blank=True, help_text="The path of the alias,")
-
+    scope = models.CharField(
+        max_length=20,
+        default="local",
+        help_text="The scope of the alias. 'local' means that the alias is only available within the local network. 'network' means that the alias is available within the organization's network."
+    )
     class Meta:
         """Meta class for InstanceAlias model."""
 

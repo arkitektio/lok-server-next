@@ -151,11 +151,11 @@ def find_instance_for_requirement(service: models.Service, requirement: base_mod
     return instance
 
 
-def find_instance_for_requirement_and_organization(requirement: base_models.Requirement, user: models.AbstractUser, organization: models.Organization) -> models.ServiceInstance | None:
+def find_instance_for_requirement_and_composition(requirement: base_models.Requirement, user: models.AbstractUser, composition: models.Composition) -> models.ServiceInstance | None:
     instance = (
         models.ServiceInstance.objects.filter(
             release__service__identifier=requirement.service,
-            organization=organization,
+            composition=composition,
         )
         .filter(
             models.Q(allowed_users__isnull=True)
@@ -187,7 +187,7 @@ def auto_compose(client: models.Client, manifest: base_models.Manifest, user: mo
 
         for req in requirements:
             try:
-                instance = find_instance_for_requirement_and_organization(req, user, organization=organization)
+                instance = find_instance_for_requirement_and_composition(req, user, composition=client.composition)
 
                 models.ServiceInstanceMapping.objects.get_or_create(
                     client=client,

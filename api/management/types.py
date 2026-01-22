@@ -499,7 +499,7 @@ class StagingAlias:
     ssl: bool = False
     path: Optional[str] = None
     challenge: Optional[str] = None
-
+    scope: str = "local"
 
 @pydantic.type(base_models.ServiceManifest)
 class ManagementStagingServiceManifest:
@@ -551,6 +551,24 @@ class ManagementService:
         description="The releases of the service. A service release is a configured instance of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."
     )
     logo: ManagementMediaStore | None = strawberry.field(description="The logo of the app. This should be a url to a logo that can be used to represent the app.")
+
+
+@strawberry_django.type(
+    fakts_models.KommunityPartner,
+    description="A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself.",
+    pagination=True,
+    filters=filters.ManagementKommunityPartnerFilter,
+    order=filters.ManagementKommunityPartnerOrder,
+)
+class ManagementKommunityPartner:
+    id: strawberry.ID
+    auth_url: str = strawberry.field(description="The authentication URL of the partner.")
+    logo_url: str | None = strawberry.field(description="The logo URL of the partner.")
+    description: str | None = strawberry.field(description="The description of the partner.")
+    name: str = strawberry.field(description="The name of the partner.")
+    identifier: str = strawberry.field(description="The unique identifier of the partner.")
+
+
 
 
 @strawberry.type(description="Result of validating a device code against an organization")
@@ -654,7 +672,7 @@ class ManagementInstanceAlias:
     ssl: bool = strawberry.field(description="Is this alias using SSL? If true, the alias will be accessed via https:// instead of http://. This is used to indicate that the alias is secure and should be accessed via SSL")
     challenge: str = strawberry.field(description="The challenge of the alias. This is used to verify that the alias is reachable. If set, the alias will be accessed via the challenge URL (e.g. 'example.com/.well-known/challenge'). If not set, the alias will be accessed via the instance's URL.")
     usages: list["ManagementUsedAlias"] = strawberry_django.field(description="The usages of this alias by clients.")
-
+    scope: str = strawberry.field(description="The scope of the alias. This indicates where the alias can be used. E.g 'local' means that the alias can only be used within the local network.")
 
 @strawberry_django.type(
     fakts_models.ServiceInstanceMapping,

@@ -1,5 +1,5 @@
 from typing import Any, AsyncGenerator, Type
-from fakts.logic import find_instance_for_requirement, find_instance_for_requirement_and_organization
+from fakts.logic import find_instance_for_requirement, find_instance_for_requirement_and_composition
 import strawberry
 import strawberry_django
 from kante.types import Info
@@ -17,6 +17,7 @@ from authapp.models import OAuth2Client
 @strawberry.type
 class Query:
     organizations: list[types.ManagementOrganization] = kante.django_field()
+    kommunity_partners: list[types.ManagementKommunityPartner] = kante.django_field()
     friends: list[types.ManagementUser] = kante.django_field()
     apps: list[types.ManagementApp] = kante.django_field()
     releases: list[types.ManagementRelease] = kante.django_field()
@@ -42,6 +43,10 @@ class Query:
     @kante.django_field()
     def social_account(self, info: Info, id: strawberry.ID) -> types.ManagementSocialAccount:
         return smodels.SocialAccount.objects.get(id=id)
+    
+    @kante.django_field()
+    def kommunity_partner(self, info: Info, id: strawberry.ID) -> types.ManagementKommunityPartner:
+        return fakts_models.KommunityPartner.objects.get(id=id)
 
     @kante.django_field()
     def me(self, info: Info) -> ManagementUser:
@@ -93,9 +98,9 @@ class Query:
         return OAuth2Client.objects.get(client_id=client_id)
 
     @kante.django_field()
-    def validate_device_code(self, info: Info, device_code: strawberry.ID, organization: strawberry.ID) -> types.ValidationResult:
+    def validate_device_code(self, info: Info, device_code: strawberry.ID, composition: strawberry.ID) -> types.ValidationResult:
         device_code_obj = fakts_models.DeviceCode.objects.get(id=device_code)
-        organization_obj = karakter_models.Organization.objects.get(id=organization)
+        composition_obj = fakts_models.Composition.objects.get(id= composition)
         user = info.context.request.user
         manifest = device_code_obj.manifest_as_model
         errors: list[str] = []
@@ -107,7 +112,7 @@ class Query:
 
         for req in manifest.requirements:
             try:
-                instance = find_instance_for_requirement_and_organization(req, user, organization=organization_obj)
+                instance = find_instance_for_requirement_and_composition(req, user, composition=composition_obj)
                 if instance:
                     mappings.append(
                         types.PotentialMapping(

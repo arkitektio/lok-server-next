@@ -1,5 +1,7 @@
 from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional, Literal
+from fakts import enums
+from fakts.base_models import CompositionManifest
 
 
 class LayerModel(BaseModel):
@@ -100,6 +102,10 @@ class KommunityPartnerModel(BaseModel):
     description: Optional[str] = None
     logo_url: Optional[str] = None
     oauth2: Oauth2ClientModel
+    partner_kind: enums.PartnerKind 
+    kommunity_kind: enums.KommunityKind = enums.KommunityKind.OPEN
+    preconfigured_composition: Optional[CompositionManifest] = None
+    
 
 class KommunityPartnerConfigModel(BaseModel):
     """Model representing the Kommunity YAML configuration."""

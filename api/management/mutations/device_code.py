@@ -14,7 +14,7 @@ class AcceptDeviceCodeInput:
     """Input for creating a single-use magic device code for an organization"""
 
     device_code: strawberry.ID
-    organization: strawberry.ID
+    composition: strawberry.ID
 
 
 def accept_device_code(info: Info, input: AcceptDeviceCodeInput) -> types.ManagementClient:
@@ -27,7 +27,8 @@ def accept_device_code(info: Info, input: AcceptDeviceCodeInput) -> types.Manage
     """
     user = info.context.request.user
     device_code = fakts_models.DeviceCode.objects.get(id=input.device_code)
-    organization = models.Organization.objects.get(id=input.organization)
+    composition = fakts_models.Composition.objects.get(id=input.composition)
+    organization = composition.organization
 
     manifest = device_code.manifest_as_model
 
@@ -46,6 +47,7 @@ def accept_device_code(info: Info, input: AcceptDeviceCodeInput) -> types.Manage
         node=node,
         tenant=user,
         organization=organization,
+        composition=composition,
         redirect_uris=redirect_uris,
     ).first()
 
