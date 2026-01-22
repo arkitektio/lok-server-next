@@ -13,16 +13,14 @@ uv run python manage.py ensureadmin
 echo "=> Ensuring Roles..."
 uv run python manage.py ensureroles
 
-
-echo "=> Ensuring Organizations..."
-uv run python manage.py ensureorganizations
+echo "=> Ensuring Kommunity Partners..."
+uv run python manage.py ensure_kommunity
 
 echo "=> Ensuring Users..."
 uv run python manage.py ensureusers
 
-
-echo "=> Ensuring Composition..."
-uv run python manage.py ensurecomposition
+echo "=> Ensuring Organizations (with auto-configured compositions)..."
+uv run python manage.py ensureorganizations
 
 echo "=> Ensuring Redeem Tokens..."
 uv run python manage.py ensuretokens

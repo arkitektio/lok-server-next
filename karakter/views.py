@@ -1,104 +1,61 @@
-from django.shortcuts import render, redirect
-from .forms import ProfileForm
+from django.shortcuts import redirect
 from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from django.conf import settings
 
 
-@login_required
-def profile(request):
-    # Assuming `ProfileForm` is a form for your `Profile` model
-    profile_form = ProfileForm(instance=request.user.profile)
-
-    if request.method == "POST":
-        profile_form = ProfileForm(request.POST, instance=request.user.profile)
-        if profile_form.is_valid():
-            profile_form.save()
-            return redirect("profile")
-
-    context = {
-        "profile_form": profile_form,
-        "social_accounts": [],
-    }
-
-    return render(request, "karakter/profile.html", context)
-
-
-@login_required
-def home(request):
-    return render(request, "account/home.html")
+def get_frontend_url():
+    """Get the frontend URL from settings or default."""
+    return getattr(settings, 'KONTROL_FRONTEND_URL', '/')
 
 
 @login_required
 def organization_detail(request, slug):
-    from karakter.models import Organization
-
-    try:
-        organization = Organization.objects.get(slug=slug)
-    except Organization.DoesNotExist:
-        return redirect("home")
-
-    context = {
-        "organization": organization,
-        "roles": organization.roles.all(),
-    }
-
-    return render(request, "karakter/organization_detail.html", context)
+    """Redirect to frontend organization page."""
+    frontend_url = get_frontend_url()
+    return redirect(f"{frontend_url}/organizations/{slug}")
 
 
 @login_required
 def change_org(request):
+    """API endpoint to change the active organization."""
     from karakter.models import Organization
 
     if request.method == "POST":
-        print(request.POST)
         org_slug = request.POST.get("organization")
         try:
             organization = Organization.objects.get(slug=org_slug)
             request.user.active_organization = organization
             request.user.save()
-            next_url = request.POST.get("next", "home")
+            next_url = request.POST.get("next", get_frontend_url())
             return redirect(next_url)
         except Organization.DoesNotExist:
-            return render(request, "karakter/change_org.html", {"error": "Organization does not exist."})
+            return JsonResponse({"error": "Organization does not exist."}, status=404)
 
-    memberships = request.user.memberships.all()
-    return render(request, "karakter/change_org.html", {"memberships": memberships})
+    # For GET requests, redirect to frontend
+    frontend_url = get_frontend_url()
+    return redirect(f"{frontend_url}/organizations")
 
 
 @login_required
 def accept_invite(request, token):
-    """View for accepting an organization invite"""
+    """View for accepting an organization invite - redirects to frontend with token."""
     from karakter.models import Invite, Membership, Role
 
     try:
         invite = Invite.objects.get(token=token)
     except Invite.DoesNotExist:
-        context = {
-            "error": "Invalid invite token",
-            "invite": None,
-        }
-        return render(request, "karakter/accept_invite.html", context)
+        frontend_url = get_frontend_url()
+        return redirect(f"{frontend_url}/invite/error?reason=invalid")
 
     # Check status and validity
     if invite.status != Invite.Status.PENDING:
-        if invite.status == Invite.Status.ACCEPTED:
-            error = f"This invite has already been accepted by {invite.accepted_by.username}"
-        elif invite.status == Invite.Status.DECLINED:
-            error = f"This invite was declined by {invite.declined_by.username}"
-        else:
-            error = "This invite has been cancelled"
-
-        context = {
-            "error": error,
-            "invite": invite,
-        }
-        return render(request, "karakter/accept_invite.html", context)
+        frontend_url = get_frontend_url()
+        return redirect(f"{frontend_url}/invite/error?reason=already_processed")
 
     if not invite.is_valid():
-        context = {
-            "error": "This invite has expired",
-            "invite": invite,
-        }
-        return render(request, "karakter/accept_invite.html", context)
+        frontend_url = get_frontend_url()
+        return redirect(f"{frontend_url}/invite/error?reason=expired")
 
     # Handle POST request (user accepts or declines the invite)
     if request.method == "POST":
@@ -106,7 +63,8 @@ def accept_invite(request, token):
 
         if action == "decline":
             invite.decline(request.user)
-            return redirect("home")
+            frontend_url = get_frontend_url()
+            return redirect(frontend_url)
 
         # Default action is accept
         # Check if already a member
@@ -119,7 +77,8 @@ def accept_invite(request, token):
             invite.accept(request.user)
             request.user.active_organization = invite.created_for
             request.user.save()
-            return redirect("home")
+            frontend_url = get_frontend_url()
+            return redirect(frontend_url)
 
         # Create new membership
         membership = Membership.objects.create(
@@ -146,19 +105,17 @@ def accept_invite(request, token):
         request.user.active_organization = invite.created_for
         request.user.save()
 
-        return redirect("home")
+        frontend_url = get_frontend_url()
+        return redirect(frontend_url)
 
-    # Display invite details for GET request
-    context = {
-        "invite": invite,
-        "organization": invite.created_for,
-        "error": None,
-    }
-    return render(request, "karakter/accept_invite.html", context)
+    # For GET requests, redirect to frontend invite page
+    frontend_url = get_frontend_url()
+    return redirect(f"{frontend_url}/invite/{token}")
 
 
 @login_required
 def leave_org(request, slug):
+    """API endpoint to leave an organization."""
     from karakter.models import Organization, Membership
 
     if request.method == "POST":
@@ -172,8 +129,9 @@ def leave_org(request, slug):
                 request.user.active_organization = None
                 request.user.save()
 
-            return redirect("profile")
+            frontend_url = get_frontend_url()
+            return redirect(frontend_url)
         except (Organization.DoesNotExist, Membership.DoesNotExist):
-            pass
+            return JsonResponse({"error": "Organization or membership not found."}, status=404)
 
     return redirect("organization_detail", slug=slug)

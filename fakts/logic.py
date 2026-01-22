@@ -3,15 +3,177 @@ from karakter import models as karakter_models
 from fakts import models, inputs, enums
 from pydantic import BaseModel, Field
 import re
-from typing import Optional
+from typing import Optional, Callable
 from fakts import fields, errors
 from django.http import HttpRequest
-from uuid import uuid4
-from fakts.base_models import Alias, Manifest, ClaimAnswer, InstanceClaim, SelfClaim, AuthClaim, CompositionAuthClaim, CompositionInstanceClaim, CompositionClientClaim, CompositionClaimAnswer
+from uuid import uuid4, uuid5, NAMESPACE_DNS
+from fakts.base_models import Alias, Manifest, ClaimAnswer, InstanceClaim, SelfClaim, AuthClaim, CompositionAuthClaim, CompositionInstanceClaim, CompositionClientClaim, CompositionClaimAnswer, CompositionManifest
 from hashlib import sha256
 from django.conf import settings
 from typing import Dict
 from ionscale.repo import django_repo
+
+
+def create_composition_from_manifest(
+    manifest: CompositionManifest,
+    organization: karakter_models.Organization,
+    creator: karakter_models.User,
+    token: str | None = None,
+    log: Callable[[str], None] | None = None,
+) -> models.Composition:
+    """
+    Create a composition from a CompositionManifest for a given organization.
+    
+    This is the core logic for creating compositions with all their service instances,
+    roles, scopes, and aliases.
+    
+    Args:
+        manifest: The composition manifest containing the configuration
+        organization: The organization to create the composition for
+        creator: The user who will be the creator of the composition
+        token: Optional token for the composition (generated if not provided)
+        log: Optional logging function for progress messages
+    
+    Returns:
+        The created or updated Composition instance
+    """
+    if not token:
+        token = str(uuid5(NAMESPACE_DNS, f"{manifest.identifier}:{organization.slug}"))
+    
+    # Create or update the composition
+    composition, created = models.Composition.objects.update_or_create(
+        token=token,
+        defaults={
+            "name": manifest.identifier or "Unnamed Composition",
+            "description": manifest.description or "Auto-configured composition",
+            "organization": organization,
+            "creator": creator,
+        }
+    )
+    
+    if log:
+        log(f"{'Created' if created else 'Updated'} composition '{composition.name}' for org '{organization.slug}'")
+    
+    # Create service instances from the composition manifest
+    for instance_request in manifest.instances:
+        service_manifest = instance_request.manifest
+        
+        # Create or get the service
+        service, _ = models.Service.objects.get_or_create(
+            identifier=service_manifest.identifier,
+            defaults={"name": service_manifest.identifier}
+        )
+        
+        # Create or get the service release
+        release, _ = models.ServiceRelease.objects.get_or_create(
+            service=service,
+            version=service_manifest.version
+        )
+        
+        # Create or update the service instance
+        instance, inst_created = models.ServiceInstance.objects.update_or_create(
+            token=instance_request.identifier,
+            defaults={
+                "steward": creator,
+                "release": release,
+                "organization": organization,
+                "template": "{}",
+                "instance_id": instance_request.identifier,
+                "composition": composition,
+            }
+        )
+        
+        if log:
+            log(f"  {'Created' if inst_created else 'Updated'} instance: {instance.token}")
+        
+        # Create roles from manifest
+        if service_manifest.roles:
+            for role_config in service_manifest.roles:
+                role, role_created = karakter_models.Role.objects.get_or_create(
+                    organization=organization,
+                    identifier=role_config.key,
+                    defaults={
+                        "description": role_config.description,
+                        "creating_instance": instance
+                    }
+                )
+                role.used_by.add(instance)
+                if log:
+                    log(f"    {'Created' if role_created else 'Updated'} role: {role.identifier}")
+        
+        # Create scopes from manifest
+        if service_manifest.scopes:
+            for scope_config in service_manifest.scopes:
+                scope, scope_created = karakter_models.Scope.objects.get_or_create(
+                    organization=organization,
+                    identifier=scope_config.key,
+                    defaults={
+                        "description": scope_config.description,
+                        "creating_instance": instance
+                    }
+                )
+                scope.used_by.add(instance)
+                if log:
+                    log(f"    {'Created' if scope_created else 'Updated'} scope: {scope.identifier}")
+        
+        # Create aliases from staging aliases
+        for alias in instance_request.aliases:
+            alias_obj, alias_created = models.InstanceAlias.objects.update_or_create(
+                instance=instance,
+                name=alias.name or alias.id,
+                defaults={
+                    "host": alias.host,
+                    "port": alias.port,
+                    "ssl": alias.ssl if alias.ssl is not None else True,
+                    "path": alias.path,
+                    "kind": alias.kind,
+                    "challenge": alias.challenge,
+                }
+            )
+            if log:
+                log(f"    {'Created' if alias_created else 'Updated'} alias: {alias_obj.name}")
+    
+    return composition
+
+
+def create_composition_from_partner(
+    partner: models.KommunityPartner,
+    organization: karakter_models.Organization,
+    creator: karakter_models.User,
+    log: Callable[[str], None] | None = None,
+) -> models.Composition | None:
+    """
+    Create a composition from a KommunityPartner's preconfigured_composition for a given organization.
+    
+    This is a convenience wrapper around create_composition_from_manifest that handles
+    the partner-specific logic like generating deterministic tokens.
+    
+    Args:
+        partner: The KommunityPartner with the preconfigured composition
+        organization: The organization to create the composition for
+        creator: The user who will be the creator of the composition
+        log: Optional logging function for progress messages
+    
+    Returns:
+        The created Composition or None if the partner has no preconfigured composition
+    """
+    manifest = partner.preconfigured_composition_as_model
+    if not manifest:
+        return None
+    
+    # Generate deterministic token from partner identifier and org slug
+    token = str(uuid5(NAMESPACE_DNS, f"{partner.identifier}:{organization.slug}"))
+    
+    if log:
+        log(f"Creating composition from partner '{partner.identifier}'")
+    
+    return create_composition_from_manifest(
+        manifest=manifest,
+        organization=organization,
+        creator=creator,
+        token=token,
+        log=log,
+    )
 
 
 def create_composition_auth_key(user: karakter_models.User, composition: models.Composition, ephemeral: bool = False, tags: list[str] = None) -> models.IonscaleAuthKey:

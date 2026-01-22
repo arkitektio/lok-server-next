@@ -555,7 +555,7 @@ class ManagementService:
 
 @strawberry_django.type(
     fakts_models.KommunityPartner,
-    description="A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself.",
+    description="A KommunityPartner represents a pre-configured partner that can provide compositions and services to organizations. Partners can be auto-configured to automatically create compositions for new organizations.",
     pagination=True,
     filters=filters.ManagementKommunityPartnerFilter,
     order=filters.ManagementKommunityPartnerOrder,
@@ -567,6 +567,14 @@ class ManagementKommunityPartner:
     description: str | None = strawberry.field(description="The description of the partner.")
     name: str = strawberry.field(description="The name of the partner.")
     identifier: str = strawberry.field(description="The unique identifier of the partner.")
+    website_url: str | None = strawberry.field(description="The website URL of the partner.")
+    partner_kind: str = strawberry.field(description="The kind of partner (e.g., 'preauthorized', 'oauth2').")
+    kommunity_kind: str = strawberry.field(description="The kind of kommunity (e.g., 'open', 'restricted', 'private').")
+    auto_configure: bool = strawberry.field(description="Whether this partner should automatically create compositions for new organizations.")
+    
+    @strawberry.field(description="The preconfigured composition manifest for this partner, if any.")
+    def preconfigured_composition(self) -> strawberry.scalars.JSON | None:
+        return self.preconfigured_composition
 
 
 

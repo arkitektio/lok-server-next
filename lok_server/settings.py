@@ -93,9 +93,6 @@ INSTALLED_APPS = [
     "karakter",
     "health_check",
     "health_check.db",
-    "allauth_ui",
-    "widget_tweaks",
-    "slippers",
 ]
 
 INSTALLED_APPS += [
@@ -421,10 +418,12 @@ LOGGING = {
 
 LOGIN_URL = "account_login"  # Redirect to login page if not authenticated
 LOGOUT_URL = "account_logout"  # Redirect to logout page
-LOGIN_REDIRECT_URL = "profile"  # Redirect to home after login
-LOGOUT_REDIRECT_URL = "home"  # Redirect to home after logout
-ACCOUNT_LOGOUT_REDIRECT_URL = "home"
+LOGIN_REDIRECT_URL = "mainhome"  # Redirect to main after login
+LOGOUT_REDIRECT_URL = "mainhome"  # Redirect to main after logout
+ACCOUNT_LOGOUT_REDIRECT_URL = "mainhome"
 
+# Frontend URL for redirects (used by karakter views)
+KONTROL_FRONTEND_URL = conf.get("kontrol_frontend_url", "/")
 
 ENSURED_APPS = []
 

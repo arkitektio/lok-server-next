@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional, Literal
 from fakts import enums
-from fakts.base_models import CompositionManifest
+from fakts.base_models import CompositionManifest, StagingAlias, Role, Scope
 
 
 class LayerModel(BaseModel):
@@ -15,45 +15,28 @@ class LayerModel(BaseModel):
     get_probe: Optional[str] = None
 
 
-class AliasModel(BaseModel):
-    """Model representing an alias for a service instance."""
-
-    layer: str
-    "Layer identifier this alias belongs to."
-    ssl: Optional[bool] = None
-    """The ssl flag indicates if the alias is available over SSL or not."""
-    name: Optional[str] = None
-    host: Optional[str] = None
-    port: Optional[int] = None
-    path: Optional[str] = None
-    kind: Optional[Literal["relative", "absolute"]] = "relative"
-    challenge: str = Field(default="ht", description="A challenge url to verify the alias on the client. If it returns a 200 OK, the alias is valid. It can additionally return a JSON object with a `challenge` key that contains the challenge to be solved by the client.")
+# Alias for backwards compatibility - use StagingAlias from base_models
+AliasModel = StagingAlias
 
 
-class RoleConfig(BaseModel):
-    """Model representing a role assigned to a service instance."""
-
-    identifier: str
-    description: Optional[str] = None
+# Alias for backwards compatibility - use Role from base_models  
+RoleConfig = Role
 
 
-class ScopeConfig(BaseModel):
-    """Model representing a scope assigned to a service instance."""
-
-    identifier: str
-    description: Optional[str] = None
+# Alias for backwards compatibility - use Scope from base_models
+ScopeConfig = Scope
 
 
 class ServiceInstanceModel(BaseModel):
-    """Model representing a service instance. Belong its to a service and has multiple aliases."""
+    """Model representing a service instance. Belongs to a service and has multiple aliases."""
 
     organization: Optional[str] = None
     service: str
     version: Optional[str] = "1.0.0"
     identifier: str
-    roles: List[RoleConfig] = []
-    scopes: List[ScopeConfig] = []
-    aliases: List[AliasModel]
+    roles: List[Role] = Field(default_factory=list)
+    scopes: List[Scope] = Field(default_factory=list)
+    aliases: List[StagingAlias] = Field(default_factory=list)
 
 
 class ClientInstanceModel(BaseModel):
@@ -82,8 +65,6 @@ class YamlConfigModel(BaseModel):
         return self
 
 
-
-
 class Oauth2ClientModel(BaseModel):
     """Model representing an OAuth2 client."""
     client_id: str
@@ -92,18 +73,18 @@ class Oauth2ClientModel(BaseModel):
     scopes: List[str] = []
 
 
-
 class KommunityPartnerModel(BaseModel):
     """Model representing a Kommunity partner."""
     name: str
     identifier: str
-    auth_url: str
+    auth_url: Optional[str] = None
     website_url: Optional[str] = None
     description: Optional[str] = None
     logo_url: Optional[str] = None
-    oauth2: Oauth2ClientModel
-    partner_kind: enums.PartnerKind 
+    oauth2: Optional[Oauth2ClientModel] = None
+    partner_kind: enums.PartnerKind = enums.PartnerKind.PREAUTHORIZED
     kommunity_kind: enums.KommunityKind = enums.KommunityKind.OPEN
+    auto_configure: bool = False
     preconfigured_composition: Optional[CompositionManifest] = None
     
 
