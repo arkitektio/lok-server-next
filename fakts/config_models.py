@@ -73,6 +73,18 @@ class Oauth2ClientModel(BaseModel):
     scopes: List[str] = []
 
 
+class FilterConfigModel(BaseModel):
+    """Model representing filter conditions for partner applicability.
+    
+    All conditions are optional. If multiple conditions are specified, 
+    ALL must be satisfied (AND logic).
+    """
+    email_domain_equals: Optional[List[str]] = None
+    email_domain_ends_with: Optional[List[str]] = None
+    username_equals: Optional[List[str]] = None
+    username_contains: Optional[List[str]] = None
+
+
 class KommunityPartnerModel(BaseModel):
     """Model representing a Kommunity partner."""
     name: str
@@ -86,6 +98,7 @@ class KommunityPartnerModel(BaseModel):
     kommunity_kind: enums.KommunityKind = enums.KommunityKind.OPEN
     auto_configure: bool = False
     preconfigured_composition: Optional[CompositionManifest] = None
+    filter_config: Optional[FilterConfigModel] = None
     
 
 class KommunityPartnerConfigModel(BaseModel):

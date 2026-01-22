@@ -14,9 +14,11 @@ class ManagementKommunityPartnerOrder:
 
 @strawberry_django.filter(fakts_models.KommunityPartner)
 class ManagementKommunityPartnerFilter:
-    search: str | None
-    ids: list[strawberry.ID] | None
-    organization: strawberry.ID | None
+    search: str | None = None
+    ids: list[strawberry.ID] | None = None
+    auto_configure: bool | None = None
+    applicable_for_me: bool | None = None
+    has_preconfigured_composition: bool | None = None
 
     def filter_ids(self, queryset, info):
         if self.ids is None:
@@ -26,12 +28,36 @@ class ManagementKommunityPartnerFilter:
     def filter_search(self, queryset, info):
         if self.search is None:
             return queryset
-        return queryset.filter(name__contains=self.search)
+        return queryset.filter(name__icontains=self.search)
 
-    def filter_organization(self, queryset, info):
-        if self.organization is None:
+    def filter_auto_configure(self, queryset, info):
+        if self.auto_configure is None:
             return queryset
-        return queryset.filter(organization__id=self.organization)
+        return queryset.filter(auto_configure=self.auto_configure)
+
+    def filter_has_preconfigured_composition(self, queryset, info):
+        if self.has_preconfigured_composition is None:
+            return queryset
+        if self.has_preconfigured_composition:
+            return queryset.exclude(preconfigured_composition__isnull=True).exclude(preconfigured_composition={})
+        return queryset.filter(preconfigured_composition__isnull=True) | queryset.filter(preconfigured_composition={})
+
+    def filter_applicable_for_me(self, queryset, info):
+        """Filter partners that apply to the current user based on their filter_config."""
+        if self.applicable_for_me is None:
+            return queryset
+        
+        user = info.context.request.user
+        if not user.is_authenticated:
+            return queryset.none() if self.applicable_for_me else queryset
+        
+        # We need to filter in Python since filter_config logic is complex
+        applicable_ids = []
+        for partner in queryset:
+            if partner.applies_to_user(user) == self.applicable_for_me:
+                applicable_ids.append(partner.id)
+        
+        return queryset.filter(id__in=applicable_ids)
 
 
 @strawberry_django.order(fakts_models.IonscaleLayer)

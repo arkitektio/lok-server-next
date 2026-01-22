@@ -47,6 +47,8 @@ class Command(BaseCommand):
                     self.stdout.write(self.style.SUCCESS(f"Created OpenID client {oauth_client.client_id}"))
 
             # Create or update the KommunityPartner
+            filter_config_data = partner.filter_config.model_dump() if partner.filter_config else {}
+            
             kommunity_partner, created = KommunityPartner.objects.update_or_create(
                 identifier=partner.identifier,
                 defaults={
@@ -60,6 +62,7 @@ class Command(BaseCommand):
                     "auto_configure": partner.auto_configure,
                     "preconfigured_composition": preconfigured_composition_data,
                     "oauth_client": oauth_client,
+                    "filter_config": filter_config_data,
                 },
             )
 
@@ -78,5 +81,11 @@ class Command(BaseCommand):
                 self.stdout.write(
                     self.style.WARNING(
                         f"  -> Auto-configure enabled: compositions will be created for new organizations"
+                    )
+                )
+            if filter_config_data:
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"  -> Filter config: {filter_config_data}"
                     )
                 )

@@ -38,7 +38,14 @@ class KommunityPartner(models.Model):
         help_text="The kind of kommunity",
     )
     auto_configure = models.BooleanField(default=False)
-    preconfigured_composition = models.JSONField( help_text="A preconfigured composition that gets created when a user redeems a token from this partner.", null=True, blank=True)
+    preconfigured_composition = models.JSONField(help_text="A preconfigured composition that gets created when a user redeems a token from this partner.", null=True, blank=True)
+    filter_config = models.JSONField(
+        help_text="Filter conditions to determine which users/organizations this partner applies to. "
+                  "Example: {'email_domain_equals': ['example.com', 'test.org'], 'email_domain_ends_with': ['edu']}",
+        null=True,
+        blank=True,
+        default=dict,
+    )
 
     def __str__(self):
         return f"{self.identifier}"
@@ -48,6 +55,56 @@ class KommunityPartner(models.Model):
         if not self.preconfigured_composition:
             return None
         return base_models.CompositionManifest(**self.preconfigured_composition)
+    
+    def applies_to_user(self, user) -> bool:
+        """
+        Check if this partner's filter conditions apply to the given user.
+        
+        If no filter_config is set, the partner applies to everyone.
+        If filter_config is set, all conditions must be satisfied.
+        
+        Supported filter conditions:
+        - email_domain_equals: list of domains that the user's email must match exactly
+        - email_domain_ends_with: list of domain suffixes that the user's email domain must end with
+        - username_equals: list of usernames that must match exactly
+        - username_contains: list of substrings that must be in the username
+        """
+        if not self.filter_config:
+            return True
+        
+        user_email = getattr(user, 'email', None) or ''
+        user_email_domain = user_email.split('@')[-1].lower() if '@' in user_email else ''
+        username = getattr(user, 'username', '') or ''
+        
+        # Check email_domain_equals
+        if 'email_domain_equals' in self.filter_config:
+            domains = self.filter_config['email_domain_equals']
+            if isinstance(domains, list) and domains:
+                if user_email_domain.lower() not in [d.lower() for d in domains]:
+                    return False
+        
+        # Check email_domain_ends_with
+        if 'email_domain_ends_with' in self.filter_config:
+            suffixes = self.filter_config['email_domain_ends_with']
+            if isinstance(suffixes, list) and suffixes:
+                if not any(user_email_domain.endswith(s.lower()) for s in suffixes):
+                    return False
+        
+        # Check username_equals
+        if 'username_equals' in self.filter_config:
+            usernames = self.filter_config['username_equals']
+            if isinstance(usernames, list) and usernames:
+                if username not in usernames:
+                    return False
+        
+        # Check username_contains
+        if 'username_contains' in self.filter_config:
+            substrings = self.filter_config['username_contains']
+            if isinstance(substrings, list) and substrings:
+                if not any(s in username for s in substrings):
+                    return False
+        
+        return True
 
 
 class Layer(models.Model):

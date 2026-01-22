@@ -29,6 +29,7 @@ dependencies = [
     "joserfc>=1.0.4",
     "django-health-check>=3.20.0",
     "django-allauth[headless,mfa,socialaccount]>=65.13",
+    "pyjwt>=2.10.1",
 ]
 
 [dependency-groups]
