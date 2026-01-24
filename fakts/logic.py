@@ -2,7 +2,6 @@ import token
 from fakts import base_models
 from karakter import models as karakter_models
 from fakts import models, inputs, enums
-from mounts.lok.api.management.mutations import device_code
 from pydantic import BaseModel, Field
 import re
 from typing import Optional, Callable
