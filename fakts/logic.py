@@ -513,6 +513,7 @@ def validate_redeem_token(redeem_token: models.RedeemToken, manifest: Manifest) 
 
     redeem_token.client = client
     redeem_token.save()
+    return redeem_token
 
 
 def validate_device_code(device_code: models.DeviceCode, user: models.AbstractUser, organization: models.Organization, composition: models.Composition) -> models.DeviceCode:
@@ -564,3 +565,4 @@ def validate_device_code(device_code: models.DeviceCode, user: models.AbstractUs
 
     device_code.client = client
     device_code.save()
+    return device_code

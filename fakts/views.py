@@ -1,3 +1,4 @@
+from xmlrpc import client
 from django.http import JsonResponse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -497,14 +498,14 @@ class RedeemView(View):
 
         else:
             try:
-                client = logic.validate_redeem_token(
+                token = logic.validate_redeem_token(
                     redeem_token=valid_token,
                     manifest=manifest,
                 )
                 return JsonResponse(
                     data={
                         "status": "granted",
-                        "token": client.token,
+                        "token": token.client.token,
                     }
                 )
             except Exception as e:
