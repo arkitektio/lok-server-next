@@ -4,7 +4,7 @@ from django.conf import settings
 import os
 from fakts import models
 from karakter.models import Organization
-
+from fakts.config_models import RedeemTokenConfigs
 
 # assign directory
 directory = "files"
@@ -19,16 +19,18 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):
         TOKENS = settings.REDEEM_TOKENS
 
-        for token in TOKENS:
-            user = get_user_model().objects.get(username=token["user"])
-            org = Organization.objects.get(slug=token["organization"])
+        tokens = RedeemTokenConfigs(tokens=TOKENS)
+
+        for token in tokens.tokens:
+            user = get_user_model().objects.get(username=token.user)
+            composition = models.Composition.objects.get(organization__slug=token.organization, identifier=token.composition)
 
             token, _ = models.RedeemToken.objects.update_or_create(
-                token=token["token"],
+                token=token.token,
                 defaults={
                     "user": user,
-                    "organization": org,
+                    "composition": composition,
                 },
             )
 
-            print(f"Token {token} created for user {user} and organization {org.slug}")
+            print(f"Token {token.token} created for user {user} and composition {composition}")

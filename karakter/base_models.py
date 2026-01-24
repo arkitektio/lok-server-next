@@ -5,6 +5,7 @@ from typing import Optional
 class MembershipConfig(BaseModel):
     organization: str
     is_active: bool = True
+    user: str
     roles: list[str] = []
 
 
@@ -14,7 +15,8 @@ class UserConfig(BaseModel):
     username: str
     password: str
     email: Optional[str] = None
-    memberships: list[MembershipConfig] = []
+    is_superuser: bool = False
+    is_staff: bool = False
 
 
 class OrganizationConfig(BaseModel):
@@ -23,6 +25,7 @@ class OrganizationConfig(BaseModel):
     description: Optional[str] = None
     identifier: Optional[str] = None
     parent: Optional[str] = None
+    auto_configure: bool = True
 
 
 class Members(BaseModel):

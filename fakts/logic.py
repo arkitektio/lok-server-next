@@ -14,8 +14,11 @@ from django.conf import settings
 from typing import Dict
 from ionscale.repo import django_repo
 import logging
+from fakts import builders
+
 
 logger = logging.getLogger(__name__)
+
 
 def create_composition_from_manifest(
     manifest: CompositionManifest,
@@ -23,51 +26,47 @@ def create_composition_from_manifest(
 ) -> models.Composition:
     """
     Create a composition from a CompositionManifest for a given organization.
-    
+
     This is the core logic for creating compositions with all their service instances,
     roles, scopes, and aliases.
-    
+
     Args:
         manifest: The composition manifest containing the configuration
         organization: The organization to create the composition for
         creator: The user who will be the creator of the composition
         token: Optional token for the composition (generated if not provided)
         log: Optional logging function for progress messages
-    
+
     Returns:
         The created or updated Composition instance
     """
     token = str(uuid5(NAMESPACE_DNS, f"{manifest.identifier}:{organization.slug}"))
-    
+
     # Create or update the composition
     composition, created = models.Composition.objects.update_or_create(
-        token=token,
+        identifier=manifest.identifier,
+        organization=organization,
         defaults={
+            "token": token,
             "name": manifest.identifier or "Unnamed Composition",
             "description": manifest.description or "Auto-configured composition",
             "organization": organization,
             "creator": organization.owner,
-        }
+        },
     )
-    
+
     logger.info(f"{'Created' if created else 'Updated'} composition '{composition.name}' for org '{organization.slug}'")
-    
+
     # Create service instances from the composition manifest
     for instance_request in manifest.instances:
         service_manifest = instance_request.manifest
-        
+
         # Create or get the service
-        service, _ = models.Service.objects.get_or_create(
-            identifier=service_manifest.identifier,
-            defaults={"name": service_manifest.identifier}
-        )
-        
+        service, _ = models.Service.objects.get_or_create(identifier=service_manifest.identifier, defaults={"name": service_manifest.identifier})
+
         # Create or get the service release
-        release, _ = models.ServiceRelease.objects.get_or_create(
-            service=service,
-            version=service_manifest.version
-        )
-        
+        release, _ = models.ServiceRelease.objects.get_or_create(service=service, version=service_manifest.version)
+
         # Create or update the service instance
         instance, inst_created = models.ServiceInstance.objects.update_or_create(
             token=instance_request.identifier,
@@ -78,39 +77,25 @@ def create_composition_from_manifest(
                 "template": "{}",
                 "instance_id": instance_request.identifier,
                 "composition": composition,
-            }
+            },
         )
-        
+
         logger.info(f"  {'Created' if inst_created else 'Updated'} instance: {instance.token}")
-        
+
         # Create roles from manifest
         if service_manifest.roles:
             for role_config in service_manifest.roles:
-                role, role_created = karakter_models.Role.objects.get_or_create(
-                    organization=organization,
-                    identifier=role_config.key,
-                    defaults={
-                        "description": role_config.description,
-                        "creating_instance": instance
-                    }
-                )
+                role, role_created = karakter_models.Role.objects.get_or_create(organization=organization, identifier=role_config.key, defaults={"description": role_config.description, "creating_instance": instance})
                 role.used_by.add(instance)
                 logger.info(f"    {'Created' if role_created else 'Updated'} role: {role.identifier}")
-        
+
         # Create scopes from manifest
         if service_manifest.scopes:
             for scope_config in service_manifest.scopes:
-                scope, scope_created = karakter_models.Scope.objects.get_or_create(
-                    organization=organization,
-                    identifier=scope_config.key,
-                    defaults={
-                        "description": scope_config.description,
-                        "creating_instance": instance
-                    }
-                )
+                scope, scope_created = karakter_models.Scope.objects.get_or_create(organization=organization, identifier=scope_config.key, defaults={"description": scope_config.description, "creating_instance": instance})
                 scope.used_by.add(instance)
                 logger.info(f"    {'Created' if scope_created else 'Updated'} scope: {scope.identifier}")
-        
+
         # Create aliases from staging aliases
         for alias in instance_request.aliases:
             alias_obj, alias_created = models.InstanceAlias.objects.update_or_create(
@@ -123,10 +108,10 @@ def create_composition_from_manifest(
                     "path": alias.path,
                     "kind": alias.kind,
                     "challenge": alias.challenge,
-                }
+                },
             )
             logger.info(f"    {'Created' if alias_created else 'Updated'} alias: {alias_obj.name}")
-    
+
     return composition
 
 
@@ -136,29 +121,28 @@ def create_composition_from_partner(
 ) -> models.Composition | None:
     """
     Create a composition from a KommunityPartner's preconfigured_composition for a given organization.
-    
+
     This is a convenience wrapper around create_composition_from_manifest that handles
     the partner-specific logic like generating deterministic tokens.
-    
+
     Args:
         partner: The KommunityPartner with the preconfigured composition
         organization: The organization to create the composition for
         creator: The user who will be the creator of the composition
         log: Optional logging function for progress messages
-    
+
     Returns:
         The created Composition or None if the partner has no preconfigured composition
     """
     manifest = partner.preconfigured_composition_as_model
     if not manifest:
         raise ValueError(f"Partner '{partner.identifier}' has no preconfigured composition")
-    
+
     logger.info(f"Creating composition from partner '{partner.identifier}' for org '{organization.slug}' ")
-    
+
     return create_composition_from_manifest(
         manifest=manifest,
         organization=organization,
-        
     )
 
 
@@ -167,94 +151,72 @@ def auto_configure_kommunity_partners(
 ) -> list[str]:
     """
     Scan kommunity partners and auto-configure those that apply to the user.
-    
+
     This function finds all KommunityPartners with auto_configure=True,
     filters them by their filter_config conditions (e.g., email domain),
     and creates compositions from their preconfigured_composition.
-    
+
     Args:
         organization: The organization to configure
         user: The user whose attributes are checked against filter conditions
         log: Optional logging function for progress messages
-    
+
     Returns:
         A list of partner identifiers that were successfully applied
     """
     import logging
+
     logger = logging.getLogger(__name__)
-    
+
     applied_partners = []
-    
+
     # Find auto-configure partners
     auto_configure_partners = models.KommunityPartner.objects.filter(auto_configure=True)
     user = organization.owner
-    
+
     for partner in auto_configure_partners:
         # Check if this partner applies to the user based on filter conditions
         if not partner.applies_to_user(organization.owner):
             logger.info(f"Partner '{partner.identifier}' does not apply to user '{user}'")
             continue
-        
+
         # Check if partner has a preconfigured composition
         if not partner.preconfigured_composition:
             logger.warning(f"Partner '{partner.identifier}' has no preconfigured composition")
             continue
-        
-        
+
         logger.info(f"Applying partner '{partner.identifier}' to organization '{organization.slug}'")
-        
+
         create_composition_from_partner(
-                partner=partner,
-                organization=organization,
+            partner=partner,
+            organization=organization,
         )
         applied_partners.append(partner.identifier)
-            
-    
+
     return applied_partners
 
 
 def create_composition_auth_key(user: karakter_models.User, composition: models.Composition, ephemeral: bool = False, tags: list[str] = None) -> models.IonscaleAuthKey:
-    
     layer = models.IonscaleLayer.objects.filter(
         organization=composition.organization,
     ).first()
-    
+
     if not layer:
         raise Exception("No Ionscale layer found for organization")
-    
-    tags = ["tag:composition-"+str(composition.pk)] if tags is None else tags
-    
-    
-    key = django_repo.create_auth_key(
-        tailnet=layer.tailnet_name,
-        ephemeral=ephemeral,
-        pre_authorized=True,
-        tags=tags
-    )
-    key = models.IonscaleAuthKey.objects.create(
-        layer=layer,
-        key=key,
-        creator=user,
-        ephemeral=ephemeral,
-        tags=tags
-    )
+
+    tags = ["tag:composition-" + str(composition.pk)] if tags is None else tags
+
+    key = django_repo.create_auth_key(tailnet=layer.tailnet_name, ephemeral=ephemeral, pre_authorized=True, tags=tags)
+    key = models.IonscaleAuthKey.objects.create(layer=layer, key=key, creator=user, ephemeral=ephemeral, tags=tags)
     return key
 
+
 def render_server_fakts(composition: models.Composition, context: base_models.LinkingContext) -> CompositionClaimAnswer:
-    
-    
     self_claim = SelfClaim(
         deployment_name=context.deployment_name,
-        alias=Alias(
-            id="self",
-            host=context.request.host,
-            port=context.request.port,
-            is_secure=context.request.is_secure,
-            path="lok",
-            challenge="ht"
-        ),
+        alias=Alias(id="self", host=context.request.host, port=context.request.port, is_secure=context.request.is_secure, path="lok", challenge="ht"),
     )
-    
+
     auth_claim = CompositionAuthClaim(
         jwks_url=f"{context.request.base_url}/.well-known/jwks.json",
         ionscale_auth_key=composition.auth_key.key if composition.auth_key else None,
@@ -263,47 +225,35 @@ def render_server_fakts(composition: models.Composition, context: base_models.Li
 
     instance_claims: Dict[str, CompositionInstanceClaim] = {}
     client_claims: Dict[str, CompositionClientClaim] = {}
-    
-    
+
     for instance in composition.instances.all():
         instance_claims[instance.token] = CompositionInstanceClaim(
             identifier=instance.token,
             private_key=instance.private_key,
         )
-        
+
     for client in composition.clients.all():
         client_claims[client.token] = CompositionClientClaim(
             token=client.token,
         )
-        
+
     claim = CompositionClaimAnswer(
         auth=auth_claim,
         self=self_claim,
         instances=instance_claims,
         clients=client_claims,
     )
-    
-    return claim
-        
-        
-    
-    
 
-#TODO: Rename to render_fakts
+    return claim
+
+
+# TODO: Rename to render_fakts
 def render_composition(client: models.Client, context: base_models.LinkingContext) -> dict:
     config_dict = {}
 
     self_claim = SelfClaim(
         deployment_name=context.deployment_name,
-        alias=Alias(
-            id="self",
-            host=context.request.host,
-            port=context.request.port,
-            is_secure=context.request.is_secure,
-            path="lok",
-            challenge="ht"
-        ),
-        
+        alias=Alias(id="self", host=context.request.host, port=context.request.port, is_secure=context.request.is_secure, path="lok", challenge="ht"),
     )
 
     auth_claim = AuthClaim(
@@ -473,8 +423,8 @@ def create_linking_context(request: HttpRequest, client: models.Client, claim: b
             redirect_uris=client.oauth2_client.redirect_uris.split(" "),
         ),
     )
-    
-    
+
+
 def create_serverlinking_context(request: HttpRequest, composition: models.Composition, claim: base_models.ServerClaimRequest) -> base_models.LinkingContext:
     host_string = request.get_host().split(":")
     if len(host_string) == 2:
@@ -520,51 +470,52 @@ def create_fake_linking_context(client: models.Client, host, port, secure=False)
     )
 
 
-def validate_device_code(literal_device_code: str, user: models.AbstractUser, org: models.Organization) -> models.DeviceCode:
-    from .builders import create_client
+def validate_device_code(device_code: models.DeviceCode, user: models.AbstractUser, organization: models.Organization, composition: models.Composition) -> models.DeviceCode:
+    manifest = device_code.manifest_as_model
 
-    try:
-        device_code = models.DeviceCode.objects.get(
-            code=literal_device_code,
+    node_id = manifest.node_id
+    if node_id:
+        node, _ = models.ComputeNode.objects.get_or_create(organization=organization, node_id=node_id)
+    else:
+        node = None
+
+    redirect_uris = (" ".join(device_code.staging_redirect_uris),)
+
+    client = models.Client.objects.filter(
+        release__app__identifier=device_code.staging_manifest["identifier"],
+        release__version=device_code.staging_manifest["version"],
+        kind=device_code.staging_kind,
+        node=node,
+        tenant=user,
+        organization=organization,
+        composition=composition,
+        redirect_uris=redirect_uris,
+    ).first()
+
+    if not client:
+        token = create_api_token()
+
+        config = None
+
+        if device_code.staging_kind == enums.ClientKindVanilla.DEVELOPMENT.value:
+            config = base_models.DevelopmentClientConfig(
+                kind=enums.ClientKindVanilla.DEVELOPMENT.value,
+                token=token,
+                user=user.username,
+                organization=organization.slug,
+                tenant=user.username,
+            )
+
+        else:
+            raise Exception("Unknown client kind or no longer supported")
+
+        client = builders.create_client(
+            manifest=manifest,
+            config=config,
+            user=user,
+            organization=organization,
+            composition=composition,
         )
-        if device_code.client:
-            raise ValueError(f"Device code {literal_device_code} is already validated.")
 
-        manifest = base_models.Manifest(**device_code.staging_manifest)
-
-        redirect_uris = (" ".join(device_code.staging_redirect_uris),)
-
-        client = models.Client.objects.filter(
-            release__app__identifier=device_code.staging_manifest["identifier"],
-            release__version=device_code.staging_manifest["version"],
-            kind=device_code.staging_kind,
-            tenant=user,
-            organization=org,
-            redirect_uris=redirect_uris,
-        ).first()
-
-        if not client:
-            token = create_api_token()
-
-            manifest = base_models.Manifest(**device_code.staging_manifest)
-            config = None
-
-            if device_code.staging_kind == enums.ClientKindVanilla.DEVELOPMENT.value:
-                config = base_models.DevelopmentClientConfig(
-                    kind=enums.ClientKindVanilla.DEVELOPMENT.value,
-                    token=token,
-                    user=user.username,
-                    organization=org.slug,
-                    tenant=user.username,
-                )
-
-            else:
-                raise Exception("Unknown client kind or no longer supported")
-
-            client = create_client(manifest=manifest, config=config, user=user, organization=org)
-
-        device_code.client = client
-        device_code.save()
-        return device_code
-    except models.DeviceCode.DoesNotExist:
-        raise ValueError(f"Device code {literal_device_code} does not exist or is invalid.")
+    device_code.client = client
+    device_code.save()

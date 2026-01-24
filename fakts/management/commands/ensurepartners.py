@@ -6,6 +6,7 @@ from authapp.models import OAuth2Client
 from fakts.config_models import KommunityPartnerConfigModel  # <-- Your validated Pydantic schema
 from django.contrib.auth import get_user_model
 from django.conf import settings
+from fakts import logic
 import uuid
 
 
@@ -48,7 +49,7 @@ class Command(BaseCommand):
 
             # Create or update the KommunityPartner
             filter_config_data = partner.filter_config.model_dump() if partner.filter_config else {}
-            
+
             kommunity_partner, created = KommunityPartner.objects.update_or_create(
                 identifier=partner.identifier,
                 defaults={
@@ -72,20 +73,9 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS(f"Updated KommunityPartner: {kommunity_partner.identifier}"))
 
             if partner.preconfigured_composition:
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"  -> Preconfigured composition: {partner.preconfigured_composition.identifier}"
-                    )
-                )
+                self.stdout.write(self.style.SUCCESS(f"  -> Preconfigured composition: {partner.preconfigured_composition.identifier}"))
             if partner.auto_configure:
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"  -> Auto-configure enabled: compositions will be created for new organizations"
-                    )
-                )
+                self.stdout.write(self.style.WARNING(f"  -> Auto-configure enabled: compositions will be created for new organizations"))
+
             if filter_config_data:
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"  -> Filter config: {filter_config_data}"
-                    )
-                )
+                self.stdout.write(self.style.SUCCESS(f"  -> Filter config: {filter_config_data}"))

@@ -169,7 +169,7 @@ class ClientRequest(BaseModel):
 class CompositionManifest(BaseModel):
     """A Composition Request allows to request seting up a composition of clients and services."""
 
-    identifier: str
+    identifier: str = Field(..., description="A unique identifier for the composition WITHIN the organization.")
     description: Optional[str] = None
     """A human readable description of the composition."""
     logo: Optional[str] = None
@@ -208,6 +208,7 @@ class ConfigurationRequest(BaseModel):
 class ClaimRequest(BaseModel):
     token: str
     secure: bool = False
+
 
 class ServerClaimRequest(BaseModel):
     token: str
@@ -253,12 +254,11 @@ class LinkingContext(BaseModel):
     client: LinkingClient
     secure: bool = False
 
+
 class ServerLinkingContext(BaseModel):
     deployment_name: str = Field(default=settings.DEPLOYMENT_NAME)
     request: LinkingRequest
     secure: bool = False
-
-
 
 
 class ClientConfig(BaseModel):
@@ -356,11 +356,9 @@ class InstanceClaim(BaseModel):
     aliases: List[Alias] = Field(default_factory=list)
 
 
-
 class SelfClaim(BaseModel):
     deployment_name: str = Field(default=settings.DEPLOYMENT_NAME)
     alias: Alias
-
 
 
 class ClaimAnswer(BaseModel):
@@ -373,17 +371,18 @@ class ClaimAnswer(BaseModel):
     instances: Dict[str, InstanceClaim] = Field(default_factory=dict)
 
 
-
 class CompositionAuthClaim(BaseModel):
     jwks_url: str
     ionscale_auth_key: str | None = None
     ionscale_coord_url: str | None = None
+
 
 class CompositionInstanceClaim(BaseModel):
     """InstancesClaim is a claim that contains the instances that are available
     for the client. It is used to link the client to the server and to provide
     the client with the necessary information to connect to the server.
     """
+
     identifier: str
     private_key: str | None = None
 
@@ -393,6 +392,7 @@ class CompositionClientClaim(BaseModel):
     for the client. It is used to link the client to the server and to provide
     the client with the necessary information to connect to the server.
     """
+
     token: str | None = None
 
 
@@ -405,6 +405,3 @@ class CompositionClaimAnswer(BaseModel):
     auth: CompositionAuthClaim
     instances: Dict[str, CompositionInstanceClaim] = Field(default_factory=dict)
     clients: Dict[str, CompositionClientClaim] = Field(default_factory=dict)
-    
-
-

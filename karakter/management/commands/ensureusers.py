@@ -19,12 +19,17 @@ class Command(BaseCommand):
                 if User.objects.filter(username=user_config.username).exists():
                     user = User.objects.get(username=user_config.username)
                     user.email = user_config.email
+                    user.is_superuser = user_config.is_superuser
+                    user.is_staff = user_config.is_staff
                     user.set_password(user_config.password.strip())
                     user.save()
 
                     self.stdout.write(self.style.SUCCESS(f"Updated user {user.username}"))
                 else:
                     user = User.objects.create_user(username=user_config.username, email=user_config.email, password=user_config.password)
+                    user.is_superuser = user_config.is_superuser
+                    user.is_staff = user_config.is_staff
+                    user.save()
                     self.stdout.write(self.style.SUCCESS(f"Created user {user.username}"))
 
             except Exception as e:

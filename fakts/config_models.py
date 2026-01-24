@@ -19,7 +19,7 @@ class LayerModel(BaseModel):
 AliasModel = StagingAlias
 
 
-# Alias for backwards compatibility - use Role from base_models  
+# Alias for backwards compatibility - use Role from base_models
 RoleConfig = Role
 
 
@@ -67,6 +67,7 @@ class YamlConfigModel(BaseModel):
 
 class Oauth2ClientModel(BaseModel):
     """Model representing an OAuth2 client."""
+
     client_id: str
     client_secret: str
     redirect_uris: List[str] = []
@@ -75,10 +76,11 @@ class Oauth2ClientModel(BaseModel):
 
 class FilterConfigModel(BaseModel):
     """Model representing filter conditions for partner applicability.
-    
-    All conditions are optional. If multiple conditions are specified, 
+
+    All conditions are optional. If multiple conditions are specified,
     ALL must be satisfied (AND logic).
     """
+
     email_domain_equals: Optional[List[str]] = None
     email_domain_ends_with: Optional[List[str]] = None
     username_equals: Optional[List[str]] = None
@@ -87,8 +89,9 @@ class FilterConfigModel(BaseModel):
 
 class KommunityPartnerModel(BaseModel):
     """Model representing a Kommunity partner."""
+
     name: str
-    identifier: str
+    identifier: str = Field(..., description="Unique identifier for the partner within the system")
     auth_url: Optional[str] = None
     website_url: Optional[str] = None
     description: Optional[str] = None
@@ -99,7 +102,22 @@ class KommunityPartnerModel(BaseModel):
     auto_configure: bool = False
     preconfigured_composition: Optional[CompositionManifest] = None
     filter_config: Optional[FilterConfigModel] = None
-    
+
+
+class RedeemTokenModel(BaseModel):
+    """Model representing a redeem token configuration."""
+
+    token: str
+    user: str
+    organization: str
+    composition: str
+
+
+class RedeemTokenConfigs(BaseModel):
+    """The redeem tokens configuration model"""
+
+    tokens: List[RedeemTokenModel] = Field(default_factory=list)
+
 
 class KommunityPartnerConfigModel(BaseModel):
     """Model representing the Kommunity YAML configuration."""

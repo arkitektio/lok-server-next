@@ -30,56 +30,14 @@ def accept_device_code(info: Info, input: AcceptDeviceCodeInput) -> types.Manage
     composition = fakts_models.Composition.objects.get(id=input.composition)
     organization = composition.organization
 
-    manifest = device_code.manifest_as_model
-
-    node_id = manifest.node_id
-    if node_id:
-        node, _ = fakts_models.ComputeNode.objects.get_or_create(organization=organization, node_id=node_id)
-    else:
-        node = None
-
-    redirect_uris = (" ".join(device_code.staging_redirect_uris),)
-
-    client = fakts_models.Client.objects.filter(
-        release__app__identifier=device_code.staging_manifest["identifier"],
-        release__version=device_code.staging_manifest["version"],
-        kind=device_code.staging_kind,
-        node=node,
-        tenant=user,
+    validate_device_code = logic.validate_device_code(
+        device_code=device_code,
+        user=user,
         organization=organization,
         composition=composition,
-        redirect_uris=redirect_uris,
-    ).first()
+    )
 
-    if not client:
-        token = logic.create_api_token()
-
-        config = None
-
-        if device_code.staging_kind == enums.ClientKindVanilla.DEVELOPMENT.value:
-            config = base_models.DevelopmentClientConfig(
-                kind=enums.ClientKindVanilla.DEVELOPMENT.value,
-                token=token,
-                user=user.username,
-                organization=organization.slug,
-                tenant=user.username,
-            )
-
-        else:
-            raise Exception("Unknown client kind or no longer supported")
-
-        client = builders.create_client(
-            manifest=manifest,
-            config=config,
-            user=user,
-            organization=organization,
-            composition=composition,
-        )
-
-    device_code.client = client
-    device_code.save()
-
-    return client
+    return validate_device_code.client
 
 
 @kante.input

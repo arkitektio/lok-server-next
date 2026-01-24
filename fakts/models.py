@@ -27,12 +27,12 @@ class KommunityPartner(models.Model):
     identifier = fields.IdentifierField(unique=True)
     auth_url = models.CharField(max_length=1000, null=True, blank=True)
     oauth_client = models.ForeignKey(OAuth2Client, on_delete=models.CASCADE, null=True)
-    partner_kind=models.CharField(
+    partner_kind = models.CharField(
         max_length=50,
         choices=[(e.value, e.name) for e in enums.PartnerKind],
         help_text="The kind of partner",
     )
-    kommunity_kind=models.CharField(
+    kommunity_kind = models.CharField(
         max_length=50,
         choices=[(e.value, e.name) for e in enums.KommunityKind],
         help_text="The kind of kommunity",
@@ -40,8 +40,7 @@ class KommunityPartner(models.Model):
     auto_configure = models.BooleanField(default=False)
     preconfigured_composition = models.JSONField(help_text="A preconfigured composition that gets created when a user redeems a token from this partner.", null=True, blank=True)
     filter_config = models.JSONField(
-        help_text="Filter conditions to determine which users/organizations this partner applies to. "
-                  "Example: {'email_domain_equals': ['example.com', 'test.org'], 'email_domain_ends_with': ['edu']}",
+        help_text="Filter conditions to determine which users/organizations this partner applies to. Example: {'email_domain_equals': ['example.com', 'test.org'], 'email_domain_ends_with': ['edu']}",
         null=True,
         blank=True,
         default=dict,
@@ -49,20 +48,20 @@ class KommunityPartner(models.Model):
 
     def __str__(self):
         return f"{self.identifier}"
-    
+
     @property
     def preconfigured_composition_as_model(self) -> Optional[base_models.CompositionManifest]:
         if not self.preconfigured_composition:
             return None
         return base_models.CompositionManifest(**self.preconfigured_composition)
-    
+
     def applies_to_user(self, user) -> bool:
         """
         Check if this partner's filter conditions apply to the given user.
-        
+
         If no filter_config is set, the partner applies to everyone.
         If filter_config is set, all conditions must be satisfied.
-        
+
         Supported filter conditions:
         - email_domain_equals: list of domains that the user's email must match exactly
         - email_domain_ends_with: list of domain suffixes that the user's email domain must end with
@@ -71,39 +70,39 @@ class KommunityPartner(models.Model):
         """
         if not self.filter_config:
             return True
-        
-        user_email = getattr(user, 'email', None) or ''
-        user_email_domain = user_email.split('@')[-1].lower() if '@' in user_email else ''
-        username = getattr(user, 'username', '') or ''
-        
+
+        user_email = getattr(user, "email", None) or ""
+        user_email_domain = user_email.split("@")[-1].lower() if "@" in user_email else ""
+        username = getattr(user, "username", "") or ""
+
         # Check email_domain_equals
-        if 'email_domain_equals' in self.filter_config:
-            domains = self.filter_config['email_domain_equals']
+        if "email_domain_equals" in self.filter_config:
+            domains = self.filter_config["email_domain_equals"]
             if isinstance(domains, list) and domains:
                 if user_email_domain.lower() not in [d.lower() for d in domains]:
                     return False
-        
+
         # Check email_domain_ends_with
-        if 'email_domain_ends_with' in self.filter_config:
-            suffixes = self.filter_config['email_domain_ends_with']
+        if "email_domain_ends_with" in self.filter_config:
+            suffixes = self.filter_config["email_domain_ends_with"]
             if isinstance(suffixes, list) and suffixes:
                 if not any(user_email_domain.endswith(s.lower()) for s in suffixes):
                     return False
-        
+
         # Check username_equals
-        if 'username_equals' in self.filter_config:
-            usernames = self.filter_config['username_equals']
+        if "username_equals" in self.filter_config:
+            usernames = self.filter_config["username_equals"]
             if isinstance(usernames, list) and usernames:
                 if username not in usernames:
                     return False
-        
+
         # Check username_contains
-        if 'username_contains' in self.filter_config:
-            substrings = self.filter_config['username_contains']
+        if "username_contains" in self.filter_config:
+            substrings = self.filter_config["username_contains"]
             if isinstance(substrings, list) and substrings:
                 if not any(s in username for s in substrings):
                     return False
-        
+
         return True
 
 
@@ -189,7 +188,7 @@ class ServiceInstance(models.Model):
     logo = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
     instance_id = models.CharField(max_length=1000, default="default")
     private_key = models.TextField(help_text="The private key of the instance, used for signing claims.", null=True, blank=True)
-    public_key = models.TextField(help_text="The public key of the instance, used for verifying claims.", null=True, blank=True )
+    public_key = models.TextField(help_text="The public key of the instance, used for verifying claims.", null=True, blank=True)
     steward = models.ForeignKey(
         get_user_model(),
         on_delete=models.CASCADE,
@@ -283,11 +282,8 @@ class InstanceAlias(models.Model):
         key that contains the challenge to be solved by the client.""",
     )
     path = models.CharField(max_length=1000, null=True, blank=True, help_text="The path of the alias,")
-    scope = models.CharField(
-        max_length=20,
-        default="local",
-        help_text="The scope of the alias. 'local' means that the alias is only available within the local network. 'network' means that the alias is available within the organization's network."
-    )
+    scope = models.CharField(max_length=20, default="local", help_text="The scope of the alias. 'local' means that the alias is only available within the local network. 'network' means that the alias is available within the organization's network.")
+
     class Meta:
         """Meta class for InstanceAlias model."""
 
@@ -340,8 +336,8 @@ class RedeemToken(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(null=True)
     user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="issued_tokens")
-    organization = models.ForeignKey(
-        Organization,
+    composition = models.ForeignKey(
+        "Composition",
         on_delete=models.CASCADE,
         related_name="issued_tokens",
     )
@@ -354,19 +350,29 @@ class Composition(models.Model):
         on_delete=models.CASCADE,
         related_name="compositions",
     )
+    identifier = fields.IdentifierField()
     description = models.TextField(default="No description available", null=True, blank=True)
     creator = models.ForeignKey(
         get_user_model(),
         on_delete=models.CASCADE,
         related_name="created_compositions",
     )
-    token = models.CharField(max_length=1000, unique=True, default=uuid.uuid4)
+    token = models.CharField(max_length=1000, default=uuid.uuid4)
     auth_key = models.ForeignKey(
         IonscaleAuthKey,
         on_delete=models.SET_NULL,
         related_name="compositions",
-        null=True, blank=True,
+        null=True,
+        blank=True,
     )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "identifier"],
+                name="Only one composition identifier per organization",
+            )
+        ]
 
     def __str__(self):
         return f"{self.name} ({self.organization})"

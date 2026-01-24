@@ -4,7 +4,7 @@ from django.conf import settings
 from karakter.base_models import OrganizationConfig
 from karakter.models import Organization
 from fakts.models import KommunityPartner
-from fakts.logic import create_composition_from_partner
+from fakts.logic import auto_configure_kommunity_partners
 
 User = get_user_model()
 
@@ -39,33 +39,10 @@ class Command(BaseCommand):
 
                 self.stdout.write(self.style.SUCCESS(f"Updated org {org.slug}"))
             else:
-                org = Organization.objects.create(
-                    slug=org_config.identifier,
-                    name=org_config.name,
-                    description=org_config.description,
-                    owner=owner
-                )
+                org = Organization.objects.create(slug=org_config.identifier, name=org_config.name, description=org_config.description, owner=owner)
                 org_created = True
                 self.stdout.write(self.style.SUCCESS(f"Created org {org.slug}"))
 
             # Apply auto-configure kommunity partners for new organizations
-            if org_created:
-                auto_configure_partners = KommunityPartner.objects.filter(auto_configure=True)
-                for partner in auto_configure_partners:
-                    if partner.preconfigured_composition:
-                        self.stdout.write(
-                            self.style.WARNING(
-                                f"Applying auto-configure partner '{partner.identifier}' to org '{org.slug}'"
-                            )
-                        )
-                        
-                        # Create a logging function that uses management command styling
-                        def log_message(msg: str):
-                            self.stdout.write(self.style.SUCCESS(f"  {msg}"))
-                        
-                        create_composition_from_partner(
-                            partner=partner,
-                            organization=org,
-                            creator=owner,
-                            log=log_message,
-                        )
+            if org_config.auto_configure:
+                auto_configure_kommunity_partners(organization=org)

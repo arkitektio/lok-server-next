@@ -50,22 +50,29 @@ ENSURED_OPENID_APPS = [
 ]
 
 
-KOMMUNITY_PARTNERS = conf.get("kommunity_partners", [
-    {
-        "description": "A fun little demo instance of Arkitekt to try out some features. Attention: Data will be deleted every 24 hours!",
-        "name": "Arkitekt Demo",
-        "identifier": "arkitekt-demo",
-        "website_url": "https://demo.arkitekt.live",
-        "auth_url": "https://demo.arkitekt.live/authorize",
-        "logo_url": "https://arkitekt.live/img/apps.png",
-        "oauth2": {
-            "client_name": "Frankon Lok Frontend",
-            "client_id": "lok-frontend",
-            "client_secret": "in0929sd0fn039j02n309n2309rn099n09n0s9n",
-            "redirect_uris": ["https://demo.arkitekt.live/auth/callback", "https://demo.arkitekt.live/auth/callback"],
+ENSURE_ORGANIZATIONS = OmegaConf.to_object(conf.get("organizations", [{"identifier": "default", "name": "Default Organization", "description": "Default Organization Description"}]))
+ENSURED_USERS = OmegaConf.to_object(conf.users)
+ENSURED_MEMBERSHIPS = OmegaConf.to_object(conf.get("memberships", []))
+
+KOMMUNITY_PARTNERS = conf.get(
+    "kommunity_partners",
+    [
+        {
+            "description": "A fun little demo instance of Arkitekt to try out some features. Attention: Data will be deleted every 24 hours!",
+            "name": "Arkitekt Demo",
+            "identifier": "arkitekt-demo",
+            "website_url": "https://demo.arkitekt.live",
+            "auth_url": "https://demo.arkitekt.live/authorize",
+            "logo_url": "https://arkitekt.live/img/apps.png",
+            "oauth2": {
+                "client_name": "Frankon Lok Frontend",
+                "client_id": "lok-frontend",
+                "client_secret": "in0929sd0fn039j02n309n2309rn099n09n0s9n",
+                "redirect_uris": ["https://demo.arkitekt.live/auth/callback", "https://demo.arkitekt.live/auth/callback"],
+            },
         }
-    }
-])
+    ],
+)
 
 OIDC_ISSUER = conf.get("oidc_issuer", "https://go.arkitekt.live")
 
@@ -73,7 +80,7 @@ OIDC_ISSUER = conf.get("oidc_issuer", "https://go.arkitekt.live")
 if conf.get("ionscale", None):
     IONSCALE_SERVER_URL = conf.ionscale.server_url
     IONSCALE_ADMIN_KEY = conf.ionscale.admin_key
-    IONSCALE_COORD_URL = conf.ionscale.coord_url # thats the public coord url
+    IONSCALE_COORD_URL = conf.ionscale.coord_url  # thats the public coord url
 else:
     IONSCALE_SERVER_URL = None
     IONSCALE_ADMIN_KEY = None
@@ -112,9 +119,6 @@ INSTALLED_APPS += [
 ]
 
 
-FAKTS_COMPOSITIONS = conf.get("compositions", [])
-
-
 # These are the URLs to be implemented by your single-page application.
 HEADLESS_FRONTEND_URLS = {
     "account_confirm_email": "https://jhnnsrs-lab.hyena-sole.ts.net/account/verify-email/{key}",
@@ -139,7 +143,7 @@ AUTHENTICATION_BACKENDS = [
 SUPERUSERS = [
     {
         "USERNAME": conf.django.admin.username,
-        "EMAIL": "fake@fake.com",
+        "EMAIL": conf.django.admin.email,
         "PASSWORD": conf.django.admin.password,
     }
 ]
@@ -428,13 +432,6 @@ ACCOUNT_LOGOUT_REDIRECT_URL = "mainhome"
 
 # Frontend URL for redirects (used by karakter views)
 KONTROL_FRONTEND_URL = conf.get("kontrol_frontend_url", "/")
-
-ENSURED_APPS = []
-
-
-ENSURE_ORGANIZATIONS = OmegaConf.to_object(conf.get("organizations", [{"identifier": "default", "name": "Default Organization", "description": "Default Organization Description"}]))
-ENSURED_USERS = OmegaConf.to_object(conf.users)
-ENSURED_ROLES = OmegaConf.to_object(conf.roles)
 
 
 SYSTEM_MESSAGES = conf.get(
