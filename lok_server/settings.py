@@ -54,6 +54,8 @@ ENSURE_ORGANIZATIONS = OmegaConf.to_object(conf.get("organizations", [{"identifi
 ENSURED_USERS = OmegaConf.to_object(conf.users)
 ENSURED_MEMBERSHIPS = OmegaConf.to_object(conf.get("memberships", []))
 
+REDEEM_TOKENS = conf.get("redeem_tokens", [])
+
 KOMMUNITY_PARTNERS = conf.get(
     "kommunity_partners",
     [
@@ -231,9 +233,6 @@ INITIAL_MESSAGE_TEMPLATE = [
 
 WSGI_APPLICATION = "lok_server.wsgi.application"
 ASGI_APPLICATION = "lok_server.asgi.application"
-
-
-REDEEM_TOKENS = conf.get("redeem_tokens", [])
 
 
 CA_FILE = conf.get("ca_file", "/certs/ca.crt")

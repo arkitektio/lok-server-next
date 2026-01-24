@@ -2,6 +2,7 @@ import token
 from fakts import base_models
 from karakter import models as karakter_models
 from fakts import models, inputs, enums
+from mounts.lok.api.management.mutations import device_code
 from pydantic import BaseModel, Field
 import re
 from typing import Optional, Callable
@@ -468,6 +469,51 @@ def create_fake_linking_context(client: models.Client, host, port, secure=False)
             redirect_uris=client.oauth2_client.redirect_uris.split(" "),
         ),
     )
+
+
+def validate_redeem_token(redeem_token: models.RedeemToken, manifest: Manifest) -> models.RedeemToken:
+    node_id = manifest.node_id
+    composition = redeem_token.composition
+    organization = redeem_token.composition.organization
+    user = redeem_token.user
+
+    if node_id:
+        node, _ = models.ComputeNode.objects.get_or_create(organization=organization, node_id=node_id)
+    else:
+        node = None
+
+    client = models.Client.objects.filter(
+        release__app__identifier=manifest.identifier,
+        release__version=manifest.version,
+        kind="development",
+        node=node,
+        tenant=user,
+        organization=organization,
+        composition=composition,
+        redirect_uris=None,
+    ).first()
+
+    if not client:
+        token = create_api_token()
+
+        config = base_models.DevelopmentClientConfig(
+            kind=enums.ClientKindVanilla.DEVELOPMENT.value,
+            token=token,
+            user=user.username,
+            organization=organization.slug,
+            tenant=user.username,
+        )
+
+        client = builders.create_client(
+            manifest=manifest,
+            config=config,
+            user=user,
+            organization=organization,
+            composition=composition,
+        )
+
+    redeem_token.client = client
+    redeem_token.save()
 
 
 def validate_device_code(device_code: models.DeviceCode, user: models.AbstractUser, organization: models.Organization, composition: models.Composition) -> models.DeviceCode:

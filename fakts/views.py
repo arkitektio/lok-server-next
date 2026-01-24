@@ -497,23 +497,10 @@ class RedeemView(View):
 
         else:
             try:
-                token = logic.create_api_token()
-
-                config = None
-
-                config = base_models.DevelopmentClientConfig(
-                    kind=enums.ClientKindVanilla.DEVELOPMENT.value,
-                    token=token,
-                    user=valid_token.user.username,
-                    tenant=valid_token.user.username,
-                    organization=valid_token.organization.slug if valid_token.organization else None,
+                client = logic.validate_redeem_token(
+                    redeem_token=valid_token,
+                    manifest=manifest,
                 )
-
-                client = builders.create_client(manifest=manifest, config=config, user=valid_token.user, organization=valid_token.organization)
-
-                valid_token.client = client
-                valid_token.save()
-
                 return JsonResponse(
                     data={
                         "status": "granted",
@@ -578,8 +565,8 @@ class ClaimView(View):
                     "message": f"Error creating configuration",
                 }
             )
-            
-            
+
+
 @method_decorator(csrf_exempt, name="dispatch")
 class ClaimCompositionView(View):
     """
