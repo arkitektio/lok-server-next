@@ -36,7 +36,7 @@ class OpenIDCode(oidcgrants.OpenIDCode):
             name=membership.user.username,
             preferred_username=membership.user.username,
             active_org=membership.organization.slug,
-            email=membership.user.email,
+            email= membership.user.email or f"{str(membership.pk)}@users.noreply",
         )
 
 
@@ -44,9 +44,11 @@ class AuthorizationCodeGrant(grants.AuthorizationCodeGrant):
     TOKEN_ENDPOINT_AUTH_METHODS = ["client_secret_basic", "client_secret_post"]
 
     def query_authorization_code(self, code, client):
+        print("Querying authorization code:", code, "for client:", client.client_id)  # Debug log
         try:
             item = AuthorizationCode.objects.get(code=code, client_id=client.client_id)
         except AuthorizationCode.DoesNotExist:
+            print("Authorization code not found:", code)  # Debug log
             return None
 
         if not item.is_expired():

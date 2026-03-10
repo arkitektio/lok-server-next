@@ -36,6 +36,7 @@ class IonscaleRepository:
         # Ionscale CLI requires the flag, so we pass it in the args but execute carefully.
 
         base_cmd = [self.binary,  *args]
+        print("Running Ionscale CLI command:", " ".join(base_cmd))  # Debug log, safe since key is not in args
 
         try:
             result = subprocess.run(
@@ -49,6 +50,7 @@ class IonscaleRepository:
                     "IONSCALE_ADDR": self.server_url,
                 },
             )
+            print("Ionscale CLI output:", result.stdout)  # Debug log
             return result.stdout.strip()
 
         except subprocess.CalledProcessError as e:
@@ -125,6 +127,7 @@ class IonscaleRepository:
 
             try:
                 output = self._run_command(["tailnets", "set-iam-policy", "--tailnet", tailnet, "--file", temp_file], command_type="iam")
+                
                 return output
             finally:
                 # Clean up temp file

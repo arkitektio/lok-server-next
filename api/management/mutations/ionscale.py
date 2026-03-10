@@ -8,7 +8,7 @@ import kante
 from fakts import models as fakts_models
 from ionscale.repo import django_repo
 from ionscale import base_models as ionscale_models
-from ionscale import manager
+from ionscale.manager import sync
 from karakter import models as karakter_models
 
 
@@ -43,6 +43,8 @@ def create_ionscale_layer(info: Info, input: CreateIonscaleLayerInput) -> types.
         tailnet_name=tailnet_name,
     )
 
+    sync(layer)
+
     return layer
 
 
@@ -66,7 +68,7 @@ def update_ionscale_layer(info: Info, input: UpdateIonscaleLayerInput) -> types.
         layer.blocked_for.set(memberships)
         layer.save()
     
-    manager.sync(layer)
+    sync(layer)
     
     
 

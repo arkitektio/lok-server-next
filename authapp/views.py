@@ -48,18 +48,21 @@ def jwks(request: HttpRequest) -> JsonResponse:
 @resource_protector("profile")
 def user_info(request: HttpRequest) -> JsonResponse:
     membership = request.oauth_token.user  # type: ignore
-    return JsonResponse(
+    x =  JsonResponse(
         {
             "sub": str(membership.user.id),
             "name": membership.user.username,
             "nickname": membership.user.username,
             "preferred_username": membership.user.username,
-            "email": membership.user.email,
+            "email": membership.user.email or f"{str(membership.user.id)}@users.noreply",
             "roles": [role.identifier for role in membership.roles.all()],
             "scope": "scope",
             "active_org": membership.organization.slug,
         }
     )
+    print(x.content)
+    
+    return x
 
 
 # use ``server.create_token_response`` to handle token endpoint
@@ -108,6 +111,8 @@ def issue_token(request: HttpRequest) -> HttpResponse | tuple:
     Returns:
         HttpResponse produced by the AuthorizationServer token handler.
     """
+    print(request)
+    print(request.POST)
     return server.create_token_response(request)
 
 
