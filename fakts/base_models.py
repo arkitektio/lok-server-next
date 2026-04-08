@@ -54,7 +54,7 @@ class Manifest(BaseModel):
     """ The scopes are a list of scopes that the client can request. """
     requirements: list[Requirement] = Field(default_factory=list)
     """ The requirements are a list of requirements that the client needs to run on (e.g. needs GPU)"""
-    node_id: Optional[str] = None
+    node_id: Optional[str] = None 
     """ The node_id is the id of the node that the runs on """
     repo_url: Optional[str] = None
     """ The repo_url is the url to track issues and get more information about the client. """

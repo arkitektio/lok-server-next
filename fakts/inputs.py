@@ -16,7 +16,7 @@ class RequirementModel(BaseModel):
 
 
 @pydantic.input(RequirementModel)
-class Requirement:
+class RequirementInput:
     service: str
     optional: bool = False
     description: Optional[str] = None
@@ -42,7 +42,7 @@ class ManifestInput:
     logo: Optional[str] = None
     scopes: list[str]
     node_id: Optional[str] = None
-    requirements: list[Requirement] = Field(default_factory=list)
+    requirements: list[RequirementInput] = Field(default_factory=list)
     public_sources: list[PublicSourceInput] | None = None
 
 

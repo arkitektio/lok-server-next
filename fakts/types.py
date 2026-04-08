@@ -62,6 +62,22 @@ class Layer:
     instances: list["ServiceInstance"] = strawberry_django.field(
         description="The instances of the service. A service instance is a configured instance of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."
     )
+    
+    
+
+@strawberry_django.type(
+    models.Composition,
+    description="A Composition is a specific configuration of a Service. It contains the configuration for a particular version of the service.",
+    pagination=True,
+    filters=filters.CompositionFilter,
+)
+class Composition:
+    id: strawberry.ID
+    organization: types.Organization = strawberry.field(description="The organization that this composition belongs to.")
+    identifier: scalars.ServiceIdentifier = strawberry.field(description="The identifier of the composition. This should be a globally unique string that identifies the composition. We encourage you to use the reverse domain name notation. E.g. `com.example.mycomposition`")
+    description: str | None = strawberry.field(description="The description of the service. This should be a human readable description of the service.")
+    name: str = strawberry.field(description="The name of the composition. This should be a human readable name of the composition.")
+    
 
 
 @strawberry_django.type(
@@ -75,10 +91,27 @@ class Service:
     name: str = strawberry.field(description="The name of the service")
     identifier: scalars.ServiceIdentifier = strawberry.field(description="The identifier of the service. This should be a globally unique string that identifies the service. We encourage you to use the reverse domain name notation. E.g. `com.example.myservice`")
     description: str | None = strawberry.field(description="The description of the service. This should be a human readable description of the service.")
+    releases: list["ServiceRelease"] = strawberry_django.field(
+        description="The releases of the service. A service release is a specific version of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."
+    )
+    logo: types.MediaStore | None = strawberry.field(description="The logo of the app. This should be a url to a logo that can be used to represent the app.")
+
+
+@strawberry_django.type(
+    models.ServiceRelease,
+    description="A ServiceRelease is a specific release of a Service. It contains the configuration for a particular version of the service.",
+    pagination=True,
+    filters=filters.ServiceReleaseFilter,
+)
+class ServiceRelease:
+    id: strawberry.ID
+    version: str = strawberry.field(description="The version of the service. This should be a human readable version string.")
+    service: Service = strawberry.field(description="The service that this release belongs to.")
+    description: str | None = strawberry.field(description="The description of the service. This should be a human readable description of the service.")
     instances: list["ServiceInstance"] = strawberry_django.field(
         description="The instances of the service. A service instance is a configured instance of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."
     )
-    logo: types.MediaStore | None = strawberry.field(description="The logo of the app. This should be a url to a logo that can be used to represent the app.")
+    
 
 
 @strawberry_django.type(
@@ -89,7 +122,8 @@ class Service:
 )
 class ServiceInstance:
     id: strawberry.ID
-    service: Service = strawberry.field(description="The service that this instance belongs to.")
+    release: ServiceRelease = strawberry.field(description="The service release that this instance belongs to.")
+    instance_id: strawberry.ID = strawberry.field(description="The instance id of the instance. This is a unique string that identifies the instance. It is used to identify the instance in the code and in the database.")  
     name: str = strawberry.field(description="The name of the instance. This is a human readable name of the instance.")
     allowed_users: list[types.User] = strawberry_django.field(description="The users that are allowed to use this instance.")
     denied_users: list[types.User] = strawberry_django.field(description="The users that are denied to use this instance.")

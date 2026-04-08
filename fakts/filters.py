@@ -169,3 +169,35 @@ class ServiceInstanceFilter:
         if self.search is None:
             return queryset
         return queryset.filter(backend__contains=self.search)
+
+
+@strawberry_django.filter(fakts_models.ServiceRelease)
+class ServiceReleaseFilter:
+    search: str | None
+    ids: list[strawberry.ID] | None
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+
+    def filter_search(self, queryset, info):
+        if self.search is None:
+            return queryset
+        return queryset.filter(backend__contains=self.search)
+
+
+@strawberry_django.filter(fakts_models.Composition)
+class CompositionFilter:
+    search: str | None
+    ids: list[strawberry.ID] | None
+
+    def filter_ids(self, queryset, info):
+        if self.ids is None:
+            return queryset
+        return queryset.filter(id__in=self.ids)
+
+    def filter_search(self, queryset, info):
+        if self.search is None:
+            return queryset
+        return queryset.filter(backend__contains=self.search)

@@ -41,6 +41,7 @@ def create_developmental_client(info: Info, input: inputs.DevelopmentClientInput
         config,
         user=info.context.request.user,
         organization=info.context.request.organization,
+        composition=info.context.request.client.composition,
     )
 
     return client
