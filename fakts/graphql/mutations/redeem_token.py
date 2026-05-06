@@ -28,13 +28,15 @@ def create_redeem_token(info: Info, input: RedeemTokenInput) -> types.RedeemToke
     org = info.context.request.organization
 
     token, _ = models.RedeemToken.objects.update_or_create(
-        token=input.token or uuid_token,
+        token=uuid_token,
         defaults={
             "user": user,
             "organization": org,
+            "composition": info.context.request.client.composition,
+            
         },
     )
 
-    print(f"Token {token} created for user {user} and organization {org.slug}")
+    print(f"Token {token} created for user {user} and organization {org}")
 
     return token

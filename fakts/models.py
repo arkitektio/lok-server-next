@@ -336,6 +336,10 @@ class RedeemToken(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(null=True)
     user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="issued_tokens")
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,        related_name="issued_tokens",
+    )
     composition = models.ForeignKey(
         "Composition",
         on_delete=models.CASCADE,

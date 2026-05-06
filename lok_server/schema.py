@@ -89,6 +89,11 @@ class Query:
     @kante.django_field()
     def compute_node(self, info: Info, id: strawberry.ID) -> fakts_types.ComputeNode:
         return fakts_models.ComputeNode.objects.get(id=id)
+    
+    
+    @kante.django_field()
+    def device_by_device_id(self, info: Info, id: strawberry.ID) -> fakts_types.ComputeNode:
+        return fakts_models.ComputeNode.objects.get(node_id=id, organization=info.context.request.organization)
 
     @kante.django_field()
     def device_group(self, info: Info, id: strawberry.ID) -> fakts_types.DeviceGroup:
