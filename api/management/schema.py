@@ -258,6 +258,10 @@ class Mutation:
         resolver=mutations.cancel_invite,
     )
 
+    create_redeem_token = strawberry_django.mutation(
+        resolver=mutations.create_redeem_token,
+    )
+
     # device Mutations
     create_device = strawberry_django.mutation(
         resolver=mutations.create_device,

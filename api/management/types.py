@@ -1034,9 +1034,13 @@ class ManagementCompositionDeviceCode:
 @strawberry_django.type(fakts_models.RedeemToken, pagination=True)
 class ManagementRedeemToken:
     id: strawberry.ID
+    created_at: datetime.datetime
+    expires_at: datetime.datetime | None
     token: str = strawberry.field(description="The token of the redeem token")
+    composition: ManagementComposition = strawberry.field(description="The composition that this redeem token grants access to.")
     client: ManagementClient | None = strawberry.field(description="The client that this redeem token belongs to.")
     user: ManagementUser = strawberry.field(description="The user that this redeem token belongs to.")
 
-    def get_queryset(cls, info) -> fakts_models.RedeemToken:
-        return fakts_models.RedeemToken.objects.filter(user=info.context.request.user, organization=info.context.request.organization)
+    @classmethod
+    def get_queryset(cls, queryset, info: Info):
+        return queryset.filter(organization__memberships__user=info.context.request.user).distinct()

@@ -37,6 +37,7 @@ from .composition_device_code import (
     decline_composition_device_code,
 )
 from .composition import update_composition, delete_composition
+from .redeem_token import create_redeem_token
 from .ionscale import (
     create_ionscale_layer,
     delete_ionscale_layer,

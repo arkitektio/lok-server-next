@@ -82,7 +82,7 @@ class StartChallengeView(View):
         device_code = models.DeviceCode.objects.create(
             code=logic.create_device_code(),
             staging_manifest=manifest.dict(),
-            expires_at=datetime.datetime.now() + datetime.timedelta(seconds=start_grant.expiration_time_seconds),
+            expires_at=timezone.now() + datetime.timedelta(seconds=start_grant.expiration_time_seconds),
             staging_kind=start_grant.requested_client_kind.value,
             staging_redirect_uris=start_grant.redirect_uris,
             staging_logo=logo,
@@ -136,7 +136,7 @@ class ServiceStartChallengeView(View):
             challenge_code=logic.create_device_code(),
             staging_manifest=manifest.model_dump(),
             staging_aliases=[alias.model_dump() for alias in start_grant.staging_aliases],
-            expires_at=datetime.datetime.now() + datetime.timedelta(seconds=start_grant.expiration_time_seconds),
+            expires_at=timezone.now() + datetime.timedelta(seconds=start_grant.expiration_time_seconds),
         )
 
         return JsonResponse(
@@ -186,7 +186,7 @@ class CompositionStartChallengeView(View):
             code=logic.create_device_code(),
             challenge_code=logic.create_device_code(),
             manifest=manifest.model_dump(),
-            expires_at=datetime.datetime.now() + datetime.timedelta(seconds=start_grant.expiration_time_seconds),
+            expires_at=timezone.now() + datetime.timedelta(seconds=start_grant.expiration_time_seconds),
         )
 
         return JsonResponse(
@@ -226,7 +226,7 @@ class CompositionChallengeView(View):
                 }
             )
 
-        if datetime.datetime.now(datetime.timezone.utc) > device_code.expires_at:
+        if timezone.now() > device_code.expires_at:
             device_code.delete()
             return JsonResponse(
                 data={
@@ -289,7 +289,7 @@ class ServiceChallengeView(View):
                 }
             )
 
-        if datetime.datetime.now(datetime.timezone.utc) > device_code.expires_at:
+        if timezone.now() > device_code.expires_at:
             device_code.delete()
             return JsonResponse(
                 data={
@@ -352,7 +352,7 @@ class ChallengeView(View):
                 }
             )
 
-        if datetime.datetime.now(datetime.timezone.utc) > device_code.expires_at:
+        if timezone.now() > device_code.expires_at:
             device_code.delete()
             return JsonResponse(
                 data={
@@ -479,7 +479,7 @@ class RedeemView(View):
                 }
             )
         if valid_token.expires_at:
-            if valid_token.expires_at < datetime.datetime.now():
+            if valid_token.expires_at < timezone.now():
                 valid_token.delete()
                 return JsonResponse(
                     data={
