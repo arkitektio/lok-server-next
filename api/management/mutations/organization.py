@@ -4,7 +4,8 @@ import strawberry
 from api.management import types
 from karakter import models, managers
 import logging
-from fakts.logic import auto_configure_kommunity_partners
+from fakts import models as fakts_models
+from fakts.logic import auto_configure_kommunity_partners, create_composition_from_partner
 
 logger = logging.getLogger(__name__)
 
@@ -114,3 +115,42 @@ def delete_organization(info: Info, input: DeleteOrganizationInput) -> strawberr
     organization.delete()
     logger.info(f"Deleted Organization: {organization.id}")
     return input.id
+
+
+@strawberry.input
+class ConnectKommunityPartnerInput:
+    partner_id: strawberry.ID
+    organization_id: strawberry.ID
+    license_signature: str | None = None
+
+
+def connect_kommunity_partner(info: Info, input: ConnectKommunityPartnerInput) -> types.ManagementComposition:
+    """Attach a preauthorized kommunity partner composition to an organization."""
+    organization = models.Organization.objects.get(pk=input.organization_id)
+    partner = fakts_models.KommunityPartner.objects.get(pk=input.partner_id)
+    user = info.context.request.user
+
+    can_manage_organization = organization.owner_id == user.id or organization.memberships.filter(
+        user=user,
+        roles__identifier="admin",
+    ).exists()
+    assert can_manage_organization, "You are not allowed to connect partners for this organization."
+    assert partner.partner_kind == "preauthorized", "Only preauthorized partners can be connected directly."
+    if partner.license_agreement:
+        assert input.license_signature and input.license_signature.strip(), "You must sign the partner license agreement before continuing."
+
+    composition = create_composition_from_partner(
+        partner=partner,
+        organization=organization,
+        license_signature=input.license_signature.strip() if input.license_signature else None,
+    )
+    assert composition is not None, "This partner has no preconfigured composition."
+
+    logger.info(
+        "Connected kommunity partner '%s' to organization '%s' as composition '%s'",
+        partner.identifier,
+        organization.slug,
+        composition.identifier,
+    )
+
+    return composition

@@ -95,7 +95,12 @@ class KommunityPartnerModel(BaseModel):
     auth_url: Optional[str] = None
     website_url: Optional[str] = None
     description: Optional[str] = None
+    short_description: Optional[str] = None
     logo_url: Optional[str] = None
+    image_url: Optional[str] = None
+    license_agreement: Optional[str] = None
+    pre_authorize_hook: Optional[str] = None
+    pre_authorize_token: Optional[str] = None
     oauth2: Optional[Oauth2ClientModel] = None
     partner_kind: enums.PartnerKind = enums.PartnerKind.PREAUTHORIZED
     kommunity_kind: enums.KommunityKind = enums.KommunityKind.OPEN

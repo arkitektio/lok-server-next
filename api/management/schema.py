@@ -237,6 +237,9 @@ class Mutation:
     create_organization = strawberry_django.mutation(
         resolver=mutations.create_organization,
     )
+    connect_kommunity_partner = strawberry_django.mutation(
+        resolver=mutations.connect_kommunity_partner,
+    )
     update_organization = strawberry_django.mutation(
         resolver=mutations.update_organization,
     )

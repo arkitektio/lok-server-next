@@ -22,10 +22,15 @@ from fakts import enums
 class KommunityPartner(models.Model):
     name = models.CharField(max_length=1000)
     description = models.TextField(default="No description available", null=True, blank=True)
+    short_description = models.CharField(max_length=280, null=True, blank=True)
     logo_url = models.CharField(max_length=1000, null=True, blank=True)
+    image_url = models.CharField(max_length=1000, null=True, blank=True)
     website_url = models.CharField(max_length=1000, null=True, blank=True)
     identifier = fields.IdentifierField(unique=True)
     auth_url = models.CharField(max_length=1000, null=True, blank=True)
+    license_agreement = models.TextField(null=True, blank=True, help_text="Optional license agreement text shown before connecting this partner.")
+    pre_authorize_hook = models.CharField(max_length=1000, null=True, blank=True, help_text="Optional hook called after creating a partner composition. The response must explicitly approve the composition.")
+    pre_authorize_token = models.CharField(max_length=1000, null=True, blank=True, help_text="Optional bearer token sent to the pre-authorize hook.")
     oauth_client = models.ForeignKey(OAuth2Client, on_delete=models.CASCADE, null=True)
     partner_kind = models.CharField(
         max_length=50,

@@ -1,4 +1,10 @@
-from .organization import create_organization, change_organization_owner, update_organization, delete_organization
+from .organization import (
+    create_organization,
+    change_organization_owner,
+    update_organization,
+    delete_organization,
+    connect_kommunity_partner,
+)
 from .invite import (
     create_invite,
     accept_invite,

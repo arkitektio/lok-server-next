@@ -1,4 +1,5 @@
 import token
+import requests
 from fakts import base_models
 from karakter import models as karakter_models
 from fakts import models, inputs, enums
@@ -18,6 +19,91 @@ from fakts import builders
 
 
 logger = logging.getLogger(__name__)
+
+
+class PartnerPreAuthorizationError(Exception):
+    """Raised when a partner pre-authorization hook rejects a composition."""
+
+
+def run_partner_pre_authorize_hook(
+    partner: models.KommunityPartner,
+    organization: karakter_models.Organization,
+    composition: models.Composition,
+    composition_config: dict | None,
+    license_signature: str | None = None,
+) -> None:
+    """Call an optional partner pre-authorization hook and require an explicit OK response."""
+    if not partner.pre_authorize_hook:
+        return
+
+    headers = {
+        "Content-Type": "application/json",
+    }
+    if partner.pre_authorize_token:
+        headers["Authorization"] = f"Bearer {partner.pre_authorize_token}"
+
+    payload = {
+        "partner": {
+            "id": str(partner.pk),
+            "identifier": partner.identifier,
+            "name": partner.name,
+        },
+        "organization": {
+            "id": str(organization.pk),
+            "slug": organization.slug,
+            "name": organization.name,
+        },
+        "composition": {
+            "id": str(composition.pk),
+            "identifier": composition.identifier,
+            "name": composition.name,
+            "token": composition.token,
+        },
+        "composition_config": composition_config,
+    }
+    if license_signature:
+        payload["license_signature"] = license_signature
+
+    try:
+        response = requests.post(
+            partner.pre_authorize_hook,
+            json=payload,
+            headers=headers,
+            timeout=10,
+        )
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        raise PartnerPreAuthorizationError(
+            f"Partner approval failed for '{partner.name}'. The approval hook could not be reached."
+        ) from exc
+
+    approval_message = None
+    try:
+        response_data = response.json()
+    except ValueError:
+        response_text = response.text.strip().lower()
+        if response_text == "ok":
+            return
+        approval_message = response.text.strip() or None
+    else:
+        if isinstance(response_data, dict):
+            if response_data.get("ok") is True:
+                return
+
+            for key in ("status", "answer", "result"):
+                value = response_data.get(key)
+                if isinstance(value, str) and value.strip().lower() == "ok":
+                    return
+
+            approval_message = response_data.get("message") or response_data.get("error") or response_data.get("detail")
+        elif isinstance(response_data, str) and response_data.strip().lower() == "ok":
+            return
+        elif isinstance(response_data, str):
+            approval_message = response_data.strip() or None
+
+    raise PartnerPreAuthorizationError(
+        approval_message or f"Partner approval failed for '{partner.name}'. The approval hook did not return ok."
+    )
 
 
 def create_composition_from_manifest(
@@ -118,6 +204,7 @@ def create_composition_from_manifest(
 def create_composition_from_partner(
     partner: models.KommunityPartner,
     organization: karakter_models.Organization,
+    license_signature: str | None = None,
 ) -> models.Composition | None:
     """
     Create a composition from a KommunityPartner's preconfigured_composition for a given organization.
@@ -140,10 +227,29 @@ def create_composition_from_partner(
 
     logger.info(f"Creating composition from partner '{partner.identifier}' for org '{organization.slug}' ")
 
-    return create_composition_from_manifest(
+    composition = create_composition_from_manifest(
         manifest=manifest,
         organization=organization,
     )
+
+    try:
+        run_partner_pre_authorize_hook(
+            partner=partner,
+            organization=organization,
+            composition=composition,
+            composition_config=partner.preconfigured_composition,
+            license_signature=license_signature,
+        )
+    except PartnerPreAuthorizationError:
+        logger.exception(
+            "Partner pre-authorization rejected composition '%s' for organization '%s'; deleting composition.",
+            composition.identifier,
+            organization.slug,
+        )
+        composition.delete()
+        raise
+
+    return composition
 
 
 def auto_configure_kommunity_partners(
@@ -187,10 +293,19 @@ def auto_configure_kommunity_partners(
 
         logger.info(f"Applying partner '{partner.identifier}' to organization '{organization.slug}'")
 
-        create_composition_from_partner(
-            partner=partner,
-            organization=organization,
-        )
+        try:
+            create_composition_from_partner(
+                partner=partner,
+                organization=organization,
+            )
+        except PartnerPreAuthorizationError:
+            logger.warning(
+                "Skipping auto-configured partner '%s' for organization '%s' because the pre-authorization hook rejected it.",
+                partner.identifier,
+                organization.slug,
+            )
+            continue
+
         applied_partners.append(partner.identifier)
 
     return applied_partners

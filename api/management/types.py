@@ -543,7 +543,10 @@ class ManagementKommunityPartner:
     id: strawberry.ID
     auth_url: str | None = strawberry.field(description="The authentication URL of the partner.")
     logo_url: str | None = strawberry.field(description="The logo URL of the partner.")
+    image_url: str | None = strawberry.field(description="A larger marketing image URL for the partner.")
     description: str | None = strawberry.field(description="The description of the partner.")
+    short_description: str | None = strawberry.field(description="A short description of the partner for cards and previews.")
+    license_agreement: str | None = strawberry.field(description="Optional license agreement text that must be signed before connecting this partner.")
     name: str = strawberry.field(description="The name of the partner.")
     identifier: str = strawberry.field(description="The unique identifier of the partner.")
     website_url: str | None = strawberry.field(description="The website URL of the partner.")
