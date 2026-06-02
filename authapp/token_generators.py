@@ -17,6 +17,7 @@ Notes:
 """
 
 from authlib.oauth2.rfc9068 import JWTBearerTokenGenerator, JWTBearerTokenValidator
+from authlib.oauth2.rfc6749.errors import InvalidClientError
 from joserfc.jwk import RSAKey
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
@@ -50,6 +51,23 @@ class MyJWTBearerTokenGenerator(JWTBearerTokenGenerator):
         """
         return jwk_dict
 
+    def _get_fakts_client(self, client: Any) -> Any | None:
+        try:
+            return client.client
+        except ObjectDoesNotExist:
+            return None
+
+    def _get_membership(self, client: Any, user: Any) -> Any:
+        if user:
+            return user
+
+        try:
+            return client.resolve_membership()
+        except ObjectDoesNotExist as exc:
+            raise InvalidClientError(
+                description="Client is no longer attached to an organization membership."
+            ) from exc
+
     def get_extra_claims(self, client: Any, grant_type: Any, user: Any, scope: Optional[str]) -> dict:
         """Construct application-specific claims to include in the JWT.
 
@@ -67,27 +85,13 @@ class MyJWTBearerTokenGenerator(JWTBearerTokenGenerator):
         - scope: the resolved scope string
         - active_org: the client's organization slug
         """
-        # actually resolve user and scope
-        # user is actually a membership object
-        membership = user
-
-        if not membership:
-            membership = client.client.membership
+        membership = self._get_membership(client, user)
 
         if not scope:
             # fall back to the client's configured scope
             scope = client.scope
 
-        if not membership:
-            raise ValueError("Membership not found")
-
-        if not membership:
-            raise ValueError("User is not a member of the organization (anymore)")
-
-        try:
-            fakts_client = client.client
-        except ObjectDoesNotExist:
-            fakts_client = None
+        fakts_client = self._get_fakts_client(client)
 
         # TODO: Implement correct scoping rules; for now expose roles and
         # some basic user identifiers used by resource servers.

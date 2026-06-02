@@ -1,7 +1,8 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.db.models.signals import post_delete, post_save
+from django.db.models.signals import post_delete, post_save, pre_delete
+from django.db.models import Q
 from django.dispatch import receiver
 from allauth.account.signals import user_signed_up
 from .models import Profile, Organization, Role, OrganizationProfile, Membership
@@ -72,3 +73,12 @@ def sync_ionscale_layers_on_membership_delete(sender, instance, **kwargs):
     from ionscale.manager import sync_organization_layers
 
     sync_organization_layers(instance.organization)
+
+
+@receiver(pre_delete, sender=Organization)
+def delete_oauth_clients_for_organization(sender, instance, **kwargs):
+    from authapp.models import OAuth2Client
+
+    OAuth2Client.objects.filter(
+        Q(membership__organization=instance) | Q(client__organization=instance)
+    ).distinct().delete()

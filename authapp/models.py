@@ -2,6 +2,8 @@ import time
 from django.db import models
 from django.contrib.auth import get_user_model
 from authlib.oauth2.rfc6749 import ClientMixin, TokenMixin, AuthorizationCodeMixin
+from authlib.oauth2.rfc6749.errors import InvalidClientError
+from django.core.exceptions import ObjectDoesNotExist
 
 from karakter.models import Membership
 
@@ -53,12 +55,27 @@ class OAuth2Client(models.Model, ClientMixin):
     response_types = models.TextField(blank=True)
     id_token_signed_response_alg = models.CharField(max_length=48, default="RS256")
 
+    def resolve_membership(self) -> Membership:
+        if self.membership_id:
+            return self.membership
+
+        try:
+            fakts_client = self.client
+        except ObjectDoesNotExist:
+            fakts_client = None
+
+        membership = getattr(fakts_client, "membership", None)
+        if membership:
+            return membership
+
+        raise InvalidClientError(
+            description="Client is no longer attached to an organization membership."
+        )
+
     @property
     def user_id(self):
         """Return the membership associated with this authorization code."""
-        if not self.client:
-            raise ValueError("This is a bug in the logic of this server, we better fix it")
-        return self.client.membership.id
+        return self.resolve_membership().id
 
     def __str__(self):
         return f"{self.client_id}"

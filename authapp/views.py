@@ -113,7 +113,10 @@ def issue_token(request: HttpRequest) -> HttpResponse | tuple:
     """
     print(request)
     print(request.POST)
-    return server.create_token_response(request)
+    try:
+        return server.create_token_response(request)
+    except OAuth2Error as error:
+        return server.handle_response(*error())
 
 
 class CustomLoginView(LoginView):
