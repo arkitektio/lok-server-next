@@ -230,6 +230,11 @@ class Client:
     node: Optional["ComputeNode"] = strawberry_django.field(description="The node this runs on")
     mappings: list["ServiceInstanceMapping"] = strawberry_django.field(description="The mappings of the client. A mapping is a mapping of a service to a service instance. This is used to configure the composition.")
 
+
+
+
+
+
     @strawberry_django.field(description="The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information.")
     def kind(self, info) -> enums.ClientKind:
         if self.kind == "website":

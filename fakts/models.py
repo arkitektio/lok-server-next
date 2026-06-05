@@ -188,7 +188,7 @@ class ServiceRelease(models.Model):
 
 
 class ServiceInstance(models.Model):
-    composition = models.ForeignKey("Composition", on_delete=models.CASCADE, related_name="instances", null=True)
+    composition = models.ForeignKey("Composition", on_delete=models.CASCADE, related_name="instances")
     release = models.ForeignKey(ServiceRelease, on_delete=models.CASCADE, related_name="instances")
     logo = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
     instance_id = models.CharField(max_length=1000, default="default")
@@ -214,7 +214,7 @@ class ServiceInstance(models.Model):
     allowed_groups = models.ManyToManyField(Group, related_name="allowed_instances")
     allowed_organizations = models.ManyToManyField(Organization, related_name="allowed_instances")
     public_key = models.TextField(null=True, blank=True, help_text="The public key of the instance, if applicable.")
-    token = models.CharField(max_length=1000, unique=True, help_text="The token of the instance, used for authentication.")
+    token = models.CharField(max_length=1000, help_text="The token of the instance, used for authentication.")
 
     def __str__(self):
         return f"{self.release}:{self.instance_id}"
@@ -224,7 +224,11 @@ class ServiceInstance(models.Model):
             models.UniqueConstraint(
                 fields=["release", "instance_id", "organization", "device", "composition"],
                 name="Only one instance_id per release, organization and device and instance",
-            )
+            ),
+            models.UniqueConstraint(
+                fields=["token", "composition"],
+                name="Only one token per composition",
+            ),
         ]
 
     def render(self, context: base_models.LinkingContext) -> base_models.InstanceClaim:

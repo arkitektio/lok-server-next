@@ -156,13 +156,13 @@ def create_composition_from_manifest(
         # Create or update the service instance
         instance, inst_created = models.ServiceInstance.objects.update_or_create(
             token=instance_request.identifier,
+            composition=composition,
             defaults={
                 "steward": organization.owner,
                 "release": release,
                 "organization": organization,
                 "template": "{}",
                 "instance_id": instance_request.identifier,
-                "composition": composition,
             },
         )
 

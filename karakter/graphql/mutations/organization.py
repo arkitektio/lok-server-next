@@ -2,7 +2,6 @@ from kante.types import Info
 import strawberry_django
 import strawberry
 from karakter import types, models, managers
-from fakts.logic import auto_configure_kommunity_partners
 import logging
 
 logger = logging.getLogger(__name__)
@@ -52,17 +51,12 @@ def update_organization(info: Info, input: UpdateOrganizationInput) -> types.Org
 class CreateOrganizationInput:
     name: str
     description: str | None = None
-    setup_kommunity_partners: bool = True
 
 
 def create_organization(info: Info, input: CreateOrganizationInput) -> types.Organization:
-    """Create a new organization with the given name, slug, and description.
-    
-    If setup_kommunity_partners is True (default), automatically configure
-    kommunity partners that apply to the creating user based on their filter conditions.
-    """
+    """Create a new organization with the given name, slug, and description."""
     user = info.context.request.user
-    
+
     organization = models.Organization.objects.create(
         slug=create_random_slug(input.name),
         name=input.name,
@@ -70,19 +64,12 @@ def create_organization(info: Info, input: CreateOrganizationInput) -> types.Org
         owner=user,
     )
     logger.info(f"Created Organization: {organization.id} with name: {organization.name}")
-    
-    # Create default roles and add creator as admin
+
     managers.create_default_roles_for_org(organization)
     managers.add_user_roles(
         user=user,
         organization=organization,
         roles=["admin"],
     )
-    
-    # Auto-configure kommunity partners if requested
-    if input.setup_kommunity_partners:
-        applied_partners = auto_configure_kommunity_partners(organization, user)
-        if applied_partners:
-            logger.info(f"Applied {len(applied_partners)} kommunity partners to org '{organization.slug}': {applied_partners}")
-    
+
     return organization
