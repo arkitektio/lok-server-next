@@ -392,6 +392,7 @@ def render_composition(client: models.Client, context: base_models.LinkingContex
         self=self_claim,
         auth=auth_claim,
         instances=instances_map,
+        statuses=client.statuses,
     )
 
     return claim.model_dump()
@@ -436,38 +437,45 @@ def hash_requirements(requirements: list[base_models.Requirement]) -> str:
     return sha256(".".join(sorted([req.service + req.key for req in requirements])).encode()).hexdigest()
 
 
-def auto_compose(client: models.Client, manifest: base_models.Manifest, user: models.AbstractUser, organization: models.Organization, device: models.ComputeNode | None = None) -> models.Client:
+def auto_compose(client: models.Client, manifest: base_models.Manifest, user: models.AbstractUser, organization: models.Organization, device: models.ComputeNode | None = None, declined_requirements: list[str] | None = None) -> models.Client:
     requirements = manifest.requirements
 
     if not requirements:
         return client
 
-    if hash_requirements(requirements) != client.requirements_hash or True:
-        errors = []
-        warnings = []
+    declined = set(declined_requirements or [])
+    statuses: dict[str, str] = {}
 
-        for old_mapping in client.mappings.all():
-            old_mapping.delete()
+    for old_mapping in client.mappings.all():
+        old_mapping.delete()
 
-        for req in requirements:
-            try:
-                instance = find_instance_for_requirement_and_composition(req, user, composition=client.composition)
+    for req in requirements:
+        if req.optional and req.key in declined:
+            statuses[req.key] = "denied"
+            continue
 
-                models.ServiceInstanceMapping.objects.get_or_create(
-                    client=client,
-                    instance=instance,
-                    key=req.key,
-                )
+        try:
+            instance = find_instance_for_requirement_and_composition(req, user, composition=client.composition)
 
-            except Exception as e:
-                if req.optional:
-                    warnings.append(str(e))
-                else:
-                    raise Exception(f"Unable to find instance for requirement {req.service}") from e
+            if instance is None:
+                raise errors.InstanceNotFound(f"No instance for {req.service} in this composition.")
 
-        client.requirements_hash = hash_requirements(requirements)
+            models.ServiceInstanceMapping.objects.get_or_create(
+                client=client,
+                instance=instance,
+                key=req.key,
+            )
+            statuses[req.key] = "granted"
 
-        client.save()
+        except Exception as e:
+            if req.optional:
+                statuses[req.key] = "unavailable"
+            else:
+                raise Exception(f"Unable to find instance for requirement {req.service}") from e
+
+    client.requirements_hash = hash_requirements(requirements)
+    client.statuses = statuses
+    client.save()
 
     return client
 
@@ -631,7 +639,7 @@ def validate_redeem_token(redeem_token: models.RedeemToken, manifest: Manifest) 
     return redeem_token
 
 
-def validate_device_code(device_code: models.DeviceCode, user: models.AbstractUser, organization: models.Organization, composition: models.Composition) -> models.DeviceCode:
+def validate_device_code(device_code: models.DeviceCode, user: models.AbstractUser, organization: models.Organization, composition: models.Composition, declined_requirements: list[str] | None = None) -> models.DeviceCode:
     manifest = device_code.manifest_as_model
 
     node_id = manifest.node_id
@@ -676,7 +684,11 @@ def validate_device_code(device_code: models.DeviceCode, user: models.AbstractUs
             user=user,
             organization=organization,
             composition=composition,
+            declined_requirements=declined_requirements,
         )
+
+    else:
+        auto_compose(client, manifest, user, organization, declined_requirements=declined_requirements)
 
     device_code.client = client
     device_code.save()

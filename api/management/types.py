@@ -986,7 +986,7 @@ class ManagementDeviceCode:
     def staging_manifest(self, info: Info) -> Optional[ManagementStagingManifest]:
         if not self.staging_manifest:
             return None
-        return ManagementStagingManifest(**self.staging_manifest)
+        return ManagementStagingManifest.from_pydantic(base_models.Manifest(**self.staging_manifest))
 
 
 @strawberry_django.type(fakts_models.ServiceDeviceCode, filters=karakter_filters.OrganizationFilter, pagination=True, description="""A ServiceDeviceCode is used for the device code flow for service instances.""")

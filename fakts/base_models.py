@@ -16,6 +16,7 @@ class Layer(BaseModel):
 class WellKnownFakts(BaseModel):
     name: str = settings.DEPLOYMENT_NAME
     version: str
+    protocol_version: str = "1"
     description: str | None = None
     claim: str
     base_url: str
@@ -97,6 +98,9 @@ class ServiceManifest(BaseModel):
     """ The instance_id is the id of the instance that the runs on """
     public_sources: Optional[List[PublicSource]] = None
     """ The public_sources are a list of public sources where the client can be found. """
+    challenge_key: Optional[str] = None
+    """ Base64-encoded raw Ed25519 public key (32 bytes). When set, the Fakts server stores it
+    and includes it in claims so clients can verify signed alias challenges. """
 
 
 class CompositionInputModel(BaseModel):
@@ -354,6 +358,8 @@ class InstanceClaim(BaseModel):
     identifier: str
     """The identifier is a unique string that identifies the instance."""
     aliases: List[Alias] = Field(default_factory=list)
+    challenge_key: Optional[Dict] = None
+    """Ed25519 public key for verifying signed alias challenges: {"kind": "ed25519", "key": "<base64 raw 32 bytes>"}. Absent when the instance has no registered key."""
 
 
 class SelfClaim(BaseModel):
@@ -369,6 +375,10 @@ class ClaimAnswer(BaseModel):
     self: SelfClaim
     auth: AuthClaim
     instances: Dict[str, InstanceClaim] = Field(default_factory=dict)
+    statuses: Dict[str, str] = Field(default_factory=dict)
+    """Per-requirement grant outcomes keyed by manifest requirement key.
+    Values: 'granted' | 'denied' | 'unavailable'. Omitted for registrations
+    that predate this feature (clients should treat missing keys as 'unknown')."""
 
 
 class CompositionAuthClaim(BaseModel):

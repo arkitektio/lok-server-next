@@ -87,6 +87,10 @@ def accept_service_device_code(info: Info, input: AcceptServiceDeviceCodeInput) 
 
         sc.used_by.add(instance)
 
+    if manifest.challenge_key:
+        instance.public_key = manifest.challenge_key
+        instance.save()
+
     print("Creating aliases:", aliases)
     for alias in aliases:
         fakts_models.InstanceAlias.objects.update_or_create(instance=instance, host=alias.host, port=alias.port, ssl=alias.ssl, path=alias.path, kind=alias.kind)

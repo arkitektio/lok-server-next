@@ -52,7 +52,7 @@ def create_development_client(release: models.Release, config: base_models.Devel
         )
 
 
-def create_client(manifest: base_models.Manifest, config: base_models.ClientConfig, user: models.AbstractUser, organization: models.Organization, composition: models.Composition | None = None) -> models.Client:
+def create_client(manifest: base_models.Manifest, config: base_models.ClientConfig, user: models.AbstractUser, organization: models.Organization, composition: models.Composition | None = None, declined_requirements: list[str] | None = None) -> models.Client:
     from .utils import download_logo
 
     try:
@@ -87,7 +87,7 @@ def create_client(manifest: base_models.Manifest, config: base_models.ClientConf
     else:
         raise ValueError(f"Client kind {config.kind} not supported yet")
 
-    client = logic.auto_compose(client, manifest, user, organization, device=node)
+    client = logic.auto_compose(client, manifest, user, organization, device=node, declined_requirements=declined_requirements)
 
     for scope in manifest.scopes or []:
         client.scopes.add(karakter_models.Scope.objects.get(identifier=scope, organization=organization))

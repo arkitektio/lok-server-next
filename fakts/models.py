@@ -193,7 +193,6 @@ class ServiceInstance(models.Model):
     logo = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
     instance_id = models.CharField(max_length=1000, default="default")
     private_key = models.TextField(help_text="The private key of the instance, used for signing claims.", null=True, blank=True)
-    public_key = models.TextField(help_text="The public key of the instance, used for verifying claims.", null=True, blank=True)
     steward = models.ForeignKey(
         get_user_model(),
         on_delete=models.CASCADE,
@@ -241,10 +240,13 @@ class ServiceInstance(models.Model):
             except AssertionError as e:
                 raise errors.InstanceAliasNotFound(f"Error rendering alias {alias}: {str(e)}")
 
+        challenge_key = {"kind": "ed25519", "key": self.public_key} if self.public_key else None
+
         return base_models.InstanceClaim(
             service=self.release.service.identifier,
             identifier=str(self.id),
             aliases=urls,
+            challenge_key=challenge_key,
         )
 
 
@@ -548,6 +550,7 @@ class Client(models.Model):
     tenant = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="managed_clients")
     created_at = models.DateTimeField(auto_now_add=True)
     requirements_hash = models.CharField(max_length=1000, unique=False)
+    statuses = models.JSONField(default=dict, help_text="Per-requirement grant outcomes: {'key': 'granted'|'denied'|'unavailable'}.")
     logo = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
     last_reported_at = models.DateTimeField(auto_now=True)
     manifest = models.JSONField(default=dict)

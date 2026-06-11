@@ -15,6 +15,8 @@ class AcceptDeviceCodeInput:
 
     device_code: strawberry.ID
     composition: strawberry.ID
+    declined_requirements: list[str] = strawberry.field(default_factory=list)
+    """Requirement keys the user has explicitly declined (optional requirements only)."""
 
 
 def accept_device_code(info: Info, input: AcceptDeviceCodeInput) -> types.ManagementClient:
@@ -35,6 +37,7 @@ def accept_device_code(info: Info, input: AcceptDeviceCodeInput) -> types.Manage
         user=user,
         organization=organization,
         composition=composition,
+        declined_requirements=input.declined_requirements,
     )
 
     return validate_device_code.client
