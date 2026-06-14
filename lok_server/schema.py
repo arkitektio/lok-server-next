@@ -79,7 +79,6 @@ class Query:
 
     @kante.django_field()
     def hallo(self, info: Info) -> str:
-        print("hallosss")
         return "hallo"
 
     @kante.django_field(name="service")

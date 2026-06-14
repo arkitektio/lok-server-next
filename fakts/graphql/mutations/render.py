@@ -4,7 +4,7 @@ from kante.types import Info
 
 from fakts import inputs, models, scalars
 
-from fakts.logic import render_composition as rc, create_fake_linking_context
+from fakts.services.rendering import render_composition as rc, create_fake_linking_context
 
 logger = logging.getLogger(__name__)
 

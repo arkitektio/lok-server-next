@@ -47,6 +47,12 @@ django_settings_module = "lok_server.settings"
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "lok_server.settings_test"
+# importlib import mode + pythonpath avoids module-name collisions between the
+# top-level `tests` package and the app-level `tests.py` files (authapp, fakts).
+addopts = "--import-mode=importlib"
+pythonpath = ["."]
+# Collect both `test_*.py` and the Django-style app-level `tests.py` files.
+python_files = ["test_*.py", "tests.py"]
 
 
 [tool.ruff]

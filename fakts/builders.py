@@ -1,95 +1,10 @@
-from fakts import base_models, models, enums
-from karakter import models as karakter_models
-from fakts import logic
-from authapp.models import generate_client_id, generate_client_secret
+"""Backwards-compatibility shim.
 
+The client-building logic now lives in :mod:`fakts.services.clients`. This module
+re-exports it so existing imports (``from fakts.builders import create_client``)
+keep working. Prefer importing from ``fakts.services.clients`` in new code.
+"""
 
-def create_development_client(release: models.Release, config: base_models.DevelopmentClientConfig, manifest: base_models.Manifest, node: models.ComputeNode | None = None, composition: models.Composition | None = None):
-    tenant = config.get_tenant()
-    user = config.get_user()
-    organization = config.get_organization()
+from fakts.services.clients import create_client, create_development_client
 
-    try:
-        client = models.Client.objects.get(user=user, release=release, organization=organization, node=node, kind=enums.ClientKindVanilla.DEVELOPMENT.value)
-        if client.token != config.token:
-            client.token = config.token
-        client.tenant = tenant
-        client.node = node
-        client.manifest = manifest.model_dump()
-        client.membership = karakter_models.Membership.objects.get(user=user, organization=organization)
-        client.composition = composition
-        client.public_sources = [t.dict() for t in manifest.public_sources] if manifest.public_sources else []
-        client.save()
-
-        return client
-
-    except models.Client.DoesNotExist:
-        print("Did not exist", user, release)
-        client_secret = generate_client_secret()
-        client_id = generate_client_id()
-
-        oauth2_client = models.OAuth2Client.objects.create(
-            client_id=client_id,
-            client_secret=client_secret,
-        )
-
-        return models.Client.objects.create(
-            release=release,
-            user=user,
-            tenant=user,
-            membership=karakter_models.Membership.objects.get(user=user, organization=organization),
-            node=node,
-            token=config.token,
-            kind=enums.ClientKindVanilla.DEVELOPMENT.value,
-            oauth2_client=oauth2_client,
-            redirect_uris="",
-            public=False,
-            composition=composition,
-            manifest=manifest.model_dump(),
-            logo=release.logo,
-            organization=organization,
-            public_sources=[t.dict() for t in manifest.public_sources] if manifest.public_sources else [],
-        )
-
-
-def create_client(manifest: base_models.Manifest, config: base_models.ClientConfig, user: models.AbstractUser, organization: models.Organization, composition: models.Composition | None = None, declined_requirements: list[str] | None = None) -> models.Client:
-    from .utils import download_logo
-
-    try:
-        logo = download_logo(manifest.logo) if manifest.logo else None
-    except Exception as e:
-        raise ValueError(f"Could not download logo {e}")
-
-    app, _ = models.App.objects.get_or_create(identifier=manifest.identifier)
-    if logo:
-        app.logo = logo
-        app.save()
-
-    release, _ = models.Release.objects.update_or_create(
-        app=app,
-        version=manifest.version,
-        defaults={
-            "logo": logo,
-            "scopes": manifest.scopes,
-            "requirements": manifest.dict()["requirements"],
-        },
-    )
-
-    if manifest.node_id:
-        node = models.ComputeNode.objects.get_or_create(organization=organization, node_id=manifest.node_id)[0]
-    else:
-        node = None
-
-    print(config)
-
-    if config.kind == enums.ClientKindVanilla.DEVELOPMENT.value:
-        client = create_development_client(release, config, manifest, node=node, composition=composition)
-    else:
-        raise ValueError(f"Client kind {config.kind} not supported yet")
-
-    client = logic.auto_compose(client, manifest, user, organization, device=node, declined_requirements=declined_requirements)
-
-    for scope in manifest.scopes or []:
-        client.scopes.add(karakter_models.Scope.objects.get(identifier=scope, organization=organization))
-
-    return client
+__all__ = ["create_client", "create_development_client"]

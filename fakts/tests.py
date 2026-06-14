@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 from django.test import SimpleTestCase
 
-from fakts.logic import PartnerPreAuthorizationError, create_composition_from_partner, run_partner_pre_authorize_hook
+from fakts.services.compositions import PartnerPreAuthorizationError, create_composition_from_partner, run_partner_pre_authorize_hook
 
 
 class PartnerPreAuthorizeHookTests(SimpleTestCase):
@@ -18,7 +18,7 @@ class PartnerPreAuthorizeHookTests(SimpleTestCase):
 		organization = SimpleNamespace(pk="2", slug="demo-org", name="Demo Org")
 		composition = SimpleNamespace(pk="3", identifier="demo-comp", name="Demo Composition", token="comp-token")
 
-		with patch("fakts.logic.requests.post") as post:
+		with patch("fakts.services.compositions.requests.post") as post:
 			post.return_value.json.return_value = {"ok": True}
 			post.return_value.raise_for_status.return_value = None
 
@@ -44,8 +44,8 @@ class PartnerPreAuthorizeHookTests(SimpleTestCase):
 		)
 		organization = SimpleNamespace(slug="demo-org")
 
-		with patch("fakts.logic.create_composition_from_manifest", return_value=composition), patch(
-			"fakts.logic.run_partner_pre_authorize_hook",
+		with patch("fakts.services.compositions.create_composition_from_manifest", return_value=composition), patch(
+			"fakts.services.compositions.run_partner_pre_authorize_hook",
 			side_effect=PartnerPreAuthorizationError("Denied by partner"),
 		):
 			with self.assertRaisesMessage(PartnerPreAuthorizationError, "Denied by partner"):

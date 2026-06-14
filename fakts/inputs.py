@@ -51,6 +51,7 @@ class DevelopmentClientInputModel(BaseModel):
     composition: str | None = None
     requirements: list[RequirementModel] = Field(default_factory=list)
     layers: list[str] = Field(default_factory=lambda: ["web"])
+    role: enums.ClientRoleVanilla | None = None
 
 
 @pydantic.input(DevelopmentClientInputModel)
@@ -58,6 +59,7 @@ class DevelopmentClientInput:
     manifest: ManifestInput
     composition: strawberry.ID | None = None
     layers: list[str] | None = None
+    role: enums.ClientRole | None = None
 
 
 class ScanBackendInputModel(BaseModel):

@@ -1,26 +1,17 @@
 import pytest
 import boto3
-import moto
 from moto import mock_aws
 import os
-import django
-from django.conf import settings
-
-from karakter.signals import create_role
-
-
-# Configure Django settings for tests
-if not settings.configured:
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'rekuest.settings_test')
-    django.setup()
-
-
 
 from django.contrib.auth import get_user_model
-from karakter.models import  Organization, User, Membership, Role
+from karakter.models import Organization, User, Membership
+from karakter.managers import create_role
 from authapp.models import OAuth2Client
-from lok_server.schema import schema
 from kante.context import HttpContext, UniversalRequest
+
+# Make the factories importable as `pytest` fixtures-adjacent helpers.
+from tests import factories  # noqa: F401
+
 
 @pytest.fixture(scope="function")
 def aws_credentials():
@@ -46,21 +37,23 @@ def create_bucket1(s3):
 @pytest.fixture
 def create_bucket2(s3):
     s3.create_bucket(Bucket="cabanana")
-    
-    
-    
+
+
 @pytest.fixture
 def testing_org(db):
+    """An organization owned by ``testuser`` with the default roles.
 
+    Creating the ``User`` triggers the signal that builds a personal default
+    organization; creating the ``Organization`` with an owner triggers the
+    signal that seeds default roles/scopes and makes the owner an admin.
+    """
     user = User.objects.create(username="testuser", password="testpass")
-
-    org = Organization.objects.create(slug="testorg")
-
-
-    x = Membership.objects.create(user=user, organization=org)
-    x.roles.add(create_role(identifier="admin", organization=org))
+    org = Organization.objects.create(slug="testorg", name="Test Org", owner=user)
+    # ``ensure_owner_is_admin`` (org post_save signal) already added the admin
+    # role; this keeps the helper explicit/idempotent for readers.
+    membership = Membership.objects.get(user=user, organization=org)
+    membership.roles.add(create_role(organization=org, identifier="admin"))
     return org
-
 
 
 def create_auth_context(user: User, organization: Organization, client: OAuth2Client) -> HttpContext:
@@ -72,13 +65,13 @@ def create_auth_context(user: User, organization: Organization, client: OAuth2Cl
             _organization=organization,  # type: ignore
         ),
         headers={"Authorization": "Bearer token"},
-        type="http"
+        type="http",
     )
 
 
 @pytest.fixture
-def authenticated_context(db, testing_org):
+def authenticated_context(db, testing_org) -> HttpContext:
     user = User.objects.create(username="fart", password="123456789")
-    client = OAuth2Client.objects.create(client_id="oinsoins", organization=testing_org, user=user)
-
+    membership, _ = Membership.objects.get_or_create(user=user, organization=testing_org)
+    client = OAuth2Client.objects.create(client_id="oinsoins", membership=membership)
     return create_auth_context(user, testing_org, client)

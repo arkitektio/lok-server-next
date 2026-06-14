@@ -33,6 +33,34 @@ class ClientKindVanilla(str, Enum):
     DESKTOP = "desktop"
 
 
+class ClientRoleChoices(TextChoices):
+    """The operational role of a client, orthogonal to its kind (auth flow)."""
+
+    INTERFACE = "interface", "INTERFACE (Value represent INTERFACE)"
+    AGENT = "agent", "AGENT (Value represent AGENT)"
+
+
+class ClientRoleVanilla(str, Enum):
+    INTERFACE = "interface"
+    AGENT = "agent"
+
+
+@strawberry.enum
+class ClientRole(str, Enum):
+    INTERFACE = strawberry.enum_value(
+        "interface",
+        description="""An interface client. Interface clients are human interfaces: a user actively
+operates them (clicking through a UI, running a desktop app, browsing a website). They represent a
+person interacting with the platform in real time.""",
+    )
+    AGENT = strawberry.enum_value(
+        "agent",
+        description="""An agent client. Agent clients are authorized once by a user and then run
+unattended, receiving and processing tasks on that user's behalf (e.g. a Rekuest worker). They act
+automatically rather than being driven by a human in real time.""",
+    )
+
+
 @strawberry.enum
 class FaktValueType(str, Enum):
     STRING = "string"

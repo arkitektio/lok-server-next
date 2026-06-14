@@ -403,6 +403,11 @@ class DeviceCode(models.Model):
         default=enums.ClientKindChoices.DEVELOPMENT.value,
         help_text="The kind of staging client",
     )
+    staging_role = TextChoicesField(
+        choices_enum=enums.ClientRoleChoices,
+        default=enums.ClientRoleChoices.INTERFACE.value,
+        help_text="The operational role of the staging client (INTERFACE vs AGENT)",
+    )
     staging_manifest = models.JSONField(default=dict)
     staging_logo = models.CharField(max_length=1000, null=True)
     staging_public = models.BooleanField(default=False)
@@ -529,6 +534,11 @@ class Client(models.Model):
         choices_enum=enums.ClientKindChoices,
         default=enums.ClientKindChoices.DEVELOPMENT.value,
         help_text="The kind of transformation",
+    )
+    role = TextChoicesField(
+        choices_enum=enums.ClientRoleChoices,
+        default=enums.ClientRoleChoices.INTERFACE.value,
+        help_text="Operational role: human INTERFACE vs autonomous task-receiving AGENT.",
     )
     user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="clients")
     organization = models.ForeignKey(

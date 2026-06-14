@@ -5,6 +5,7 @@ from typing import Optional
 from strawberry_django.filters import FilterLookup
 import strawberry_django
 from fakts import models as fakts_models
+from fakts import enums as fakts_enums
 
 
 @strawberry_django.filter(models.User, description="Filter for User model.")
@@ -47,6 +48,7 @@ class GroupFilter:
 class ClientFilter:
     search: str | None
     ids: list[strawberry.ID] | None
+    role: fakts_enums.ClientRole | None
 
     def filter_ids(self, queryset, info):
         if self.ids is None:
@@ -57,6 +59,11 @@ class ClientFilter:
         if self.search is None:
             return queryset
         return queryset.filter(name__contains=self.search)
+
+    def filter_role(self, queryset, info):
+        if self.role is None:
+            return queryset
+        return queryset.filter(role=self.role.value)
 
 
 @strawberry_django.filter(fakts_models.App)

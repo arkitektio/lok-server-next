@@ -13,7 +13,6 @@ from .type_gen import create_stats_type
 
 
 def build_prescoped_queryset(info, queryset, field="organization"):
-    print(info)
     if info.variable_values.get("filters", {}).get("scope") is None:
         queryset = queryset.filter(**{field: info.context.request.organization})
         return queryset

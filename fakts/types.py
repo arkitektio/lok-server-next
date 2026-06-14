@@ -16,7 +16,6 @@ from authapp import types as atypes
 
 
 def build_prescoped_queryset(info, queryset, field="organization"):
-    print(info)
     if info.variable_values.get("filters", {}).get("scope") is None:
         queryset = queryset.filter(**{field: info.context.request.organization})
         return queryset
@@ -244,6 +243,12 @@ class Client:
         if self.kind == "development":
             return enums.ClientKind.DEVELOPMENT
 
+    @strawberry_django.field(description="The operational role of the client. INTERFACE clients are human interfaces operated by a user in real time. AGENT clients are authorized once and then run unattended, receiving and processing tasks on the user's behalf.")
+    def role(self, info) -> enums.ClientRole:
+        if self.role == "agent":
+            return enums.ClientRole.AGENT
+        return enums.ClientRole.INTERFACE
+
     @strawberry.field(description="The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information.")
     def token(self, info) -> str:
         # TODO: Implement only tenant should be able to see the token
@@ -252,7 +257,6 @@ class Client:
     @strawberry_django.field(description="The issue url of the client. This is the url where users can report issues and get more information about the client.")
     def issue_url(self, info) -> str | None:
         for source in self.public_sources:
-            print(source)
             if source.get("kind").lower() == "github":
                 return source.get("url") + "/issues/new"
 

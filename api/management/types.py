@@ -320,8 +320,8 @@ class ManagementRole:
     organization: "ManagementOrganization"
     creating_instance: Optional["ManagementServiceInstance"]
     is_builtin: bool = strawberry.field(description="If this role is a built-in role that cannot be deleted (admin)")
-    memberships: List["ManagementMembership"] = strawberry.django.field(description="The memberships that have this role")
-    used_by: List["ManagementServiceInstance"] = strawberry.django.field(description="The service instances that use this role")
+    memberships: List["ManagementMembership"] = strawberry_django.field(description="The memberships that have this role")
+    used_by: List["ManagementServiceInstance"] = strawberry_django.field(description="The service instances that use this role")
 
     @kante.django_field()
     def description(self, info: Info) -> "str":
@@ -339,8 +339,8 @@ class ManagementScope:
     organization: "ManagementOrganization"
     creating_instance: Optional["ManagementServiceInstance"]
     is_builtin: bool = strawberry.field(description="If this scope is a built-in scope that cannot be deleted (admin)")
-    memberships: List["ManagementMembership"] = strawberry.django.field(description="The memberships that have this scope")
-    used_by: List["ManagementServiceInstance"] = strawberry.django.field(description="The service instances that use this scope")
+    memberships: List["ManagementMembership"] = strawberry_django.field(description="The memberships that have this scope")
+    used_by: List["ManagementServiceInstance"] = strawberry_django.field(description="The service instances that use this scope")
 
     @kante.django_field()
     def description(self, info: Info) -> "str":
@@ -908,6 +908,7 @@ class ManagementClient:
     functional: bool = strawberry_django.field(description="Is this client functional? A non-functional client cannot be used to authenticate users.")
     release: ManagementRelease = strawberry_django.field(description="The release that this client belongs to.")
     kind: str = strawberry_django.field(description="The kind of the client. The kind defines the authentication flow that is used to authenticate users with this client.")
+    role: str = strawberry_django.field(description="The operational role of the client: INTERFACE (a human interface operated by a user) vs AGENT (an autonomous client authorized once that then runs unattended, receiving tasks).")
     public: bool = strawberry_django.field(description="Is this client public? If a client is public ")
     user: ManagementUser | None = strawberry_django.field(description="If the client is a DEVELOPMENT client, which requires no further authentication, this is the user that is authenticated with the client.")
     organization: ManagementOrganization = strawberry_django.field(description="The client")
@@ -916,7 +917,7 @@ class ManagementClient:
     mappings: list["ManagementServiceInstanceMapping"] = strawberry_django.field(description="The mappings of the client. A mapping is a mapping of a service to a service instance. This is used to configure the composition.")
     used_aliases: list[ManagementUsedAlias] = strawberry_django.field(description="The aliases that are used by this client.")
     last_reported_at: datetime.datetime | None = strawberry_django.field(description="The last time the client reported in. This is used to determine if the client is active or not.")
-    scopes: list["ManagementScope"] = strawberry.django.field(description="The scopes that are granted to this client.")
+    scopes: list["ManagementScope"] = strawberry_django.field(description="The scopes that are granted to this client.")
 
     @strawberry_django.field(description="Check if the device code is still valid")
     def manifest(self, info: Info) -> ManagementStagingManifest:

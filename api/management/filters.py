@@ -1,6 +1,7 @@
 import strawberry
 import strawberry_django
 from fakts import models as fakts_models
+from fakts import enums as fakts_enums
 from allauth.socialaccount import models as smodels
 from karakter import models as karakter_models
 
@@ -218,6 +219,7 @@ class ManagementClientFilter:
     ids: list[strawberry.ID] | None
     functional: bool | None
     organization: strawberry.ID | None
+    role: fakts_enums.ClientRole | None
 
     def filter_ids(self, queryset, info):
         if self.ids is None:
@@ -233,6 +235,11 @@ class ManagementClientFilter:
         if self.functional is None:
             return queryset
         return queryset.filter(functional=self.functional)
+
+    def filter_role(self, queryset, info):
+        if self.role is None:
+            return queryset
+        return queryset.filter(role=self.role.value)
 
     def filter_organization(self, queryset, info):
         if self.organization is None:

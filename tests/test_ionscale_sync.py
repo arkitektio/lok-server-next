@@ -11,9 +11,10 @@ from karakter.models import Membership, Organization, User
 
 @pytest.mark.django_db
 def test_membership_changes_resync_ionscale_layers():
-    organization = Organization.objects.create(slug="ionscale-sync-org")
     existing_user = User.objects.create(username="existing-user")
-    Membership.objects.create(user=existing_user, organization=organization)
+    # owner is required; the org post_save signal makes the owner an admin member,
+    # so we don't create the membership for ``existing_user`` explicitly.
+    organization = Organization.objects.create(slug="ionscale-sync-org", owner=existing_user)
     fakts_models.IonscaleLayer.objects.create(
         organization=organization,
         name="Default",
@@ -44,10 +45,11 @@ def test_membership_changes_resync_ionscale_layers():
 
 @pytest.mark.django_db
 def test_create_ionscale_layer_syncs_existing_members():
-    organization = Organization.objects.create(slug="ionscale-create-org")
     first_user = User.objects.create(username="first-user")
     second_user = User.objects.create(username="second-user")
-    Membership.objects.create(user=first_user, organization=organization)
+    # owner is required; the org post_save signal makes ``first_user`` an admin
+    # member, so only ``second_user``'s membership is created explicitly.
+    organization = Organization.objects.create(slug="ionscale-create-org", owner=first_user)
     Membership.objects.create(user=second_user, organization=organization)
 
     with patch("api.management.mutations.ionscale.django_repo.create_tailnet") as create_tailnet:

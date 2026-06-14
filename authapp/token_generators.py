@@ -105,6 +105,7 @@ class MyJWTBearerTokenGenerator(JWTBearerTokenGenerator):
             "client_app": fakts_client.release.app.identifier if fakts_client and fakts_client.release and fakts_client.release.app else None,
             "client_release": fakts_client.release.version if fakts_client and fakts_client.release else None,
             "client_device": fakts_client.node.node_id if fakts_client and fakts_client.node else None,
+            "client_role": fakts_client.role if fakts_client else None,
         }
 
     def get_audiences(self, client: Any, user: Any, scope: Optional[str]) -> str | list[str]:

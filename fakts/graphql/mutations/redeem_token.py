@@ -11,7 +11,7 @@ import kante
 
 from fakts import enums, inputs, models, scalars, types
 from fakts.base_models import DevelopmentClientConfig, Manifest, Requirement
-from fakts.builders import create_client
+from fakts.services.clients import create_client
 
 logger = logging.getLogger(__name__)
 
