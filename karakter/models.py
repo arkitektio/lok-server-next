@@ -5,7 +5,7 @@ from typing import Optional, List, Tuple
 
 import requests
 from django.conf import settings
-from django.contrib.auth.models import AbstractUser, Group
+from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.db import models
 from django.utils import timezone
 import uuid
@@ -145,6 +145,26 @@ class User(AbstractUser):
         null=True,
         blank=True,
         help_text="The organization that the user is currently active in",
+    )
+    # authentikate (v2) ships its own concrete `User(AbstractUser)` model, which
+    # also defines `groups`/`user_permissions` with the default `user_set` reverse
+    # accessor. Override the related names here so the two models don't clash
+    # (fields.E304). This is a Python-only change with no database effect.
+    groups = models.ManyToManyField(
+        Group,
+        verbose_name="groups",
+        blank=True,
+        help_text="The groups this user belongs to. A user will get all permissions granted to each of their groups.",
+        related_name="karakter_users",
+        related_query_name="karakter_user",
+    )
+    user_permissions = models.ManyToManyField(
+        Permission,
+        verbose_name="user permissions",
+        blank=True,
+        help_text="Specific permissions for this user.",
+        related_name="karakter_users",
+        related_query_name="karakter_user",
     )
 
     def get_user_id(self):

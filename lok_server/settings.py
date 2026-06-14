@@ -93,6 +93,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django_probes",
     "pak",
+    "authentikate",
     "authapp",
     "guardian",
     "komment",
@@ -101,7 +102,6 @@ INSTALLED_APPS = [
     "karakter",
     "ionscale",
     "health_check",
-    "health_check.db",
 ]
 
 INSTALLED_APPS += [

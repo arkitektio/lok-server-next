@@ -6,11 +6,52 @@ import os
 from django.contrib.auth import get_user_model
 from karakter.models import Organization, User, Membership
 from karakter.managers import create_role
-from authapp.models import OAuth2Client
-from kante.context import HttpContext, UniversalRequest
+from kante.context import HttpContext, UniversalRequest, TemporalResponse
+from authentikate.base_models import StaticToken
+from authentikate.settings import get_settings
 
 # Make the factories importable as `pytest` fixtures-adjacent helpers.
 from tests import factories  # noqa: F401
+
+
+@pytest.fixture(autouse=True)
+def _restore_static_tokens():
+    """Undo any per-test static tokens registered via ``build_auth_context``.
+
+    ``get_settings()`` caches a single ``AuthentikateSettings`` for the process,
+    so tokens registered during a test would otherwise leak into later tests.
+    Snapshot the configured tokens and restore them afterwards.
+    """
+    settings_obj = get_settings()
+    original = dict(settings_obj.static_tokens)
+    yield
+    settings_obj.static_tokens.clear()
+    settings_obj.static_tokens.update(original)
+
+
+def build_auth_context(user, organization, oauth2_client, roles=("admin",)) -> HttpContext:
+    """Build an authenticated ``HttpContext`` via a static token.
+
+    authentikate (v2) authenticates by decoding the ``Authorization`` header, so
+    tests register a static token whose claims (``sub``/``active_org``/
+    ``client_id``) match freshly-created fixtures and send it as a bearer token.
+    The ``AuthAppExtension`` then resolves the karakter/fakts models from those
+    claims exactly as it does in production.
+    """
+    token_str = f"static-{user.id}-{oauth2_client.client_id}"
+    get_settings().static_tokens[token_str] = StaticToken(
+        sub=str(user.id),
+        iss="lok",
+        active_org=organization.slug,
+        client_id=oauth2_client.client_id,
+        roles=list(roles),
+    )
+    return HttpContext(
+        request=UniversalRequest(_extensions={}),
+        response=TemporalResponse(),
+        headers={"Authorization": f"Bearer {token_str}"},
+        type="http",
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -78,22 +119,11 @@ def testing_org(db):
     return org
 
 
-def create_auth_context(user: User, organization: Organization, client: OAuth2Client) -> HttpContext:
-    return HttpContext(
-        request=UniversalRequest(
-            _extensions={"token": "token"},
-            _client=client,  # type: ignore
-            _user=user,  # type: ignore
-            _organization=organization,  # type: ignore
-        ),
-        headers={"Authorization": "Bearer token"},
-        type="http",
-    )
-
-
 @pytest.fixture
 def authenticated_context(db, testing_org) -> HttpContext:
     user = User.objects.create(username="fart", password="123456789")
     membership, _ = Membership.objects.get_or_create(user=user, organization=testing_org)
-    client = OAuth2Client.objects.create(client_id="oinsoins", membership=membership)
-    return create_auth_context(user, testing_org, client)
+    # A fakts Client (with its backing OAuth2Client) so the auth extension can
+    # resolve ``request.client`` from the token's ``client_id``.
+    fakts_client = factories.make_client(membership=membership)
+    return build_auth_context(user, testing_org, fakts_client.oauth2_client)

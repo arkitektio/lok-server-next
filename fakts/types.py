@@ -13,6 +13,7 @@ import datetime
 from fakts import models, scalars, enums, filters, enums
 from karakter.datalayer import get_current_datalayer
 from authapp import types as atypes
+from kante.types import Info
 
 
 def build_prescoped_queryset(info, queryset, field="organization"):
@@ -235,7 +236,7 @@ class Client:
 
 
     @strawberry_django.field(description="The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information.")
-    def kind(self, info) -> enums.ClientKind:
+    def kind(self, info: Info) -> enums.ClientKind:
         if self.kind == "website":
             return enums.ClientKind.WEBSITE
         if self.kind == "desktop":
@@ -244,18 +245,18 @@ class Client:
             return enums.ClientKind.DEVELOPMENT
 
     @strawberry_django.field(description="The operational role of the client. INTERFACE clients are human interfaces operated by a user in real time. AGENT clients are authorized once and then run unattended, receiving and processing tasks on the user's behalf.")
-    def role(self, info) -> enums.ClientRole:
+    def role(self, info: Info) -> enums.ClientRole:
         if self.role == "agent":
             return enums.ClientRole.AGENT
         return enums.ClientRole.INTERFACE
 
     @strawberry.field(description="The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information.")
-    def token(self, info) -> str:
+    def token(self, info: Info) -> str:
         # TODO: Implement only tenant should be able to see the token
         return self.token
 
     @strawberry_django.field(description="The issue url of the client. This is the url where users can report issues and get more information about the client.")
-    def issue_url(self, info) -> str | None:
+    def issue_url(self, info: Info) -> str | None:
         for source in self.public_sources:
             if source.get("kind").lower() == "github":
                 return source.get("url") + "/issues/new"
@@ -263,7 +264,7 @@ class Client:
         return None
 
     @strawberry_django.field(description="The public sources of the client. These are the public sources where users can find more information about the client.")
-    def public_sources(self, info) -> list[PublicSource]:
+    def public_sources(self, info: Info) -> list[PublicSource]:
         sources = []
         for source in self.public_sources:
             sources.append(

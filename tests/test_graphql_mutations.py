@@ -2,23 +2,15 @@
 
 import pytest
 from asgiref.sync import sync_to_async
-from kante.context import HttpContext, UniversalRequest
 
 from lok_server.schema import schema
 from tests import factories
+from tests.conftest import build_auth_context
 
 
 def _context(user, organization, client):
-    return HttpContext(
-        request=UniversalRequest(
-            _extensions={"token": "token"},
-            _client=client,  # type: ignore
-            _user=user,  # type: ignore
-            _organization=organization,  # type: ignore
-        ),
-        headers={"Authorization": "Bearer token"},
-        type="http",
-    )
+    # ``client`` is a fakts Client; authenticate through its backing OAuth2Client.
+    return build_auth_context(user, organization, client.oauth2_client)
 
 
 def _setup():

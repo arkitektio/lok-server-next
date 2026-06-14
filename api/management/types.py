@@ -927,12 +927,12 @@ class ManagementClient:
         return base_models.Manifest(**self.manifest)
 
     @strawberry.field(description="The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information.")
-    def token(self, info) -> str:
+    def token(self, info: Info) -> str:
         # TODO: Implement only tenant should be able to see the token
         return self.token
 
     @strawberry_django.field(description="The issue url of the client. This is the url where users can report issues and get more information about the client.")
-    def issue_url(self, info) -> str | None:
+    def issue_url(self, info: Info) -> str | None:
         for source in self.public_sources:
             if source.get("kind", "").lower() == "github":
                 return source.get("url") + "/issues/new"
@@ -940,7 +940,7 @@ class ManagementClient:
         return None
 
     @strawberry_django.field(description="The public sources of the client. These are the public sources where users can find more information about the client.")
-    def public_sources(self, info) -> list[ManagementPublicSource]:
+    def public_sources(self, info: Info) -> list[ManagementPublicSource]:
         sources = []
         for source in self.public_sources:
             sources.append(
@@ -952,7 +952,7 @@ class ManagementClient:
         return sources
 
     @strawberry_django.field(description="Check if the client is active")
-    def device(self, info) -> Optional["ManagementDevice"]:
+    def device(self, info: Info) -> Optional["ManagementDevice"]:
         return self.node
 
     @classmethod
