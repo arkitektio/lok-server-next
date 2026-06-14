@@ -6,7 +6,7 @@ from django.utils import timezone
 from datetime import timedelta
 import kante
 from fakts import models as fakts_models
-from ionscale.repo import django_repo
+from ionscale.repo import get_ionscale_repo
 from ionscale import base_models as ionscale_models
 from ionscale.manager import sync
 from karakter import models as karakter_models
@@ -29,7 +29,7 @@ def create_ionscale_layer(info: Info, input: CreateIonscaleLayerInput) -> types.
 
     tailnet_name = f"{organization.slug or organization.pk}-{validated_name}"
 
-    django_repo.create_tailnet(
+    get_ionscale_repo().create_tailnet(
         ionscale_models.TailnetCreate(
             name=tailnet_name,
         )
@@ -113,7 +113,7 @@ def create_ionscale_auth_key(info: Info, input: CreateIonscaleAuthKeyInput) -> t
     if not layer.organization.memberships.filter(user=info.context.request.user).exists():
         raise PermissionError("You are not a member of the organization that owns this layer.")
 
-    key = django_repo.create_auth_key(
+    key = get_ionscale_repo().create_auth_key(
         tailnet=layer.tailnet_name,
         ephemeral=input.ephemeral,
         pre_authorized=True,

@@ -114,8 +114,8 @@ class ServiceFilter:
         return queryset.filter(name__contains=self.search)
 
 
-@strawberry_django.filter(fakts_models.ComputeNode)
-class ComputeNodeFilter:
+@strawberry_django.filter(fakts_models.Device)
+class DeviceFilter:
     search: str | None
     ids: list[strawberry.ID] | None
 

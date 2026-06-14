@@ -92,10 +92,10 @@ DescendantUnion = Union[
     LeafDescendantModel, MentionDescendantModel, ParagraphDescendantModel
 ]
 
-DescendantModel.update_forward_refs()
-LeafDescendantModel.update_forward_refs()
-MentionDescendantModel.update_forward_refs()
-ParagraphDescendantModel.update_forward_refs()
+DescendantModel.model_rebuild()
+LeafDescendantModel.model_rebuild()
+MentionDescendantModel.model_rebuild()
+ParagraphDescendantModel.model_rebuild()
 
 
 class Serializer(BaseModel):

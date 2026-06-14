@@ -11,6 +11,7 @@ from fakts.services.clients import create_client
 from fakts.services.rendering import auto_compose
 from fakts.services.tokens import create_api_token, create_device_code
 from fakts.utils import download_logo
+from karakter.hashers import hash_device_id
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ def start_device_code(start_grant: base_models.DeviceCodeStartRequest) -> models
 
     return models.DeviceCode.objects.create(
         code=create_device_code(),
-        staging_manifest=manifest.dict(),
+        staging_manifest=manifest.model_dump(),
         expires_at=timezone.now() + datetime.timedelta(seconds=start_grant.expiration_time_seconds),
         staging_kind=start_grant.requested_client_kind.value,
         staging_role=start_grant.requested_client_role.value,
@@ -93,7 +94,7 @@ def validate_device_code(
 
     node_id = manifest.node_id
     if node_id:
-        node, _ = models.ComputeNode.objects.get_or_create(organization=organization, node_id=node_id)
+        node, _ = models.Device.objects.get_or_create(organization=organization, node_id=hash_device_id(node_id, organization))
     else:
         node = None
 

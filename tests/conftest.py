@@ -13,6 +13,28 @@ from kante.context import HttpContext, UniversalRequest
 from tests import factories  # noqa: F401
 
 
+@pytest.fixture(autouse=True)
+def _reset_ionscale_repo():
+    """Give every test a fresh ionscale repository with no leaked state.
+
+    The test settings point ``IONSCALE_REPOSITORY`` at ``FakeIonscaleRepository``,
+    so the rebuilt repo is the in-memory fake — no CLI, no binary, no network.
+    """
+    from ionscale.repo import reset_ionscale_repo
+
+    reset_ionscale_repo()
+    yield
+    reset_ionscale_repo()
+
+
+@pytest.fixture
+def ionscale_repo():
+    """The active (fake) ionscale repository, for seeding data and asserting calls."""
+    from ionscale.repo import get_ionscale_repo
+
+    return get_ionscale_repo()
+
+
 @pytest.fixture(scope="function")
 def aws_credentials():
     """Mocked AWS Credentials for moto."""

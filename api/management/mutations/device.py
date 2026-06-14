@@ -2,6 +2,7 @@ from kante import Info
 import strawberry
 from api.management import types
 from karakter import models
+from karakter.hashers import hash_device_id
 from django.utils import timezone
 from datetime import timedelta
 import kante
@@ -19,7 +20,8 @@ class CreateDeviceInput:
 
 def create_device(info: Info, input: CreateDeviceInput) -> types.ManagementDevice:
     """ """
-    c, _ = fakts_models.ComputeNode.objects.update_or_create(organization_id=input.organization, node_id=input.device_id, defaults=dict(name=input.name))
+    organization = models.Organization.objects.get(id=input.organization)
+    c, _ = fakts_models.Device.objects.update_or_create(organization=organization, node_id=hash_device_id(input.device_id, organization), defaults=dict(name=input.name))
 
     return c
 
@@ -37,7 +39,7 @@ def update_device(info: Info, input: UpdateDeviceInput) -> types.ManagementDevic
 
     user = info.context.request.user
 
-    device = fakts_models.ComputeNode.objects.get(id=input.id)
+    device = fakts_models.Device.objects.get(id=input.id)
     device.name = input.name
     device.save()
 
@@ -58,8 +60,8 @@ def delete_device(info: Info, input: DeleteDeviceInput) -> strawberry.ID:
     Validates the invite token and adds the user to the organization.
     """
     try:
-        device = fakts_models.ComputeNode.objects.get(id=input.id)
-    except fakts_models.ComputeNode.DoesNotExist:
+        device = fakts_models.Device.objects.get(id=input.id)
+    except fakts_models.Device.DoesNotExist:
         raise Exception("Invalid device ID")
 
     device.delete()

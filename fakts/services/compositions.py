@@ -13,7 +13,7 @@ from django.db import transaction
 from fakts import models
 from fakts.base_models import CompositionManifest
 from fakts.services.tokens import create_api_token  # noqa: F401  (kept for shim parity)
-from ionscale.repo import django_repo
+from ionscale.repo import get_ionscale_repo
 from karakter import models as karakter_models
 
 logger = logging.getLogger(__name__)
@@ -262,6 +262,6 @@ def create_composition_auth_key(user: karakter_models.User, composition: models.
 
     tags = ["tag:composition-" + str(composition.pk)] if tags is None else tags
 
-    key = django_repo.create_auth_key(tailnet=layer.tailnet_name, ephemeral=ephemeral, pre_authorized=True, tags=tags)
+    key = get_ionscale_repo().create_auth_key(tailnet=layer.tailnet_name, ephemeral=ephemeral, pre_authorized=True, tags=tags)
     key = models.IonscaleAuthKey.objects.create(layer=layer, key=key, creator=user, ephemeral=ephemeral, tags=tags)
     return key

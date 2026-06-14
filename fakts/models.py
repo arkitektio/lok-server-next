@@ -205,7 +205,7 @@ class ServiceInstance(models.Model):
         related_name="service_instances",
         help_text="The organization that owns this instance. If null the instance is global.",
     )
-    device = models.ForeignKey("ComputeNode", on_delete=models.CASCADE, null=True, blank=True, related_name="service_instances")
+    device = models.ForeignKey("Device", on_delete=models.CASCADE, null=True, blank=True, related_name="service_instances")
     template = models.TextField()
     denied_users = models.ManyToManyField(get_user_model(), related_name="denied_instances")
     denied_groups = models.ManyToManyField(Group, related_name="denied_instances")
@@ -505,15 +505,15 @@ class DeviceGroup(models.Model):
         return f"{self.name} ({self.organization})"
 
 
-class ComputeNode(models.Model):
+class Device(models.Model):
     node_id = models.CharField(max_length=1000)
     name = models.CharField(max_length=1000, null=True, blank=True)
     organization = models.ForeignKey(
         Organization,
         on_delete=models.CASCADE,
-        related_name="compute_nodes",
+        related_name="devices",
     )
-    device_groups = models.ManyToManyField(DeviceGroup, related_name="compute_nodes", blank=True)
+    device_groups = models.ManyToManyField(DeviceGroup, related_name="devices", blank=True)
 
     class Meta:
         constraints = [
@@ -555,7 +555,7 @@ class Client(models.Model):
     redirect_uris = models.CharField(max_length=1000, default=" ")
     public = models.BooleanField(default=False)
     token = models.CharField(default=uuid.uuid4, unique=True, max_length=10000)
-    node = models.ForeignKey(ComputeNode, null=True, related_name="clients", on_delete=models.SET_NULL)
+    node = models.ForeignKey(Device, null=True, related_name="clients", on_delete=models.SET_NULL)
     public_sources = models.JSONField(default=list)
     tenant = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="managed_clients")
     created_at = models.DateTimeField(auto_now_add=True)

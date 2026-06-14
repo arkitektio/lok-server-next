@@ -73,7 +73,7 @@ class WellKnownFakts(View):
                 base_url=request.build_absolute_uri(reverse("fakts:index")),
                 frontend_url=request.build_absolute_uri(reverse("mainhome")).replace(f"/{settings.MY_SCRIPT_NAME}", ""),
                 ca_crt=ca,
-            ).dict()
+            ).model_dump()
         )
 
 

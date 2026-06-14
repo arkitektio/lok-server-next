@@ -1,5 +1,6 @@
 import datetime
 import logging
+import secrets
 from typing import Optional, List, Tuple
 
 import requests
@@ -63,6 +64,11 @@ class MediaStore(S3Store):
         self.save()
 
 
+def generate_device_salt() -> str:
+    """Random per-organization salt used to hash device ids (64 hex chars)."""
+    return secrets.token_hex(32)
+
+
 class Organization(models.Model):
     """An Organization in the System
 
@@ -75,6 +81,9 @@ class Organization(models.Model):
     description = models.CharField(max_length=4000, null=True, blank=True)
     avatar = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
     owner = models.ForeignKey("User", on_delete=models.CASCADE, related_name="owned_organizations")
+    # Server-only secret. Combined with SECRET_KEY to hash device ids so the same
+    # device hashes differently across organizations and is never stored in the clear.
+    device_salt = models.CharField(max_length=64, default=generate_device_salt, editable=False)
 
     def __str__(self):
         return self.name or self.slug or "Unnamed Organization"

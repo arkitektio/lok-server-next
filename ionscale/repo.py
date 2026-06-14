@@ -3,10 +3,30 @@ import os
 import shutil
 import re
 import json
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Any, Union, Optional, Protocol, runtime_checkable
 from pathlib import Path
 from .base_models import Tailnet, TailnetCreate, Machine, MachineDetail
 from django.conf import settings
+from django.utils.module_loading import import_string
+
+
+@runtime_checkable
+class IonscaleRepo(Protocol):
+    """The behaviour the rest of the app depends on.
+
+    Both :class:`IonscaleRepository` (the real CLI-backed implementation) and the
+    in-memory ``FakeIonscaleRepository`` used in tests satisfy this protocol, so
+    consumers can depend on the interface instead of a concrete class.
+    """
+
+    def list_tailnets(self) -> List[Tailnet]: ...
+    def list_machines(self, tailnet: str) -> List[Machine]: ...
+    def get_machine(self, machine_id: str) -> MachineDetail: ...
+    def create_tailnet(self, tailnet_input: TailnetCreate) -> Tailnet: ...
+    def update_policy(self, tailnet: str, policy: Union[Dict[str, Any], str, Path]) -> str: ...
+    def create_auth_key(self, tailnet: str, ephemeral: bool = ..., pre_authorized: bool = ..., tags: List[str] = ...) -> str: ...
+    def run(self, *preargs) -> str: ...
+    def help(self, *preargs) -> str: ...
 
 
 class IonscaleRepository:
@@ -304,7 +324,48 @@ class IonscaleRepository:
         return output
 
 
-django_repo = IonscaleRepository(
-    server_url=settings.IONSCALE_SERVER_URL,
-    admin_key=settings.IONSCALE_ADMIN_KEY,
-)
+def _build_default_repo() -> IonscaleRepo:
+    """Construct the repository configured for the current environment.
+
+    Pluggable via the ``IONSCALE_REPOSITORY`` setting: set it to the dotted path
+    of a zero-argument factory (or class) that returns an :class:`IonscaleRepo`
+    — e.g. ``"ionscale.testing.FakeIonscaleRepository"`` in tests. When unset, the
+    real CLI-backed :class:`IonscaleRepository` is built from the IONSCALE_* settings.
+    """
+    dotted = getattr(settings, "IONSCALE_REPOSITORY", None)
+    if dotted:
+        return import_string(dotted)()
+    return IonscaleRepository(
+        server_url=settings.IONSCALE_SERVER_URL,
+        admin_key=settings.IONSCALE_ADMIN_KEY,
+    )
+
+
+_repo: Optional[IonscaleRepo] = None
+
+
+def get_ionscale_repo() -> IonscaleRepo:
+    """Return the active ionscale repository, building it lazily on first use.
+
+    Lazy construction means importing this module never requires the ``ionscale``
+    binary (or any live config) — it is only needed when an ionscale operation
+    actually runs. Call this at use-time rather than importing a module-level
+    instance, so a repository swapped in via :func:`set_ionscale_repo` is seen by
+    every consumer.
+    """
+    global _repo
+    if _repo is None:
+        _repo = _build_default_repo()
+    return _repo
+
+
+def set_ionscale_repo(repo: Optional[IonscaleRepo]) -> None:
+    """Install an explicit repository (e.g. a fake in tests). Pass ``None`` to clear."""
+    global _repo
+    _repo = repo
+
+
+def reset_ionscale_repo() -> None:
+    """Drop the cached repository so the next access rebuilds it from settings."""
+    global _repo
+    _repo = None

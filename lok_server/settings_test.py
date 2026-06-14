@@ -16,6 +16,12 @@ DATABASES["default"] = {
 
 AUTHENTIKATE = {**AUTHENTIKATE, "STATIC_TOKENS": {"test": {"sub": "1", "active_org": "testorg"}}}
 
+# Never touch the real ionscale CLI in tests: build the in-memory fake by default.
+# The ``_reset_ionscale_repo`` autouse fixture rebuilds it fresh per test.
+IONSCALE_REPOSITORY = "ionscale.testing.FakeIonscaleRepository"
+# Don't fail-fast / eagerly build the repo at boot during tests.
+IONSCALE_EAGER_INIT = False
+
 # Disable migrations for faster tests
 class DisableMigrations:
     """Disable migrations during testing for faster test execution."""

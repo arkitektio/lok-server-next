@@ -19,7 +19,7 @@ from karakter import filters as karakter_filters
 from strawberry.experimental import pydantic
 from authapp.models import OAuth2Client
 from ionscale.base_models import Machine, MachineDetail
-from ionscale.repo import django_repo
+from ionscale.repo import get_ionscale_repo
 
 
 def build_prescoper(field="organization"):
@@ -787,7 +787,7 @@ class ManagementLayer:
     @strawberry.field(description="The machines associated with this layer (only works for IonscaleLayers)")
     def machines(self, info: Info) -> List[ManagementMachine]:
         if hasattr(self, "tailnet_name"):
-             machines = django_repo.list_machines(self.tailnet_name)
+             machines = get_ionscale_repo().list_machines(self.tailnet_name)
              return [ManagementMachine(instance=m, tailnet=self.tailnet_name, layer_id=self.id) for m in machines]
         return []
 
@@ -795,7 +795,7 @@ class ManagementLayer:
     def machine(self, info: Info, id: str) -> Optional[ManagementMachine]:
         if hasattr(self, "tailnet_name"):
              try:
-                machine = django_repo.get_machine(str(id))
+                machine = get_ionscale_repo().get_machine(str(id))
                 return ManagementMachine(instance=machine, tailnet=self.tailnet_name, layer_id=self.id)
              except Exception:
                  return None
@@ -855,14 +855,14 @@ class ManagementDeviceGroup:
 
     @strawberry_django.field(description="The number of devices in this device group.")
     def devices(self, info: Info) -> list["ManagementDevice"]:
-        return self.compute_nodes.all()
+        return self.devices.all()
 
     @classmethod
     def get_queryset(cls, queryset, info: Info):
         return queryset.filter(organization__memberships__user=info.context.request.user).distinct()
 
 
-@strawberry_django.type(fakts_models.ComputeNode, filters=filters.ManagementDeviceFilter, order=filters.ManagementDeviceOrder, pagination=True)
+@strawberry_django.type(fakts_models.Device, filters=filters.ManagementDeviceFilter, order=filters.ManagementDeviceOrder, pagination=True)
 class ManagementDevice:
     id: strawberry.ID
     name: str | None

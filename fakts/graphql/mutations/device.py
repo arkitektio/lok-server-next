@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 User = get_user_model()
 
 
-def update_compute_node(info: Info, input: inputs.UpdateComputeNodeInput) -> types.ComputeNode:
-    node = models.ComputeNode.objects.get(id=input.id)
+def update_device(info: Info, input: inputs.UpdateDeviceInput) -> types.Device:
+    node = models.Device.objects.get(id=input.id)
 
     if input.name:
         node.name = input.name

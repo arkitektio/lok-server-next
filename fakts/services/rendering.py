@@ -131,7 +131,7 @@ def find_instance_for_requirement_and_composition(requirement: base_models.Requi
 
 
 @transaction.atomic
-def auto_compose(client: models.Client, manifest: base_models.Manifest, user: models.AbstractUser, organization: models.Organization, device: models.ComputeNode | None = None, declined_requirements: list[str] | None = None) -> models.Client:
+def auto_compose(client: models.Client, manifest: base_models.Manifest, user: models.AbstractUser, organization: models.Organization, device: models.Device | None = None, declined_requirements: list[str] | None = None) -> models.Client:
     requirements = manifest.requirements
 
     if not requirements:

@@ -67,10 +67,21 @@ if conf.get("ionscale", None):
     IONSCALE_SERVER_URL = conf.ionscale.server_url
     IONSCALE_ADMIN_KEY = conf.ionscale.admin_key
     IONSCALE_COORD_URL = conf.ionscale.coord_url  # thats the public coord url
+    IONSCALE_REPOSITORY = conf.ionscale.get("repository", None)
+    # Configured -> validate the ionscale repository at startup (fail fast).
+    IONSCALE_EAGER_INIT = True
 else:
     IONSCALE_SERVER_URL = None
     IONSCALE_ADMIN_KEY = None
     IONSCALE_COORD_URL = None
+    IONSCALE_REPOSITORY = None
+    IONSCALE_EAGER_INIT = False
+
+# IONSCALE_REPOSITORY: dotted path to a zero-arg factory returning an
+# ionscale.repo.IonscaleRepo. When None, the real CLI-backed IonscaleRepository is
+# used. Tests point it at ionscale.testing.FakeIonscaleRepository (see settings_test).
+# IONSCALE_EAGER_INIT: when True, ionscale.apps.IonscaleConfig.ready() builds the
+# repository at boot so misconfiguration fails fast.
 
 INSTALLED_APPS = [
     "daphne",
@@ -88,6 +99,7 @@ INSTALLED_APPS = [
     "channels",
     "fakts",
     "karakter",
+    "ionscale",
     "health_check",
     "health_check.db",
 ]

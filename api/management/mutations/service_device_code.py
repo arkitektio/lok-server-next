@@ -2,6 +2,7 @@ from kante import Info
 import strawberry
 from api.management import types
 from karakter import models
+from karakter.hashers import hash_device_id
 from fakts import models as fakts_models
 from fakts import logic, builders, base_models, enums
 from django.utils import timezone
@@ -34,7 +35,7 @@ def accept_service_device_code(info: Info, input: AcceptServiceDeviceCodeInput) 
 
     device_id = manifest.node_id
     if device_id:
-        device, _ = fakts_models.ComputeNode.objects.get_or_create(organization=organization, node_id=device_id)
+        device, _ = fakts_models.Device.objects.get_or_create(organization=organization, node_id=hash_device_id(device_id, organization))
     else:
         device = None
 

@@ -15,6 +15,7 @@ from fakts.base_models import Manifest
 from fakts.services.rendering import auto_compose
 from fakts.services.tokens import create_api_token
 from karakter import models as karakter_models
+from karakter.hashers import hash_device_id
 
 
 class RedeemTokenExpired(Exception):
@@ -26,7 +27,7 @@ def create_development_client(
     release: models.Release,
     config: base_models.DevelopmentClientConfig,
     manifest: base_models.Manifest,
-    node: models.ComputeNode | None = None,
+    node: models.Device | None = None,
     composition: models.Composition | None = None,
 ) -> models.Client:
     tenant = config.get_tenant()
@@ -43,7 +44,7 @@ def create_development_client(
         client.membership = karakter_models.Membership.objects.get(user=user, organization=organization)
         client.composition = composition
         client.role = config.role.value if hasattr(config.role, "value") else config.role
-        client.public_sources = [t.dict() for t in manifest.public_sources] if manifest.public_sources else []
+        client.public_sources = [t.model_dump() for t in manifest.public_sources] if manifest.public_sources else []
         client.save()
 
         return client
@@ -73,7 +74,7 @@ def create_development_client(
             manifest=manifest.model_dump(),
             logo=release.logo,
             organization=organization,
-            public_sources=[t.dict() for t in manifest.public_sources] if manifest.public_sources else [],
+            public_sources=[t.model_dump() for t in manifest.public_sources] if manifest.public_sources else [],
         )
 
 
@@ -104,12 +105,12 @@ def create_client(
         defaults={
             "logo": logo,
             "scopes": manifest.scopes,
-            "requirements": manifest.dict()["requirements"],
+            "requirements": manifest.model_dump()["requirements"],
         },
     )
 
     if manifest.node_id:
-        node = models.ComputeNode.objects.get_or_create(organization=organization, node_id=manifest.node_id)[0]
+        node = models.Device.objects.get_or_create(organization=organization, node_id=hash_device_id(manifest.node_id, organization))[0]
     else:
         node = None
 
@@ -134,7 +135,7 @@ def validate_redeem_token(redeem_token: models.RedeemToken, manifest: Manifest, 
     user = redeem_token.user
 
     if node_id:
-        node, _ = models.ComputeNode.objects.get_or_create(organization=organization, node_id=node_id)
+        node, _ = models.Device.objects.get_or_create(organization=organization, node_id=hash_device_id(node_id, organization))
     else:
         node = None
 

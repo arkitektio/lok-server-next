@@ -175,8 +175,8 @@ class Query:
 
     @kante.django_field()
     def machine(self, info: Info, id: strawberry.ID) -> types.ManagementMachine:
-        from ionscale.repo import django_repo
-        machine = django_repo.get_machine(str(id))
+        from ionscale.repo import get_ionscale_repo
+        machine = get_ionscale_repo().get_machine(str(id))
 
         if machine.tailnet:
             try:
@@ -201,7 +201,7 @@ class Query:
 
     @kante.django_field()
     def device(self, info: Info, id: strawberry.ID) -> types.ManagementDevice:
-        return fakts_models.ComputeNode.objects.get(id=id)
+        return fakts_models.Device.objects.get(id=id)
 
     @kante.django_field()
     def service_release(self, info: Info, id: strawberry.ID) -> types.ManagementServiceRelease:

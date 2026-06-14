@@ -226,7 +226,7 @@ class Client:
     user: types.User | None = strawberry_django.field(description="If the client is a DEVELOPMENT client, which requires no further authentication, this is the user that is authenticated with the client.")
     logo: types.MediaStore | None = strawberry_django.field(description="The logo of the release. This should be a url to a logo that can be used to represent the release.")
     name: str = strawberry_django.field(description="The name of the client. This is a human readable name of the client.")
-    node: Optional["ComputeNode"] = strawberry_django.field(description="The node this runs on")
+    node: Optional["Device"] = strawberry_django.field(description="The node this runs on")
     mappings: list["ServiceInstanceMapping"] = strawberry_django.field(description="The mappings of the client. A mapping is a mapping of a service to a service instance. This is used to configure the composition.")
 
 
@@ -285,22 +285,22 @@ class DeviceGroup:
     id: strawberry.ID
     name: str = strawberry.field(description="The name of the device group.")
     description: str | None = strawberry.field(description="The description of the device group.")
-    compute_nodes: list["ComputeNode"] = strawberry_django.field(description="The compute nodes that belong to this device group.")
+    devices: list["Device"] = strawberry_django.field(description="The devices that belong to this device group.")
 
     def get_queryset(cls, info) -> models.DeviceGroup:
         return models.DeviceGroup.objects.filter(organization=info.context.request.organization)
 
 
-@strawberry_django.type(models.ComputeNode, filters=filters.ComputeNodeFilter, pagination=True)
-class ComputeNode:
+@strawberry_django.type(models.Device, filters=filters.DeviceFilter, pagination=True)
+class Device:
     id: strawberry.ID
     name: str | None
     node_id: strawberry.ID
     clients: list[Client]
-    device_groups: list[DeviceGroup] = strawberry_django.field(description="The device groups that belong to this compute node.")
+    device_groups: list[DeviceGroup] = strawberry_django.field(description="The device groups that belong to this device.")
 
-    def get_queryset(cls, info) -> models.ComputeNode:
-        return models.ComputeNode.objects.filter(organization=info.context.request.organization)
+    def get_queryset(cls, info) -> models.Device:
+        return models.Device.objects.filter(organization=info.context.request.organization)
 
 
 @strawberry_django.type(models.RedeemToken, filters=filters.RedeemTokenFilter, pagination=True)

@@ -148,14 +148,14 @@ class ManagementCompositionFilter:
         return queryset.filter(organization__id=self.organization)
 
 
-@strawberry_django.order(fakts_models.ComputeNode)
+@strawberry_django.order(fakts_models.Device)
 class ManagementDeviceOrder:
     name: strawberry.auto
     created_at: strawberry.auto
     last_reported_at: strawberry.auto
 
 
-@strawberry_django.filter(fakts_models.ComputeNode)
+@strawberry_django.filter(fakts_models.Device)
 class ManagementDeviceFilter:
     search: str | None
     ids: list[strawberry.ID] | None
