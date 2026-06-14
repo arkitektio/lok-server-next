@@ -6,7 +6,7 @@ from strawberry_django.filters import FilterLookup
 import strawberry_django
 
 
-@strawberry_django.filter(models.Comment)
+@strawberry_django.filter_type(models.Comment)
 class CommentFilter:
     name: Optional[FilterLookup[str]] | None
     ids: list[strawberry.ID] | None

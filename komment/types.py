@@ -5,8 +5,7 @@ from enum import Enum
 from typing import Optional
 from typing import Any, Dict
 from typing import ForwardRef
-from strawberry import LazyType
-from typing import Literal, Union
+from typing import Annotated, Literal, Union
 import datetime
 from strawberry.experimental import pydantic
 from pydantic import BaseModel, Field
@@ -28,7 +27,7 @@ class Descendant:
     kind: enums.DescendantKind = strawberry.field(
         description="The Kind of a Descendant"
     )
-    children: list[LazyType["Descendant", __name__]] | None = strawberry.field(
+    children: list[Annotated["Descendant", strawberry.lazy(__name__)]] | None = strawberry.field(
         default=None, description="The children of this descendant. Always empty for leafs"
     )
 

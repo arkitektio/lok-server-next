@@ -7,7 +7,7 @@ import strawberry_django
 from allauth.socialaccount import models as smodels
 
 
-@strawberry_django.filter(models.User)
+@strawberry_django.filter_type(models.User)
 class UserFilter:
     search: str | None
     username: Optional[FilterLookup[str]] | None
@@ -24,7 +24,7 @@ class UserFilter:
         return queryset.filter(username__contains=self.search)
 
 
-@strawberry_django.filter(models.Group, description="__doc__")
+@strawberry_django.filter_type(models.Group, description="__doc__")
 class GroupFilter:
     """A Filterset to Filter Groups"""
 
@@ -43,7 +43,7 @@ class GroupFilter:
         return queryset.filter(name__contains=self.search)
 
 
-@strawberry_django.filter(models.Role, description="__doc__")
+@strawberry_django.filter_type(models.Role, description="__doc__")
 class RoleFilter:
     """A Filterset to Filter Groups"""
 
@@ -62,7 +62,7 @@ class RoleFilter:
         return queryset.filter(name__contains=self.search)
 
 
-@strawberry_django.filter(models.ComChannel, description="__doc__")
+@strawberry_django.filter_type(models.ComChannel, description="__doc__")
 class ComChannelFilter:
     """A Filterset to Filter Communication Channels"""
 
@@ -80,7 +80,7 @@ class ComChannelFilter:
         return queryset.filter(name__contains=self.search)
 
 
-@strawberry_django.filter(models.Organization, description="__doc__")
+@strawberry_django.filter_type(models.Organization, description="__doc__")
 class OrganizationFilter:
     """A Filterset to Filter Groups"""
 
@@ -99,7 +99,7 @@ class OrganizationFilter:
         return queryset.filter(name__contains=self.search)
 
 
-@strawberry_django.filter(models.Membership, description="__doc__")
+@strawberry_django.filter_type(models.Membership, description="__doc__")
 class MembershipFilter:
     """A Filterset to Filter Groups"""
 
@@ -118,7 +118,7 @@ class MembershipFilter:
         return queryset.filter(name__contains=self.search)
 
 
-@strawberry_django.filter(models.Profile)
+@strawberry_django.filter_type(models.Profile)
 class ProfileFilter:
     search: str | None
     ids: list[strawberry.ID] | None
@@ -134,7 +134,7 @@ class ProfileFilter:
         return queryset.filter(bio__contains=self.search)
 
 
-@strawberry_django.filter(models.OrganizationProfile)
+@strawberry_django.filter_type(models.OrganizationProfile)
 class OrganizationProfileFilter:
     search: str | None
     ids: list[strawberry.ID] | None
@@ -150,7 +150,7 @@ class OrganizationProfileFilter:
         return queryset.filter(bio__contains=self.search)
 
 
-@strawberry_django.filter(models.Profile)
+@strawberry_django.filter_type(models.Profile)
 class GroupProfileFilter:
     search: str | None
     ids: list[strawberry.ID] | None
@@ -166,7 +166,7 @@ class GroupProfileFilter:
         return queryset.filter(bio__contains=self.search)
 
 
-@strawberry_django.filter(smodels.SocialAccount)
+@strawberry_django.filter_type(smodels.SocialAccount)
 class SocialAccountFilter:
     search: str | None
     provider: Optional[enums.ProviderType] | None

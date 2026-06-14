@@ -8,7 +8,7 @@ from fakts import models as fakts_models
 from fakts import enums as fakts_enums
 
 
-@strawberry_django.filter(models.User, description="Filter for User model.")
+@strawberry_django.filter_type(models.User, description="Filter for User model.")
 class UserFilter:
     """Filter for User model."""
 
@@ -27,7 +27,7 @@ class UserFilter:
         return queryset.filter(username__contains=self.search)
 
 
-@strawberry_django.filter(models.Group, description="Filter for Group model.")
+@strawberry_django.filter_type(models.Group, description="Filter for Group model.")
 class GroupFilter:
     search: str | None
     name: Optional[FilterLookup[str]] | None
@@ -44,7 +44,7 @@ class GroupFilter:
         return queryset.filter(name__contains=self.search)
 
 
-@strawberry_django.filter(fakts_models.Client)
+@strawberry_django.filter_type(fakts_models.Client)
 class ClientFilter:
     search: str | None
     ids: list[strawberry.ID] | None
@@ -66,7 +66,7 @@ class ClientFilter:
         return queryset.filter(role=self.role.value)
 
 
-@strawberry_django.filter(fakts_models.App)
+@strawberry_django.filter_type(fakts_models.App)
 class AppFilter:
     search: str | None
     ids: list[strawberry.ID] | None
@@ -82,7 +82,7 @@ class AppFilter:
         return queryset.filter(name__contains=self.search)
 
 
-@strawberry_django.filter(fakts_models.RedeemToken)
+@strawberry_django.filter_type(fakts_models.RedeemToken)
 class RedeemTokenFilter:
     search: str | None
     ids: list[strawberry.ID] | None
@@ -98,7 +98,7 @@ class RedeemTokenFilter:
         return queryset.filter(name__contains=self.search)
 
 
-@strawberry_django.filter(fakts_models.Service)
+@strawberry_django.filter_type(fakts_models.Service)
 class ServiceFilter:
     search: str | None
     ids: list[strawberry.ID] | None
@@ -114,7 +114,7 @@ class ServiceFilter:
         return queryset.filter(name__contains=self.search)
 
 
-@strawberry_django.filter(fakts_models.Device)
+@strawberry_django.filter_type(fakts_models.Device)
 class DeviceFilter:
     search: str | None
     ids: list[strawberry.ID] | None
@@ -130,7 +130,7 @@ class DeviceFilter:
         return queryset.filter(name__contains=self.search)
 
 
-@strawberry_django.filter(fakts_models.DeviceGroup)
+@strawberry_django.filter_type(fakts_models.DeviceGroup)
 class DeviceGroupFilter:
     search: str | None
     ids: list[strawberry.ID] | None
@@ -146,7 +146,7 @@ class DeviceGroupFilter:
         return queryset.filter(name__contains=self.search)
 
 
-@strawberry_django.filter(fakts_models.Layer)
+@strawberry_django.filter_type(fakts_models.Layer)
 class LayerFilter:
     search: str | None
     ids: list[strawberry.ID] | None
@@ -162,7 +162,7 @@ class LayerFilter:
         return queryset.filter(name__contains=self.search)
 
 
-@strawberry_django.filter(fakts_models.ServiceInstance)
+@strawberry_django.filter_type(fakts_models.ServiceInstance)
 class ServiceInstanceFilter:
     search: str | None
     ids: list[strawberry.ID] | None
@@ -178,7 +178,7 @@ class ServiceInstanceFilter:
         return queryset.filter(backend__contains=self.search)
 
 
-@strawberry_django.filter(fakts_models.ServiceRelease)
+@strawberry_django.filter_type(fakts_models.ServiceRelease)
 class ServiceReleaseFilter:
     search: str | None
     ids: list[strawberry.ID] | None
@@ -194,7 +194,7 @@ class ServiceReleaseFilter:
         return queryset.filter(backend__contains=self.search)
 
 
-@strawberry_django.filter(fakts_models.Composition)
+@strawberry_django.filter_type(fakts_models.Composition)
 class CompositionFilter:
     search: str | None
     ids: list[strawberry.ID] | None
