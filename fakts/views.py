@@ -229,6 +229,8 @@ class RedeemView(View):
             return _status("error", "Invalid redeem token")
         except clients.RedeemTokenExpired:
             return _status("error", "Redeem token expired")
+        except clients.RedeemTokenManifestChanged as e:
+            return _status("error", str(e))
         except Exception as e:
             logger.error(e, exc_info=True)
             return _status("error", str(e))

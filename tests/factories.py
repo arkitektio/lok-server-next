@@ -141,7 +141,6 @@ def make_device_code(**kw) -> fmodels.DeviceCode:
 def make_redeem_token(composition: fmodels.Composition | None = None, **kw) -> fmodels.RedeemToken:
     if composition is None:
         composition = make_composition()
-    kw.setdefault("organization", composition.organization)
     kw.setdefault("user", composition.creator)
     kw.setdefault("token", str(uuid4()))
     return fmodels.RedeemToken.objects.create(composition=composition, **kw)

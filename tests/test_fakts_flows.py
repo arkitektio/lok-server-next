@@ -113,6 +113,60 @@ def test_redeem_unknown_token_errors(client):
     assert body["message"] == "Invalid redeem token"
 
 
+def _manifest(version="1.0.0"):
+    return {"identifier": "com.example.redeemed", "version": version, "scopes": [], "requirements": []}
+
+
+@pytest.mark.django_db
+def test_redeem_same_manifest_twice_returns_same_client(client):
+    redeem = factories.make_redeem_token()
+
+    first = _post(client, "fakts:redeem", {"token": redeem.token, "manifest": _manifest()}).json()
+    second = _post(client, "fakts:redeem", {"token": redeem.token, "manifest": _manifest()}).json()
+
+    assert first["status"] == "granted"
+    assert second["status"] == "granted"
+    assert first["token"] == second["token"]
+
+
+@pytest.mark.django_db
+def test_redeem_changed_manifest_rejected_without_allow_reredeem(client):
+    redeem = factories.make_redeem_token()
+
+    _post(client, "fakts:redeem", {"token": redeem.token, "manifest": _manifest("1.0.0")})
+    body = _post(client, "fakts:redeem", {"token": redeem.token, "manifest": _manifest("2.0.0")}).json()
+
+    assert body["status"] == "error"
+    assert "allow_reredeem" in body["message"]
+
+
+@pytest.mark.django_db
+def test_redeem_changed_manifest_allowed_with_reredeem(client):
+    redeem = factories.make_redeem_token(allow_reredeem=True)
+
+    _post(client, "fakts:redeem", {"token": redeem.token, "manifest": _manifest("1.0.0")})
+    body = _post(client, "fakts:redeem", {"token": redeem.token, "manifest": _manifest("2.0.0")}).json()
+
+    assert body["status"] == "granted"
+
+
+@pytest.mark.django_db
+def test_redeem_grandfathers_null_manifest_hash(client):
+    redeem = factories.make_redeem_token()
+
+    _post(client, "fakts:redeem", {"token": redeem.token, "manifest": _manifest("1.0.0")})
+
+    # Simulate a token redeemed before manifest-hash tracking existed.
+    models.RedeemToken.objects.filter(pk=redeem.pk).update(manifest_hash=None)
+
+    # A changed manifest is accepted (and the hash backfilled), not rejected.
+    body = _post(client, "fakts:redeem", {"token": redeem.token, "manifest": _manifest("3.0.0")}).json()
+    assert body["status"] == "granted"
+
+    redeem.refresh_from_db()
+    assert redeem.manifest_hash is not None
+
+
 @pytest.mark.django_db
 def test_claim_returns_config(client):
     fakts_client = factories.make_client()

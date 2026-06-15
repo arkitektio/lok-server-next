@@ -25,18 +25,16 @@ def create_redeem_token(info: Info, input: RedeemTokenInput) -> types.RedeemToke
     uuid_token = uuid.uuid4().hex
 
     user = info.context.request.user
-    org = info.context.request.organization
+    composition = info.context.request.client.composition
 
     token, _ = models.RedeemToken.objects.update_or_create(
         token=uuid_token,
         defaults={
             "user": user,
-            "organization": org,
-            "composition": info.context.request.client.composition,
-            
+            "composition": composition,
         },
     )
 
-    print(f"Token {token} created for user {user} and organization {org}")
+    print(f"Token {token} created for user {user} and composition {composition}")
 
     return token

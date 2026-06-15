@@ -3,7 +3,6 @@ from django.core.management.base import BaseCommand
 from django.conf import settings
 import os
 from fakts import models
-from karakter.models import Organization
 from fakts.config_models import RedeemTokenConfigs
 
 # assign directory

@@ -346,11 +346,17 @@ class RedeemToken(models.Model):
     token = models.CharField(max_length=1000, unique=True, default=uuid.uuid4)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(null=True)
-    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="issued_tokens")
-    organization = models.ForeignKey(
-        Organization,
-        on_delete=models.CASCADE,        related_name="issued_tokens",
+    manifest_hash = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        help_text="SHA-256 hash of the manifest this token was first redeemed with. Used to detect manifest changes on re-redeem.",
     )
+    allow_reredeem = models.BooleanField(
+        default=False,
+        help_text="If set, this token may be re-redeemed even when the manifest hash differs from the originally redeemed one.",
+    )
+    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="issued_tokens")
     composition = models.ForeignKey(
         "Composition",
         on_delete=models.CASCADE,

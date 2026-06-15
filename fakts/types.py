@@ -312,4 +312,4 @@ class RedeemToken:
     user: types.User = strawberry.field(description="The user that this redeem token belongs to.")
 
     def get_queryset(cls, info) -> models.RedeemToken:
-        return models.RedeemToken.objects.filter(user=info.context.request.user, organization=info.context.request.organization)
+        return models.RedeemToken.objects.filter(user=info.context.request.user, composition__organization=info.context.request.organization)
