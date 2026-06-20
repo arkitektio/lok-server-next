@@ -6,7 +6,6 @@ import hashlib
 import json
 import logging
 from karakter.hashers import hash_graph
-import namegenerator
 import kante
 
 

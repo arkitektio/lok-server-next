@@ -3,9 +3,7 @@ import json
 import logging
 import uuid
 
-import namegenerator
 import strawberry
-import strawberry_django
 from kante.types import Info
 import kante
 

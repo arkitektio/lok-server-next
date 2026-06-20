@@ -2,7 +2,6 @@ import hashlib
 import json
 import logging
 
-import namegenerator
 import strawberry
 import strawberry_django
 from kante.types import Info

@@ -6,7 +6,6 @@ import hashlib
 import json
 import logging
 from karakter.hashers import hash_graph
-import namegenerator
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +15,7 @@ def create_stash(info: Info, input: inputs.CreateStashInput) -> types.Stash:
     user = info.context.request.user
 
     stash = models.Stash.objects.create(
-        name=input.name or namegenerator.gen(), owner=user
+        name=input.name or "Unnamed Stash", owner=user
     )
 
     return stash
