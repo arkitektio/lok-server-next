@@ -273,8 +273,8 @@ class ClaimCompositionView(View):
             context = rendering.create_serverlinking_context(request, composition, claim)
             config = rendering.render_server_fakts(composition, context)
             return JsonResponse({"status": "granted", "config": config.model_dump()})
-        except models.Client.DoesNotExist:
-            return _status("error", "No Client found for this token")
+        except models.Composition.DoesNotExist:
+            return _status("error", "No Composition found for this token")
         except Exception as e:
             logger.error(e, exc_info=True)
             return _status("error", "Error creating configuration")

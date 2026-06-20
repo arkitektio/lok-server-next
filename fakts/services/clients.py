@@ -201,32 +201,35 @@ def redeem_token(token: str, manifest: Manifest, role: enums.ClientRoleVanilla =
         # instead of racing to create duplicate clients.
         valid_token = models.RedeemToken.objects.select_for_update().get(token=token)
 
-        if valid_token.expires_at and valid_token.expires_at < timezone.now():
-            valid_token.delete()
-            raise RedeemTokenExpired("Redeem token expired")
+        if not (valid_token.expires_at and valid_token.expires_at < timezone.now()):
+            incoming_hash = hash_manifest(manifest)
 
-        incoming_hash = hash_manifest(manifest)
+            if valid_token.client:
+                if valid_token.manifest_hash is None:
+                    # Pre-existing token from before manifest-hash tracking: record the
+                    # hash and accept this redeem rather than treating it as a change.
+                    valid_token.manifest_hash = incoming_hash
+                    valid_token.save()
+                    return valid_token.client
+                if valid_token.manifest_hash == incoming_hash:
+                    return valid_token.client
+                if not valid_token.allow_reredeem:
+                    raise RedeemTokenManifestChanged(
+                        "This redeem token was already redeemed with a different manifest. "
+                        "Re-redeeming with a changed manifest is not allowed unless allow_reredeem is set."
+                    )
+                # allow_reredeem is set and the manifest changed: re-validate to update the client.
 
-        if valid_token.client:
-            if valid_token.manifest_hash is None:
-                # Pre-existing token from before manifest-hash tracking: record the
-                # hash and accept this redeem rather than treating it as a change.
-                valid_token.manifest_hash = incoming_hash
-                valid_token.save()
-                return valid_token.client
-            if valid_token.manifest_hash == incoming_hash:
-                return valid_token.client
-            if not valid_token.allow_reredeem:
-                raise RedeemTokenManifestChanged(
-                    "This redeem token was already redeemed with a different manifest. "
-                    "Re-redeeming with a changed manifest is not allowed unless allow_reredeem is set."
-                )
-            # allow_reredeem is set and the manifest changed: re-validate to update the client.
+            valid_token = validate_redeem_token(redeem_token=valid_token, manifest=manifest, role=role)
+            valid_token.manifest_hash = incoming_hash
+            valid_token.save()
+            return valid_token.client
 
-        valid_token = validate_redeem_token(redeem_token=valid_token, manifest=manifest, role=role)
-        valid_token.manifest_hash = incoming_hash
-        valid_token.save()
-        return valid_token.client
+    # Reached only when the token is expired. Delete it *outside* the atomic block
+    # above so the removal commits — deleting inside would be rolled back by the
+    # raise (and the expired token would survive).
+    models.RedeemToken.objects.filter(token=token).delete()
+    raise RedeemTokenExpired("Redeem token expired")
 
 
 @transaction.atomic
