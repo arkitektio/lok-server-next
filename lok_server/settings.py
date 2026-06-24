@@ -12,22 +12,17 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 import os
 from pathlib import Path
-from omegaconf import OmegaConf
-from lokale.settings_model import Settings
-import yaml
+from .configuration import Settings
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-conf = OmegaConf.load(os.path.join(BASE_DIR, "config.yaml"))
-
-
-settings = Settings(**yaml.safe_load(open(os.path.join(BASE_DIR, "config.yaml"))))
+conf = Settings()
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = conf.django.get("secret_key", "changeme")  # TODO: Change this in production
+SECRET_KEY = conf.django.secret_key  # TODO: Change this in production
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -37,7 +32,7 @@ ALLOWED_HOSTS = ["*"]
 COMPOSITIONS_DIR = os.path.join(BASE_DIR, "compositions")
 FAKTS_PROTOCOL_VERSION = "0.1.0"
 DEPLOYMENT_NAME = conf.deployment.name
-DEPLOYMENT_DESCRIPTION = conf.deployment.get("description", "A Basic Arkitekt Deployment")
+DEPLOYMENT_DESCRIPTION = conf.deployment.description
 # Application definition
 
 ENSURED_OPENID_APPS = [
@@ -50,24 +45,21 @@ ENSURED_OPENID_APPS = [
 ]
 
 
-ENSURE_ORGANIZATIONS = conf.get("organizations", [])
-ENSURED_USERS = conf.get("users", [])
-ENSURED_MEMBERSHIPS = conf.get("memberships", [])
-REDEEM_TOKENS = conf.get("redeem_tokens", [])
+ENSURE_ORGANIZATIONS = conf.organizations
+ENSURED_USERS = conf.users
+ENSURED_MEMBERSHIPS = conf.memberships
+REDEEM_TOKENS = conf.redeem_tokens
 
-KOMMUNITY_PARTNERS = conf.get(
-    "kommunity_partners",
-    [],
-)
+KOMMUNITY_PARTNERS = conf.kommunity_partners
 
-OIDC_ISSUER = conf.get("oidc_issuer", "http://lok")
+OIDC_ISSUER = conf.oidc_issuer
 
 
-if conf.get("ionscale", None):
+if conf.ionscale is not None:
     IONSCALE_SERVER_URL = conf.ionscale.server_url
     IONSCALE_ADMIN_KEY = conf.ionscale.admin_key
     IONSCALE_COORD_URL = conf.ionscale.coord_url  # thats the public coord url
-    IONSCALE_REPOSITORY = conf.ionscale.get("repository", None)
+    IONSCALE_REPOSITORY = conf.ionscale.repository
     # Configured -> validate the ionscale repository at startup (fail fast).
     IONSCALE_EAGER_INIT = True
 else:
@@ -146,7 +138,7 @@ SUPERUSERS = [
     }
 ]
 
-USE_X_FORWARDED_HOST = conf.django.get("use_x_forwarded_host", True)
+USE_X_FORWARDED_HOST = conf.django.use_x_forwarded_host
 
 SECURE_PROXY_SSL_HEADER = (
     "HTTP_X_FORWARDED_PROTO",
@@ -171,20 +163,20 @@ ACCOUNT_LOGIN_BY_CODE_ENABLED = True  # Enable login by code
 MFA_TRUST_ENABLED = True  # Allow trusted devices
 
 # S3_PUBLIC_DOMAIN = f"{conf.s3.public.host}:{conf.s3.public.port}"  # TODO: FIx
-AWS_ACCESS_KEY_ID = conf.s3.access_key
-AWS_SECRET_ACCESS_KEY = conf.s3.secret_key
-AWS_S3_ENDPOINT_URL = f"{conf.s3.protocol}://{conf.s3.host}:{conf.s3.port}"
+AWS_ACCESS_KEY_ID = conf.datalayer.access_key
+AWS_SECRET_ACCESS_KEY = conf.datalayer.secret_key
+AWS_S3_ENDPOINT_URL = f"{conf.datalayer.protocol}://{conf.datalayer.host}:{conf.datalayer.port}"
 # AWS_S3_PUBLIC_ENDPOINT_URL = (
 #    f"{conf.minio.public.protocol}://{conf.minio.public.host}:{conf.minio.public.port}"
 # )
-AWS_S3_URL_PROTOCOL = f"{conf.s3.protocol}:"
+AWS_S3_URL_PROTOCOL = f"{conf.datalayer.protocol}:"
 AWS_S3_FILE_OVERWRITE = False
 AWS_QUERYSTRING_EXPIRE = 3600
-AWS_S3_REGION_NAME = conf.s3.get("region", "us-east-1")
+AWS_S3_REGION_NAME = conf.datalayer.region
 
-MEDIA_BUCKET = conf.s3.buckets.media
+MEDIA_BUCKET = conf.datalayer.media.bucket
 
-AWS_STORAGE_BUCKET_NAME = conf.s3.buckets.media
+AWS_STORAGE_BUCKET_NAME = conf.datalayer.media.bucket
 AWS_DEFAULT_ACL = "private"
 AWS_S3_USE_SSL = True
 AWS_S3_SECURE_URLS = False
@@ -231,13 +223,10 @@ WSGI_APPLICATION = "lok_server.wsgi.application"
 ASGI_APPLICATION = "lok_server.asgi.application"
 
 
-CA_FILE = conf.get("ca_file", "/certs/ca.crt")
-
-
 EKKE = {
-    "PUBLIC_KEY": conf.lok.get("public_key", None),
-    "PUBLIC_KEY_PEM_FILE": conf.lok.get("public_key_pem_file", None),
-    "KEY_TYPE": conf.lok.get("key_type", "RS256"),
+    "PUBLIC_KEY": conf.lok.public_key,
+    "PUBLIC_KEY_PEM_FILE": conf.lok.public_key_pem_file,
+    "KEY_TYPE": conf.lok.key_type,
     "AUTHORIZATION_HEADERS": [
         "Authorization",
         "X-Auth-Token",
@@ -252,23 +241,23 @@ EKKE = {
 
 DATABASES = {
     "default": {
-        "ENGINE": conf.db.engine,
-        "NAME": conf.db.db_name,
-        "USER": conf.db.username,
-        "PASSWORD": conf.db.password,
-        "HOST": conf.db.host,
-        "PORT": conf.db.port,
+        "ENGINE": conf.postgres.engine,
+        "NAME": conf.postgres.db_name,
+        "USER": conf.postgres.username,
+        "PASSWORD": conf.postgres.password,
+        "HOST": conf.postgres.host,
+        "PORT": conf.postgres.port,
     }
 }
 
-if conf.get("email", None) is not None:
+if conf.email is not None:
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-    EMAIL_HOST = conf.email.get("host", "NOTSET")  # Use your SMTP server
-    EMAIL_PORT = conf.email.get("port", 587)  # Common SMTP port
-    EMAIL_USE_TLS = conf.email.get("use_tls", True)  # Use TLS for security
-    EMAIL_HOST_USER = conf.email.get("user", "NOTSET")  # Your email address or SMTP username
-    EMAIL_HOST_PASSWORD = conf.email.get("password", "NOTSET")  # Your email password or SMTP password
-    DEFAULT_FROM_EMAIL = conf.email.get("email", "NOTSET")  # Default sender email address
+    EMAIL_HOST = conf.email.host  # Use your SMTP server
+    EMAIL_PORT = conf.email.port  # Common SMTP port
+    EMAIL_USE_TLS = conf.email.use_tls  # Use TLS for security
+    EMAIL_HOST_USER = conf.email.user  # Your email address or SMTP username
+    EMAIL_HOST_PASSWORD = conf.email.password  # Your email password or SMTP password
+    DEFAULT_FROM_EMAIL = conf.email.email  # Default sender email address
 
 
 # Unomment and re run
@@ -278,19 +267,10 @@ OAUTH2_PROVIDER_REFRESH_TOKEN_MODEL = "oauth2_provider.RefreshToken"
 OAUTH2_PROVIDER_ID_TOKEN_MODEL = "oauth2_provider.IDtoken"
 
 PRIVATE_KEY = conf.private_key
-PUBLIC_KEY = conf.lok.get("public_key", None)
+PUBLIC_KEY = conf.lok.public_key
 
 
-AUTHENTIKATE = {
-    "ISSUERS": [
-        {
-            "iss": "lok",
-            "kind": "rsa",
-            "public_key": conf.lok.get("public_key", None),
-        }
-    ],
-    "STATIC_TOKENS": conf.lok.get("static_tokens", {}),
-}
+AUTHENTIKATE = conf.authentikate.model_dump()
 
 
 OAUTH2_PROVIDER = {
@@ -304,26 +284,14 @@ OAUTH2_PROVIDER = {
     "ACCESS_TOKEN_EXPIRE_SECONDS": conf.token_expire_seconds or 60 * 60 * 24,  # TOkens are valid for 24 Hours
     "OAUTH2_VALIDATOR_CLASS": "karakter.oauth2.validator.CustomOAuth2Validator",
     "OAUTH2_SERVER_CLASS": "karakter.oauth2.server.JWTServer",
-    "ALLOWED_REDIRECT_URI_SCHEMES": conf.get(
-        "allowed_redirect_uri_schemes",
-        [
-            "http",
-            "https",
-            "tauri",
-            "arkitekt",
-            "exp",
-            "orkestrator",
-            "doks",
-            "kranken",
-        ],
-    ),
+    "ALLOWED_REDIRECT_URI_SCHEMES": conf.allowed_redirect_uri_schemes,
     "PKCE_REQUIRED": False,  # to allow no challenges
 }
 
 OAUTH2_JWT = {
     "PRIVATE_KEY": conf.private_key,
     "PUBLIC_KEY": conf.public_key,
-    "KEY_TYPE": conf.get("key_type", "RS256"),
+    "KEY_TYPE": conf.key_type,
     "ISSUER": "herre",
 }
 
@@ -374,8 +342,8 @@ USE_TZ = True
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-CSRF_TRUSTED_ORIGINS = conf.get("csrf_trusted_origins", ["http://localhost", "https://localhost", "http://localhost:300"])
-MY_SCRIPT_NAME = conf.get("force_script_name", "lok")
+CSRF_TRUSTED_ORIGINS = conf.django.csrf_trusted_origins
+MY_SCRIPT_NAME = conf.django.force_script_name
 STATIC_URL = MY_SCRIPT_NAME.lstrip("/") + "/" + "static/"
 
 
@@ -426,22 +394,19 @@ LOGOUT_REDIRECT_URL = "mainhome"  # Redirect to main after logout
 ACCOUNT_LOGOUT_REDIRECT_URL = "mainhome"
 
 # Frontend URL for redirects (used by karakter views)
-KONTROL_FRONTEND_URL = conf.get("kontrol_frontend_url", "/")
+KONTROL_FRONTEND_URL = conf.kontrol_frontend_url
 
 
-SYSTEM_MESSAGES = conf.get(
-    "system_messages",
-    [
-        {
-            "title": "Welcome to Lok",
-            "message": "Now that you are here, you can start creating your own compositions",
-        }
-    ],
-)
+SYSTEM_MESSAGES = conf.system_messages or [
+    {
+        "title": "Welcome to Lok",
+        "message": "Now that you are here, you can start creating your own compositions",
+    }
+]
 
 STATIC_ROOT = os.path.join(BASE_DIR, "static")
 
-SOCIALACCOUNT_PROVIDERS = conf.get("socialaccount_providers", {})
+SOCIALACCOUNT_PROVIDERS = conf.socialaccount_providers
 
 
-MY_SCRIPT_NAME = conf.get("force_script_name", "lok")
+MY_SCRIPT_NAME = conf.django.force_script_name

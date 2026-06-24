@@ -23,11 +23,9 @@ from fakts.services.compositions import (
 from fakts.services.device_codes import validate_device_code
 from fakts.services.rendering import (
     auto_compose,
-    check_compability,
     create_fake_linking_context,
     create_linking_context,
     create_serverlinking_context,
-    find_instance_for_requirement,
     find_instance_for_requirement_and_composition,
     render_composition,
     render_server_fakts,
@@ -38,7 +36,6 @@ __all__ = [
     "PartnerPreAuthorizationError",
     "auto_compose",
     "auto_configure_kommunity_partners",
-    "check_compability",
     "create_api_token",
     "create_client",
     "create_composition_auth_key",
@@ -49,7 +46,6 @@ __all__ = [
     "create_fake_linking_context",
     "create_linking_context",
     "create_serverlinking_context",
-    "find_instance_for_requirement",
     "find_instance_for_requirement_and_composition",
     "hash_requirements",
     "render_composition",

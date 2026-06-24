@@ -4,7 +4,6 @@ from django.core.management.base import BaseCommand
 from django.conf import settings
 from fakts import models, builders, base_models
 import json
-import omegaconf
 from pydantic import BaseModel
 
 

@@ -76,14 +76,6 @@ def test_auto_compose_noop_without_requirements():
 
 
 @pytest.mark.django_db
-def test_check_compability_empty_without_requirements():
-    user = factories.make_user()
-    errors, warnings = rendering.check_compability(_manifest(), user)
-    assert errors == []
-    assert warnings == []
-
-
-@pytest.mark.django_db
 def test_auto_compose_is_atomic_and_rolls_back_on_required_missing():
     """A failing required requirement must not delete the client's existing mappings."""
     client = factories.make_client()

@@ -1,5 +1,5 @@
 from typing import Any, AsyncGenerator, Type
-from fakts.logic import find_instance_for_requirement, find_instance_for_requirement_and_composition
+from fakts.logic import find_instance_for_requirement_and_composition
 import strawberry
 import strawberry_django
 from kante.types import Info

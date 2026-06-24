@@ -96,24 +96,6 @@ def render_composition(client: models.Client, context: base_models.LinkingContex
     return claim.model_dump()
 
 
-def find_instance_for_requirement(service: models.Service, requirement: base_models.Requirement, user: models.AbstractUser) -> models.ServiceInstance:
-    instance = (
-        models.ServiceInstance.objects.filter(
-            service=service,
-        )
-        .filter(
-            models.Q(allowed_users__isnull=True)
-            | models.Q(allowed_users=user) & (models.Q(denied_users__isnull=True) | ~models.Q(denied_users=user)) & (models.Q(allowed_groups__isnull=True) | models.Q(allowed_groups__in=user.groups.all())) & (models.Q(denied_groups__isnull=True) | ~models.Q(denied_groups__in=user.groups.all()))
-        )
-        .first()
-    )
-
-    if instance is None:
-        raise errors.InstanceNotFound(f"Instance {requirement.service} not acccessible for {user.username}. Please contact the administrator.")
-
-    return instance
-
-
 def find_instance_for_requirement_and_composition(requirement: base_models.Requirement, user: models.AbstractUser, composition: models.Composition) -> models.ServiceInstance | None:
     instance = (
         models.ServiceInstance.objects.filter(
@@ -172,31 +154,6 @@ def auto_compose(client: models.Client, manifest: base_models.Manifest, user: mo
     client.save()
 
     return client
-
-
-def check_compability(manifest: base_models.Manifest, user: models.AbstractUser) -> tuple[list[str], list[str]]:
-    errors_: list[str] = []
-    warnings: list[str] = []
-
-    if not manifest.requirements:
-        return errors_, warnings
-
-    for req in manifest.requirements:
-        try:
-            try:
-                service = models.Service.objects.get(identifier=req.service)
-            except models.Service.DoesNotExist:
-                raise Exception(f"Service {req.service} is not registered on this server. Please contact the administrator to add this feature.")
-
-            find_instance_for_requirement(service, req, user)
-
-        except Exception as e:
-            if req.optional:
-                warnings.append(str(e))
-            else:
-                errors_.append(str(e))
-
-    return errors_, warnings
 
 
 def create_linking_context(request: HttpRequest, client: models.Client, claim: base_models.ClaimRequest) -> base_models.LinkingContext:

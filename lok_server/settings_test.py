@@ -14,7 +14,7 @@ DATABASES["default"] = {
 }
 
 
-AUTHENTIKATE = {**AUTHENTIKATE, "STATIC_TOKENS": {"test": {"sub": "1", "active_org": "testorg"}}}
+AUTHENTIKATE = {**AUTHENTIKATE, "static_tokens": {"test": {"sub": "1", "active_org": "testorg"}}}
 
 # Never touch the real ionscale CLI in tests: build the in-memory fake by default.
 # The ``_reset_ionscale_repo`` autouse fixture rebuilds it fresh per test.

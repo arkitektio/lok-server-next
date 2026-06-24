@@ -58,12 +58,6 @@ class WellKnownFakts(View):
     Of the Fakts Protocol"""
 
     def get(self, request, format=None):
-        try:
-            with open(settings.CA_FILE, "r") as f:
-                ca = f.read()
-        except Exception:
-            ca = None
-
         return JsonResponse(
             data=base_models.WellKnownFakts(
                 name=settings.DEPLOYMENT_NAME,
@@ -72,7 +66,6 @@ class WellKnownFakts(View):
                 claim=request.build_absolute_uri(reverse("fakts:claim")),
                 base_url=request.build_absolute_uri(reverse("fakts:index")),
                 frontend_url=request.build_absolute_uri(reverse("mainhome")).replace(f"/{settings.MY_SCRIPT_NAME}", ""),
-                ca_crt=ca,
             ).model_dump()
         )
 

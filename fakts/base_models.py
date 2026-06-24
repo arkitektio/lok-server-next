@@ -21,7 +21,6 @@ class WellKnownFakts(BaseModel):
     claim: str
     base_url: str
     frontend_url: str
-    ca_crt: str | None = None
 
 
 class Requirement(BaseModel):
