@@ -3,8 +3,6 @@ import strawberry
 from api.management import types
 from karakter import models
 from karakter.hashers import hash_device_id
-from django.utils import timezone
-from datetime import timedelta
 import kante
 from fakts import models as fakts_models
 

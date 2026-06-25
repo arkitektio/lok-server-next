@@ -1,10 +1,7 @@
 import strawberry_django
-from komment import models, scalars, enums, filters
+from komment import models, scalars, enums
 import strawberry
-from enum import Enum
 from typing import Optional
-from typing import Any, Dict
-from typing import ForwardRef
 from typing import Annotated, Literal, Union
 import datetime
 from strawberry.experimental import pydantic

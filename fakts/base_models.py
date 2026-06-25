@@ -1,9 +1,7 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 from typing import Dict, List, Optional, Literal, Union
 from django.conf import settings
-from enum import Enum
 from fakts import enums
-from typing import Literal
 
 
 class Layer(BaseModel):

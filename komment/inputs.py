@@ -1,9 +1,8 @@
-from komment import enums, scalars
+from komment import enums
 import strawberry
-from typing import Optional
 from pydantic import BaseModel
 from strawberry.experimental import pydantic
-from typing import Annotated, Any
+from typing import Annotated
 
 
 class DescendandInputModel(BaseModel):

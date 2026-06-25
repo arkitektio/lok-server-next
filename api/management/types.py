@@ -1,12 +1,10 @@
 import datetime
-from enum import Enum
-from typing import Any, Dict, ForwardRef, List, Optional, cast
+from typing import List, Optional, cast
 from karakter.datalayer import get_current_datalayer
 import strawberry
 import strawberry_django
 from kante.types import Info
 from karakter import enums, models, scalars
-from strawberry import LazyType
 from allauth.socialaccount import models as smodels
 import kante
 from fakts import models as fakts_models
@@ -14,11 +12,10 @@ from fakts import filters as fakts_filters
 from fakts import scalars as fakts_scalars
 from fakts import base_models
 from api.management import filters, enums, scalars
-from karakter import models as karakter_models
 from karakter import filters as karakter_filters
 from strawberry.experimental import pydantic
 from authapp.models import OAuth2Client
-from ionscale.base_models import Machine, MachineDetail
+from ionscale.base_models import Machine
 from ionscale.repo import get_ionscale_repo
 
 

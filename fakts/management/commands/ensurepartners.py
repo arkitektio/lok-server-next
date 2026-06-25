@@ -1,13 +1,9 @@
-import yaml
 from django.core.management.base import BaseCommand
-from fakts.models import Layer, Service, ServiceInstance, InstanceAlias, ServiceRelease, Composition, KommunityPartner
-from karakter.models import Organization, Role, Scope
+from fakts.models import KommunityPartner
 from authapp.models import OAuth2Client
 from fakts.config_models import KommunityPartnerConfigModel  # <-- Your validated Pydantic schema
 from django.contrib.auth import get_user_model
 from django.conf import settings
-from fakts import logic
-import uuid
 
 
 User = get_user_model()

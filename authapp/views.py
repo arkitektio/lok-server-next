@@ -28,7 +28,6 @@ from django.views.decorators.http import require_http_methods
 from authapp.server import server, resource_protector
 from authlib.oauth2 import OAuth2Error
 from django.views.decorators.csrf import csrf_exempt
-from .models import OAuth2Token
 from django.conf import settings
 from joserfc.jwk import RSAKey
 

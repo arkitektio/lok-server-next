@@ -1,7 +1,6 @@
 from kante.types import Info
-import strawberry_django
 import strawberry
-from pak import types, models, scalars
+from pak import types
 from typing import AsyncGenerator
 from pak.channels import stash_channel
 

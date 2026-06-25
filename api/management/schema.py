@@ -1,9 +1,8 @@
-from typing import Any, AsyncGenerator, Type
 from fakts.logic import find_instance_for_requirement_and_composition
 import strawberry
 import strawberry_django
 from kante.types import Info
-from .types import ManagementOrganization, ManagementUser
+from .types import ManagementUser
 import api.management.mutations as mutations
 import api.management.types as types
 import kante

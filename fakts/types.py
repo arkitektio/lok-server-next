@@ -1,17 +1,8 @@
 import strawberry_django
 import strawberry
-from enum import Enum
 from typing import Optional
-from pydantic import BaseModel, Field
-from strawberry.experimental import pydantic
-from typing import Any, Dict
-from typing import ForwardRef
-from strawberry import LazyType
-from typing import Literal, Union
 from karakter import types
-import datetime
-from fakts import models, scalars, enums, filters, enums
-from karakter.datalayer import get_current_datalayer
+from fakts import models, scalars, filters, enums
 from authapp import types as atypes
 from kante.types import Info
 

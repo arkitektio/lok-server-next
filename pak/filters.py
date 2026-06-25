@@ -1,6 +1,5 @@
 import strawberry
-from pak import models, enums
-from strawberry import auto
+from pak import models
 from typing import Optional
 from strawberry_django.filters import FilterLookup
 import strawberry_django

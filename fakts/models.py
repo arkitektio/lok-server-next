@@ -4,19 +4,15 @@ from django.contrib.auth import get_user_model
 from django_choices_field import TextChoicesField
 
 # Create your models here.
-from django.core.exceptions import ObjectDoesNotExist
 from typing import List
-from django.db.models import Q
 import uuid
-import _json
 from typing import Optional
 from fakts import fields, enums
-from django.contrib.auth.models import AbstractUser, Group
+from django.db.models import Q  # noqa: F401  (re-exported as fakts.models.Q)
+from django.contrib.auth.models import AbstractUser, Group  # noqa: F401  (AbstractUser re-exported as fakts.models.AbstractUser)
 from karakter.models import MediaStore, Organization
-from django.conf import settings
 from authapp.models import OAuth2Client
 from fakts import base_models, errors
-from fakts import enums
 
 
 class KommunityPartner(models.Model):

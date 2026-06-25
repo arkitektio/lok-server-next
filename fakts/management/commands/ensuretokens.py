@@ -1,7 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.conf import settings
-import os
 from fakts import models
 from fakts.config_models import RedeemTokenConfigs
 

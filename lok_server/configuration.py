@@ -20,9 +20,7 @@ from pydantic_settings import (
 
 from authentikate.base_models import AuthentikateSettings
 
-_DEFAULT_CONFIG = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.yaml"
-)
+_DEFAULT_CONFIG = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.yaml")
 
 
 class AdminSettings(BaseModel):
@@ -40,9 +38,13 @@ class DjangoSettings(BaseModel):
     debug: bool = Field(default=False, description="Enable Django debug mode (never in production).")
     hosts: List[str] = Field(default_factory=lambda: ["*"], description="ALLOWED_HOSTS entries.")
     use_x_forwarded_host: bool = Field(default=True, description="Trust the X-Forwarded-Host header behind a reverse proxy.")
+    secure_proxy_ssl_header: bool = Field(default=True, description="Trust X-Forwarded-Proto to detect HTTPS behind a reverse proxy (SECURE_PROXY_SSL_HEADER). Disable when not behind a TLS-terminating proxy.")
     admin: AdminSettings = Field(description="Superuser provisioned on first boot.")
     csrf_trusted_origins: List[str] = Field(default_factory=lambda: ["http://localhost", "https://localhost"], description="CSRF_TRUSTED_ORIGINS for unsafe (POST) requests.")
     force_script_name: str = Field(default="", description="URL path prefix (FORCE_SCRIPT_NAME) this service is served under.")
+    language_code: str = Field(default="en-us", description="Django LANGUAGE_CODE.")
+    time_zone: str = Field(default="UTC", description="Django TIME_ZONE.")
+    log_level: str = Field(default="INFO", description="Root logger level (e.g. DEBUG, INFO, WARNING).")
 
 
 class PostgresSettings(BaseModel):
@@ -65,16 +67,14 @@ class RedisSettings(BaseModel):
 
     host: str = Field(description="Redis host.")
     port: int = Field(default=6379, description="Redis port.")
+    channel_prefix: str = Field(default="lok", description="Key prefix for the channels_redis channel layer.")
 
 
 class LokSettings(BaseModel):
     """Lok identity-provider key material used by this service."""
 
     public_key: Optional[str] = Field(default=None, description="Lok public key (SSH/PEM) used to verify issued tokens.")
-    public_key_pem_file: Optional[str] = Field(default=None, description="Path to a PEM file holding the Lok public key.")
-    key_type: str = Field(default="RS256", description="JWT signing algorithm.")
     static_tokens: Dict[str, Any] = Field(default_factory=dict, description="Pre-shared static tokens (testing only).")
-    issuer: Optional[str] = Field(default=None, description="Expected token issuer (the ``iss`` claim).")
 
 
 class EmailSettings(BaseModel):
@@ -104,6 +104,7 @@ class IonscaleSettings(BaseModel):
     admin_key: str = Field(description="Ionscale admin API key. Secret — must be set.")
     coord_url: str = Field(description="Public coordination URL advertised to clients.")
     repository: Optional[str] = Field(default=None, description="Dotted path to an IonscaleRepo factory (tests).")
+    eager_init: bool = Field(default=False, description="Eagerly initialize the ionscale repo on boot (tests).")
 
 
 class DatalayerBucket(BaseModel):
@@ -125,10 +126,64 @@ class DatalayerSettings(BaseModel):
     port: Optional[int] = Field(default=None, description="S3 endpoint port.")
     protocol: str = Field(default="http", description="S3 endpoint protocol (http or https).")
     region: str = Field(default="us-east-1", description="S3 region name.")
+    default_acl: str = Field(default="private", description="Default ACL applied to stored objects (AWS_DEFAULT_ACL).")
+    querystring_expire: int = Field(default=3600, description="Presigned URL lifetime in seconds (AWS_QUERYSTRING_EXPIRE).")
+    file_overwrite: bool = Field(default=False, description="Overwrite existing files on name collision (AWS_S3_FILE_OVERWRITE).")
+    secure: Optional[bool] = Field(default=None, description="Use TLS for S3 (AWS_S3_USE_SSL/SECURE_URLS). When None, derived from protocol == 'https'.")
     media: DatalayerBucket = Field(description="Bucket for media / general file storage. Required for this service.")
     zarr: Optional[DatalayerBucket] = Field(default=None, description="Bucket for Zarr arrays.")
     parquet: Optional[DatalayerBucket] = Field(default=None, description="Bucket for Parquet tables.")
     bigfile: Optional[DatalayerBucket] = Field(default=None, description="Bucket for large binary files.")
+
+
+class HeadlessFrontendUrls(BaseModel):
+    """Single-page-app URLs allauth-headless points users at (the ``{key}`` placeholders are filled in by allauth)."""
+
+    account_confirm_email: str = Field(
+        default="https://jhnnsrs-lab.hyena-sole.ts.net/account/verify-email/{key}",
+        description="Email-verification link; {key} substituted by allauth.",
+    )
+    account_reset_password_from_key: str = Field(
+        default="https://jhnnsrs-lab.hyena-sole.ts.net/account/password/reset/key/{key}",
+        description="Password-reset link; {key} substituted by allauth.",
+    )
+    account_signup: str = Field(
+        default="https://jhnnsrs-lab.hyena-sole.ts.net/account/signup",
+        description="Signup page URL.",
+    )
+
+
+class AccountSettings(BaseModel):
+    """django-allauth account/MFA behavior."""
+
+    email_verification: str = Field(default="none", description="ACCOUNT_EMAIL_VERIFICATION (none/optional/mandatory).")
+    login_by_code_enabled: bool = Field(default=True, description="Enable login by emailed code (ACCOUNT_LOGIN_BY_CODE_ENABLED).")
+    mfa_trust_enabled: bool = Field(default=True, description="Allow trusted devices (MFA_TRUST_ENABLED).")
+    headless_frontend_urls: HeadlessFrontendUrls = Field(default_factory=HeadlessFrontendUrls, description="SPA URLs for allauth-headless flows.")
+    social_provider_apps: List[str] = Field(
+        default_factory=lambda: ["allauth.socialaccount.providers.orcid", "allauth.socialaccount.providers.google"],
+        description="allauth social provider apps appended to INSTALLED_APPS.",
+    )
+
+
+class OpenIDAppSettings(BaseModel):
+    """An OIDC/OAuth2 client provisioned on boot (see the ``ensureopenid`` command)."""
+
+    client_name: str = Field(description="Human-readable client name.")
+    client_id: str = Field(description="OAuth2 client_id.")
+    client_secret: str = Field(description="OAuth2 client secret. Override per deployment.")
+    redirect_uris: List[str] = Field(default_factory=list, description="Allowed OAuth2 redirect URIs.")
+
+
+def _default_openid_apps() -> List[OpenIDAppSettings]:
+    return [
+        OpenIDAppSettings(
+            client_name="Frankon Lok Frontend",
+            client_id="lok-frontend",
+            client_secret="in0929sd0fn039j02n309n2309rn099n09n0s9n",
+            redirect_uris=["http://localhost:3000/auth/callback", "https://ionscale.arkitekt.live/auth/callback"],
+        )
+    ]
 
 
 class Settings(BaseSettings):
@@ -143,24 +198,20 @@ class Settings(BaseSettings):
     authentikate: AuthentikateSettings = Field(description="Token-verification config (authentikate).")
     datalayer: DatalayerSettings = Field(description="S3 storage connection and buckets.")
     deployment: DeploymentSettings = Field(default_factory=DeploymentSettings, description="Deployment identity.")
+    account: AccountSettings = Field(default_factory=AccountSettings, description="django-allauth account/MFA behavior.")
     email: Optional[EmailSettings] = Field(default=None, description="Optional SMTP settings for outbound email.")
     ionscale: Optional[IonscaleSettings] = Field(default=None, description="Optional ionscale coordinator connection.")
     private_key: str = Field(description="OIDC/OAuth2 RSA private signing key (PEM). Secret — must be set.")
-    public_key: Optional[str] = Field(default=None, description="OIDC/OAuth2 RSA public key (PEM).")
-    key_type: str = Field(default="RS256", description="OAuth2 JWT signing algorithm.")
-    token_expire_seconds: int = Field(default=60 * 60 * 24, description="OAuth2 access-token lifetime (seconds).")
     oidc_issuer: str = Field(default="http://lok", description="OIDC issuer URL advertised by lok.")
     kontrol_frontend_url: str = Field(default="/", description="Frontend URL used for redirects.")
-    scopes: Dict[str, str] = Field(default_factory=dict, description="OAuth2 scope name -> human description.")
-    allowed_redirect_uri_schemes: List[str] = Field(default_factory=lambda: ["http", "https", "tauri", "arkitekt", "exp", "orkestrator", "doks", "kranken"], description="URI schemes permitted as OAuth2 redirect targets.")
     socialaccount_providers: Dict[str, Any] = Field(default_factory=dict, description="django-allauth social provider config.")
     organizations: List[Dict[str, Any]] = Field(default_factory=list, description="Organizations ensured on boot.")
     users: List[Dict[str, Any]] = Field(default_factory=list, description="Users ensured on boot.")
     memberships: List[Dict[str, Any]] = Field(default_factory=list, description="User/organization memberships ensured on boot.")
-    roles: List[Dict[str, Any]] = Field(default_factory=list, description="Roles ensured on boot.")
     redeem_tokens: List[Dict[str, Any]] = Field(default_factory=list, description="Redeem tokens provisioned on boot.")
     kommunity_partners: List[Dict[str, Any]] = Field(default_factory=list, description="Pre-authorized kommunity partner apps.")
     system_messages: List[Dict[str, Any]] = Field(default_factory=list, description="System messages shown to users.")
+    openid_apps: List[OpenIDAppSettings] = Field(default_factory=_default_openid_apps, description="OIDC/OAuth2 clients provisioned on boot.")
 
     @classmethod
     def settings_customise_sources(

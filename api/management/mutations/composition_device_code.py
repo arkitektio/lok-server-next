@@ -5,8 +5,6 @@ from karakter import models
 from karakter.hashers import hash_device_id
 from fakts import models as fakts_models
 from fakts import logic, builders, base_models, enums
-from django.utils import timezone
-from datetime import timedelta
 import kante
 
 

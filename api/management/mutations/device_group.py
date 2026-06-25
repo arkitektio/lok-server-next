@@ -2,8 +2,6 @@ from kante import Info
 import strawberry
 from api.management import types
 from karakter import models
-from django.utils import timezone
-from datetime import timedelta
 import kante
 from fakts import models as fakts_models
 

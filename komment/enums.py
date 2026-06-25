@@ -1,6 +1,5 @@
 from enum import Enum
 import strawberry
-from django.db.models import TextChoices
 
 
 @strawberry.enum(description="The Kind of a Descendant")

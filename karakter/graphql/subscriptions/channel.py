@@ -1,7 +1,6 @@
 from kante.types import Info
-import strawberry_django
 import strawberry
-from karakter import types, models, scalars
+from karakter import types, models
 from typing import AsyncGenerator
 from karakter.channels import communication_channel
 

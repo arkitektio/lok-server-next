@@ -1,5 +1,4 @@
 from kante import Info
-import strawberry
 from authapp.models import AuthorizationCode, OAuth2Client
 import kante
 from urllib.parse import urlencode

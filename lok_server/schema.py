@@ -1,4 +1,3 @@
-from typing import Any, AsyncGenerator, Type
 
 import strawberry
 import strawberry_django
@@ -6,7 +5,6 @@ from kante.types import Info
 from fakts import types as fakts_types
 from fakts.graphql import mutations as fakts_mutations
 from fakts.graphql import queries as fakts_queries
-from fakts.graphql import subscriptions as fakts_subscriptions
 from fakts import models as fakts_models
 from karakter import types as karakter_types
 from karakter import models as karakter_models
@@ -21,7 +19,6 @@ from komment.graphql import subscriptions as komment_subscriptions
 from pak import types as pak_types
 from pak.graphql import mutations as pak_mutations
 from pak.graphql import queries as pak_queries
-from pak.graphql import subscriptions as pak_subscriptions
 from karakter.datalayer import DatalayerExtension
 from strawberry_django.optimizer import DjangoOptimizerExtension
 from authapp.extension import AuthAppExtension

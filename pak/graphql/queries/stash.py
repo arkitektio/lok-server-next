@@ -1,7 +1,6 @@
 from kante.types import Info
-import strawberry_django
 import strawberry
-from pak import types, models, inputs, enums, scalars
+from pak import types, models
 import logging
 
 logger = logging.getLogger(__name__)

@@ -26,12 +26,6 @@ class AddItemToStashInput:
 
 
 @strawberry.input
-class RemoveItemsFromStashInput:
-    stash: strawberry.ID
-    items: list[StashItemInput]
-
-
-@strawberry.input
 class DeleteStashItems:
     items: list[strawberry.ID]
 

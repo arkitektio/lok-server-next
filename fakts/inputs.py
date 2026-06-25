@@ -3,7 +3,6 @@ from strawberry.experimental import pydantic
 from fakts.base_models import Manifest, LinkingContext, LinkingRequest, PublicSource
 from typing import Optional
 from pydantic import BaseModel, Field
-import uuid
 from fakts import enums
 import enum
 

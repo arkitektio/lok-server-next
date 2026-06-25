@@ -1,5 +1,4 @@
 from typing import NewType
-from typing import Any
 import strawberry
 
 AppIdentifier = strawberry.scalar(

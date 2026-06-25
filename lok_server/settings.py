@@ -25,31 +25,22 @@ conf = Settings()
 SECRET_KEY = conf.django.secret_key  # TODO: Change this in production
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = conf.django.debug
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = conf.django.hosts
 
-COMPOSITIONS_DIR = os.path.join(BASE_DIR, "compositions")
 FAKTS_PROTOCOL_VERSION = "0.1.0"
 DEPLOYMENT_NAME = conf.deployment.name
 DEPLOYMENT_DESCRIPTION = conf.deployment.description
 # Application definition
 
-ENSURED_OPENID_APPS = [
-    {
-        "client_name": "Frankon Lok Frontend",
-        "client_id": "lok-frontend",
-        "client_secret": "in0929sd0fn039j02n309n2309rn099n09n0s9n",
-        "redirect_uris": ["http://localhost:3000/auth/callback", "https://ionscale.arkitekt.live/auth/callback"],
-    }
-]
+ENSURED_OPENID_APPS = [a.model_dump() for a in conf.openid_apps]
 
 
 ENSURE_ORGANIZATIONS = conf.organizations
 ENSURED_USERS = conf.users
 ENSURED_MEMBERSHIPS = conf.memberships
 REDEEM_TOKENS = conf.redeem_tokens
-
 KOMMUNITY_PARTNERS = conf.kommunity_partners
 
 OIDC_ISSUER = conf.oidc_issuer
@@ -61,7 +52,7 @@ if conf.ionscale is not None:
     IONSCALE_COORD_URL = conf.ionscale.coord_url  # thats the public coord url
     IONSCALE_REPOSITORY = conf.ionscale.repository
     # Configured -> validate the ionscale repository at startup (fail fast).
-    IONSCALE_EAGER_INIT = True
+    IONSCALE_EAGER_INIT = conf.ionscale.eager_init
 else:
     IONSCALE_SERVER_URL = None
     IONSCALE_ADMIN_KEY = None
@@ -101,22 +92,18 @@ INSTALLED_APPS += [
     "allauth.account",
     "allauth.headless",
     "allauth.socialaccount",
-    # "allauth.socialaccount.providers.github",
-    "allauth.socialaccount.providers.orcid",
-    "allauth.socialaccount.providers.google",
     # The MFA app:
     "allauth.mfa",
 ]
 
+# Social provider apps (e.g. orcid, google) are configurable per deployment.
+INSTALLED_APPS += conf.account.social_provider_apps
+
 
 # These are the URLs to be implemented by your single-page application.
-HEADLESS_FRONTEND_URLS = {
-    "account_confirm_email": "https://jhnnsrs-lab.hyena-sole.ts.net/account/verify-email/{key}",
-    "account_reset_password_from_key": "https://jhnnsrs-lab.hyena-sole.ts.net/account/password/reset/key/{key}",
-    "account_signup": "https://jhnnsrs-lab.hyena-sole.ts.net/account/signup",
-}
+HEADLESS_FRONTEND_URLS = conf.account.headless_frontend_urls.model_dump()
 
-ACCOUNT_EMAIL_VERIFICATION = "none"  # we don't have an smpt server by default
+ACCOUNT_EMAIL_VERIFICATION = conf.account.email_verification  # default "none": no SMTP server by default
 
 # Authentikate section
 
@@ -130,20 +117,10 @@ AUTHENTICATION_BACKENDS = [
     "allauth.account.auth_backends.AuthenticationBackend",
 ]
 
-SUPERUSERS = [
-    {
-        "USERNAME": conf.django.admin.username,
-        "EMAIL": conf.django.admin.email,
-        "PASSWORD": conf.django.admin.password,
-    }
-]
-
 USE_X_FORWARDED_HOST = conf.django.use_x_forwarded_host
 
-SECURE_PROXY_SSL_HEADER = (
-    "HTTP_X_FORWARDED_PROTO",
-    "https",
-)  # because we are going to be run behind a reverse proxy
+# Set when run behind a TLS-terminating reverse proxy; None otherwise.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https") if conf.django.secure_proxy_ssl_header else None
 
 
 MIDDLEWARE = [
@@ -159,8 +136,8 @@ MIDDLEWARE = [
 ]
 
 
-ACCOUNT_LOGIN_BY_CODE_ENABLED = True  # Enable login by code
-MFA_TRUST_ENABLED = True  # Allow trusted devices
+ACCOUNT_LOGIN_BY_CODE_ENABLED = conf.account.login_by_code_enabled  # Enable login by code
+MFA_TRUST_ENABLED = conf.account.mfa_trust_enabled  # Allow trusted devices
 
 # S3_PUBLIC_DOMAIN = f"{conf.s3.public.host}:{conf.s3.public.port}"  # TODO: FIx
 AWS_ACCESS_KEY_ID = conf.datalayer.access_key
@@ -170,26 +147,26 @@ AWS_S3_ENDPOINT_URL = f"{conf.datalayer.protocol}://{conf.datalayer.host}:{conf.
 #    f"{conf.minio.public.protocol}://{conf.minio.public.host}:{conf.minio.public.port}"
 # )
 AWS_S3_URL_PROTOCOL = f"{conf.datalayer.protocol}:"
-AWS_S3_FILE_OVERWRITE = False
-AWS_QUERYSTRING_EXPIRE = 3600
+AWS_S3_FILE_OVERWRITE = conf.datalayer.file_overwrite
+AWS_QUERYSTRING_EXPIRE = conf.datalayer.querystring_expire
 AWS_S3_REGION_NAME = conf.datalayer.region
 
 MEDIA_BUCKET = conf.datalayer.media.bucket
 
 AWS_STORAGE_BUCKET_NAME = conf.datalayer.media.bucket
-AWS_DEFAULT_ACL = "private"
-AWS_S3_USE_SSL = True
-AWS_S3_SECURE_URLS = False
+AWS_DEFAULT_ACL = conf.datalayer.default_acl
+# Derive TLS from the configured protocol unless explicitly overridden.
+_s3_secure = conf.datalayer.secure if conf.datalayer.secure is not None else conf.datalayer.protocol == "https"
+AWS_S3_USE_SSL = _s3_secure
+AWS_S3_SECURE_URLS = _s3_secure
 
 CHANNEL_LAYERS = {
     "default": {
         # This example app uses the Redis channel layer implementation channels_redis
         "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {"hosts": [(conf.redis.host, conf.redis.port)], "prefix": "mikro"},
+        "CONFIG": {"hosts": [(conf.redis.host, conf.redis.port)], "prefix": conf.redis.channel_prefix},
     },
 }
-
-CORS_ALLOW_ALL_ORIGINS = True
 
 
 ROOT_URLCONF = "lok_server.urls"
@@ -210,32 +187,10 @@ TEMPLATES = [
     },
 ]
 
-INITIAL_MESSAGE_TEMPLATE = [
-    {
-        "title": "Welcome {user.name} :) This will be fun",
-        "description": "It will be fun setting this up for you",
-        "unique": "initial_message",
-    }
-]
-
-
 WSGI_APPLICATION = "lok_server.wsgi.application"
 ASGI_APPLICATION = "lok_server.asgi.application"
 
 
-EKKE = {
-    "PUBLIC_KEY": conf.lok.public_key,
-    "PUBLIC_KEY_PEM_FILE": conf.lok.public_key_pem_file,
-    "KEY_TYPE": conf.lok.key_type,
-    "AUTHORIZATION_HEADERS": [
-        "Authorization",
-        "X-Auth-Token",
-        "AUTHORIZATION",
-        "authorization",
-    ],
-    "IMITATE_PERMISSION": "kante.imitate",
-    "ALLOW_IMITATE": True,
-}
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
@@ -260,40 +215,12 @@ if conf.email is not None:
     DEFAULT_FROM_EMAIL = conf.email.email  # Default sender email address
 
 
-# Unomment and re run
-OAUTH2_PROVIDER_APPLICATION_MODEL = "oauth2_provider.Application"
-OAUTH2_PROVIDER_ACCESS_TOKEN_MODEL = "oauth2_provider.AccessToken"
-OAUTH2_PROVIDER_REFRESH_TOKEN_MODEL = "oauth2_provider.RefreshToken"
-OAUTH2_PROVIDER_ID_TOKEN_MODEL = "oauth2_provider.IDtoken"
-
 PRIVATE_KEY = conf.private_key
 PUBLIC_KEY = conf.lok.public_key
 
 
 AUTHENTIKATE = conf.authentikate.model_dump()
 
-
-OAUTH2_PROVIDER = {
-    "OIDC_ENABLED": True,
-    "OIDC_RSA_PRIVATE_KEY": conf.private_key,
-    "SCOPES": {
-        "openid": "OpenID Connect scope",
-        **conf.scopes,
-        # ... any other scopes that you use
-    },
-    "ACCESS_TOKEN_EXPIRE_SECONDS": conf.token_expire_seconds or 60 * 60 * 24,  # TOkens are valid for 24 Hours
-    "OAUTH2_VALIDATOR_CLASS": "karakter.oauth2.validator.CustomOAuth2Validator",
-    "OAUTH2_SERVER_CLASS": "karakter.oauth2.server.JWTServer",
-    "ALLOWED_REDIRECT_URI_SCHEMES": conf.allowed_redirect_uri_schemes,
-    "PKCE_REQUIRED": False,  # to allow no challenges
-}
-
-OAUTH2_JWT = {
-    "PRIVATE_KEY": conf.private_key,
-    "PUBLIC_KEY": conf.public_key,
-    "KEY_TYPE": conf.key_type,
-    "ISSUER": "herre",
-}
 
 STRAWBERRY_DJANGO = {
     "TYPE_DESCRIPTION_FROM_MODEL_DOCSTRING": True,
@@ -324,9 +251,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/4.2/topics/i18n/
 
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = conf.django.language_code
 
-TIME_ZONE = "UTC"
+TIME_ZONE = conf.django.time_zone
 
 USE_I18N = True
 
@@ -366,7 +293,7 @@ LOGGING = {
     "loggers": {
         # root logger
         "": {
-            "level": "INFO",
+            "level": conf.django.log_level,
             "handlers": ["console"],
         },
         "oauthlib": {
@@ -375,11 +302,6 @@ LOGGING = {
             "propagate": True,
         },
         "delt": {
-            "handlers": ["console"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "oauth2_provider": {
             "handlers": ["console"],
             "level": "INFO",
             "propagate": False,
@@ -407,6 +329,3 @@ SYSTEM_MESSAGES = conf.system_messages or [
 STATIC_ROOT = os.path.join(BASE_DIR, "static")
 
 SOCIALACCOUNT_PROVIDERS = conf.socialaccount_providers
-
-
-MY_SCRIPT_NAME = conf.django.force_script_name

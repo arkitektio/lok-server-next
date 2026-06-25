@@ -1,6 +1,5 @@
 import strawberry
-from komment import models, scalars, enums
-from strawberry import auto
+from komment import models
 from typing import Optional
 from strawberry_django.filters import FilterLookup
 import strawberry_django

@@ -1,8 +1,7 @@
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from django.core.management.base import BaseCommand
 from django.conf import settings
-from karakter.base_models import UserConfig, MembershipConfig
+from karakter.base_models import MembershipConfig
 from karakter.models import Organization, Role, Membership
 
 User = get_user_model()

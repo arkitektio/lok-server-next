@@ -1,14 +1,10 @@
 from kante.types import Info
-import strawberry_django
 import strawberry
-from komment import types, models, inputs, enums, scalars
-import hashlib
-import json
+from komment import types, models, inputs, scalars
 import logging
 from typing import Dict, Tuple, List, Any
 
 logger = logging.getLogger(__name__)
-from komment import inputs
 from django.contrib.auth import get_user_model
 
 
@@ -98,14 +94,10 @@ def create_comment(info: Info, input: CreateCommentInput) -> types.Comment:
                 f"Comment on {input.identifier}",
             )
 
-    print(users)
     exp.mentions.set(users)
     exp.save()
 
     return exp
-
-    trace = models.User(name=input.user)
-    return trace
 
 
 @strawberry.input

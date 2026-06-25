@@ -1,6 +1,4 @@
-from typing import AsyncIterator, Iterator, Union, cast
-from strawberry.extensions import SchemaExtension
-from kante.context import WsContext, HttpContext
+from typing import cast
 from authentikate.strawberry.extension import AuthentikateExtension, UserModel, JWTToken
 from karakter.models import User, Organization, Membership
 from fakts.models import Client

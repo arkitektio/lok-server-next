@@ -16,13 +16,11 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import path
-from django.urls import include, path
+from django.urls import include
 from fakts.views import WellKnownFakts
 from django.shortcuts import render
 from django.conf import settings
 from kante.path import dynamicpath
-from django.conf import settings
 from django.conf.urls.static import static
 from health_check.views import HealthCheckView
 from django.views.decorators.csrf import csrf_exempt
@@ -40,7 +38,6 @@ def fakts_challenge(request):
     return HttpResponse("Fakts Challenge Endpoint", status=200)
 
 
-from django.urls import path, include, re_path
 
 
 # Bootstrap Backend
