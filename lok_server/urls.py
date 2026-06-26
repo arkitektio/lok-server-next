@@ -19,9 +19,7 @@ from django.contrib import admin
 from django.urls import include
 from fakts.views import WellKnownFakts
 from django.shortcuts import render
-from django.conf import settings
 from kante.path import dynamicpath
-from django.conf.urls.static import static
 from health_check.views import HealthCheckView
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
@@ -70,4 +68,4 @@ urlpatterns = [
     dynamicpath(".well-known/fakts-challenge", fakts_challenge, name="fakts-challenge"),
     dynamicpath(".well-known/fakts", WellKnownFakts.as_view()),
     dynamicpath(".well-known/openid-configuration", open_id_configuration, name="openid_configuration"),
-] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+]

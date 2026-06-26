@@ -30,6 +30,7 @@ dependencies = [
     "django-allauth[headless,mfa,socialaccount]>=65.13",
     "pyjwt>=2.10.1",
     "kante>=0.16.1",
+    "whitenoise>=6.6",
 ]
 
 [dependency-groups]

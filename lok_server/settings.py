@@ -10,7 +10,6 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
-import os
 from pathlib import Path
 from .configuration import Settings
 
@@ -125,6 +124,7 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https") if conf.django.sec
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -273,6 +273,10 @@ CSRF_TRUSTED_ORIGINS = conf.django.csrf_trusted_origins
 MY_SCRIPT_NAME = conf.django.force_script_name
 STATIC_URL = MY_SCRIPT_NAME.lstrip("/") + "/" + "static/"
 
+# WhiteNoise serves static directly from the staticfiles finders at request time
+# (works under both runserver and daphne), so no collectstatic / STATIC_ROOT is needed.
+WHITENOISE_USE_FINDERS = True
+
 
 LOGGING = {
     "version": 1,
@@ -325,7 +329,5 @@ SYSTEM_MESSAGES = conf.system_messages or [
         "message": "Now that you are here, you can start creating your own compositions",
     }
 ]
-
-STATIC_ROOT = os.path.join(BASE_DIR, "static")
 
 SOCIALACCOUNT_PROVIDERS = conf.socialaccount_providers
