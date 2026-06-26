@@ -1,12 +1,20 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.3 (2026-06-26)
+
+
 ## v1.0.0-rc.2 (2026-06-26)
 
 ### Bug Fixes
 
 - With CONFIG.md
   ([`e07e78f`](https://github.com/arkitektio/lok-server-next/commit/e07e78f72711a580f6f9a9e4fa21b95b8be4ceea))
+
+### Features
+
+- With white noise and optimized Dockerfile
+  ([`67bcecc`](https://github.com/arkitektio/lok-server-next/commit/67bcecc41844694828acd4fc8ab6ed699c7565c5))
 
 
 ## v1.0.0-rc.1 (2026-06-25)
