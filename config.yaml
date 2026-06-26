@@ -10,10 +10,6 @@ django:
   - "*"
   secret_key: c5d84589433e1d0b4198072c54ee0dd1
   csrf_trusted_origins:
-  - http://jhnnsrs-lab.hyena-sole.ts.net
-  - https://jhnnsrs-lab.hyena-sole.ts.net
-  - http://jhnnsrs-server
-  - https://jhnnsrs-server
   - http://localhost
   - https://localhost
   force_script_name: lok
@@ -22,12 +18,12 @@ django:
   log_level: INFO
   secure_proxy_ssl_header: true
 lok:
-  public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDXx/g7dyiwmfIQvkBKvUAM+KBuL1KdvZfZMlYhbyrz9Auk2xao1gLYiQJ183joiXadUreL4BugUrasQVdR9JvBWXOBeqm2FD5Ehf9VvqXdzCOQ7/fUXkb9N8sqmz5YitQuheKGDh0weNmVcfdsCGU38sACEvFQg+5dv1tqLbm7EllT+vogntDVX16DmvpvFEX4HYHpT8qM/xuqSB6yQ8+wBuQd3K7WTFgUrUqQx6zFrSMUbSArPrrY5Z0GJAeDAHKp4+V+um4mSHpYM2nBJ5pn80wYpsf97KIL9P+UJzjb/indB8dCqpPkAk3HogBhj67Tp5JoqCMoaXHFU3tiYQCp
-private_key: "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDXx/g7dyiwmfIQ\nvkBKvUAM+KBuL1KdvZfZMlYhbyrz9Auk2xao1gLYiQJ183joiXadUreL4BugUras\nQVdR9JvBWXOBeqm2FD5Ehf9VvqXdzCOQ7/fUXkb9N8sqmz5YitQuheKGDh0weNmV\ncfdsCGU38sACEvFQg+5dv1tqLbm7EllT+vogntDVX16DmvpvFEX4HYHpT8qM/xuq\nSB6yQ8+wBuQd3K7WTFgUrUqQx6zFrSMUbSArPrrY5Z0GJAeDAHKp4+V+um4mSHpY\nM2nBJ5pn80wYpsf97KIL9P+UJzjb/indB8dCqpPkAk3HogBhj67Tp5JoqCMoaXHF\nU3tiYQCpAgMBAAECggEAFfZyEydlOlho9YBPzeumTcuulJh3ebu27XH8p0mH3y27\nU6vDCitCPeTwHa5K46w+KPQm33NPjIlus2ixKRPTGKJwqcCg7nnv/ox++Sy++CzT\nf+iU2oZABnz7zlnfxiZXQ2b4L/nWyby7NMVVUCcomkG4fl2MN0w+YkdcWBnQWjRr\nj+KcG029zrhKI2uiXz2IysRPRAw58lWcvDO9H5q4eo9+qxV7UzbCvipOsjGFH6RJ\nIwUyCz3XFOdC84taz2+xT0umJeG4RGDdiL0ZM1BC89BqFtQiOJntqaV6FgczKRTH\nTcMuiYndX8QsZZ+zUZ2LjFRNi8u1TBkgczitBg0bQwKBgQDrMAe0xhCGP4n3zZoc\n2Dlz8XFc2XvhCfFdkfE6zzbva2444LQ2uRcbPG1m419z138SsnNN2hw1JAermMj3\nbcjMW2zsas2wkhTaLDkceHC1qFa55+TdkCNx5Min6n1Wnfr40j8Wvum9YstseuGk\nBQIlbMz0ImGnU3QQRg7kesAf/wKBgQDq4E11mR4gqKxmW4RWT9cJ+DM285APaGXf\n85fyjaVs1eVvZ5krY5vmemAOLk9v8F73Sn64zEtJVCQzD5YwihjmQ4dS+hn7f3j1\ncY1Fw+2hJJHi8o63uPtRmLV/Cc787F2iMqi/YK36f4sJX8h63CBYYPf7buN7+T9t\n4T3w0MnfVwKBgBUl03uQ18mKixhqN3Jiiv/+9OeZcscwgrCcP+m+2jy7F0UsB2ho\nSkibrWa0CVA8T2PaAf49H44zuDDY4zFEgOrHScsUa3x2FkPr+BK0TcY35dx/mpfF\nrzo9jUF0F2Mjf37CQQQFlLT/3jTZ89Iw1RmSZ/eH4+oM2gHgmtQ2qXH3AoGBAL9U\nHIUxR9N+04FGB5Vv0FI0tzOKUM3cUzCNdDeHnzv7Obz4fVNU/whOo7SpkNg0zIdR\nTc0nziRbwGk/xy6fMA1S8Qds6IFwo439BAHSyt47tgNTZ2LN8xvS8/YafVyXBuc7\nsS7EiLTH9PCb7+n1KvwTca6F9BVnQn41v4lN60RdAoGBAMwdn2xRp+Ywc8N9dvn8\nS0ozU3Vk2qbV5altixspOoWzuyFi1o/r5bgma71QjAsgvWwPhBTOsByrmEhrvWpu\nDDpLWRIGuAg5dG21Ddh8ZMaJhISmbvepUhm2fVLG3YzG0eE/KGJjX6AFGqLUOi1V\nqv9UsZQ7iutdI3MsfEU9PWEL\n-----END PRIVATE KEY-----\n"
+  public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC5y2Qg6rRIvB6EeEBnvwArZfYYVq0cIzfs2d0G36n2y3QiHgADRsqXDXieFCGX4ps4rAjERRxmK4QqHcooOGMw8rwiguiBizjx9s8Cc2bHazBKKQLa8lIw+nZcVA9HZFo37Gk54QtIIl7hqIMAsqru+tykniP5Kan2PevVJrrIlhtvEzeilLr3GgyB3jaNiLJPgF1G/Z/xemkI+uh/Ids7QuubTY4yiKUNYPXDsNAVUnK+kVZu6PF0WZ5VHJauczBNXdTSnCyGXKkXwqdPMV8vgHM5b2pirZ39oNgAI85JbUHwM7/jmpCW4ugyFQcsI0XSwY3WT9yJt2G/zjDTeiI5 lok-example
+private_key: "-----BEGIN RSA PRIVATE KEY-----\nMIIEogIBAAKCAQEAuctkIOq0SLwehHhAZ78AK2X2GFatHCM37NndBt+p9st0Ih4A\nA0bKlw14nhQhl+KbOKwIxEUcZiuEKh3KKDhjMPK8IoLogYs48fbPAnNmx2swSikC\n2vJSMPp2XFQPR2RaN+xpOeELSCJe4aiDALKq7vrcpJ4j+Smp9j3r1Sa6yJYbbxM3\nopS69xoMgd42jYiyT4BdRv2f8XppCProfyHbO0Lrm02OMoilDWD1w7DQFVJyvpFW\nbujxdFmeVRyWrnMwTV3U0pwshlypF8KnTzFfL4BzOW9qYq2d/aDYACPOSW1B8DO/\n45qQluLoMhUHLCNF0sGN1k/cibdhv84w03oiOQIDAQABAoIBAAqVffHbmPNTRxxG\nAuo+ENcIDwu+JUym63TKSOtvMp4Y4zfd1GObZOdTuMEtlafSvIOvFi1DIB3oYPYq\nvgVKSAlF7KZ9JVxa116+T/bcZtiZoDW7Thq1pu28GOHD1p57JqIMrUZjLeq5LYVG\nnZbctrzYLNlSWmuDXnek+aIp+4Y5YLNaIch9CpbVHAe40/Is3MFcqh5L8yU9k9X5\ngwh6nYksWG5NE/qLY4Df4ezNxmezJNB9DW6JH4G8icKARMUwhgFBYLyNcJ0b5aqY\nSaX2Qn3nAfZAnlkVCARDruU6O1LNUyaNw8mjekBgwU2jnFyMvKftuG7hpbARQUpI\n9Ao815ECgYEA/6wb8ZPhc/4NJUdhDl6kB0U0iuYcxIfb1HulxVlvA0yMNVKh0tKO\nKTXr0ma1vRDwnWaGhpNZaI931AZyGRluVfCYTj7B1ofQF7GV1srgIvkAaFCVq0cw\niRy9MMaHhf6fRLlhFQxbrEN1RKWNj7QlVFRBYVFPTihudlY0BIiuEgkCgYEAugha\nkDMj98G1dZe80mar5XkGsgHVsU5C+SREXNduob3qrEMzow7nGcauxuZoiqYg4Pu4\nkSBpEn/SqYCKZeTQqElkKhsw0V3jJS/Ec0/tVLc92wMkU85l0hz8f8b+lWFlp02u\nDYvcGQGzPihGs56xf6fOSz/VpuNMelY0rLqk2rECgYAOmibSak7DECxyB5ycdH1L\nyQESOchE1TmR7inulogHmTScywZhAxOJeQHp92HD1ZbYdoWSZBIELcV7P47+rfwm\nPmKEfYMWnJUe9U6IgPfCJ5SFYKzbpmo4OoL3qS8OUReJlkjcKeOGeCfXbtkh7vj+\n0v0U8M7luNtuOMgpxiCi+QKBgDAtMabeV5Y16BRH83JZfHK04PMAXqLILbfvmHSi\npdflIvzxelHj7h1SwrhnuvMNCr648ZdD2XIdACU9UJoKo66xMutkl0PhGI3szOc/\n76pcufwZ2DKL5PqA3zMICa4NxxGIoGaJrbocIpsaOxURJ85zWo1KPr41ZvzXjlSd\nEUxBAoGAanjUkWR5cJt2UJ879JHK6FVzXGboKGUO4gVbPEMqsaI0DSs9j5dksxk3\nY0hp9rokP7IZfvVEqNOfV7oArydh5YqXemZ1uFO9fANStMu2vj3XuBlY/wYDF+hn\nWPt/Ozk490MOHva4xMGJOWKpZTfmrNZodZ8iBjnOUAaqUzbQG/0=\n-----END RSA PRIVATE KEY-----\n"
 redeem_tokens:
-- token: Y22joLbkjm4vtXMj_T4FD3U99Mb71pTFnUe-8KToAQI
-  user: iacbot
-  organization: iac
+- token: example-redeem-token
+  user: demo
+  organization: demo
 redis:
   dependency: redis
   host: redis
@@ -37,52 +33,22 @@ redis:
 organizations:
 - name: Default
   identifier: default
-- name: UC2
-  identifier: uc2
-- name: IAC
-  identifier: iac
 
 users:
-- name: Johannes Roos
-  username: jhnnsrs
-  password: mysecret
-  active_organization: iac
-  memberships:
-  - organization: iac
-    roles: ["admin"]
-  - organization: uc2
-    roles: ["admin"]
-
-- name: DemoUser
+- name: Demo User
   username: demo
   password: demo
-  active_organization: iac
+  active_organization: default
   memberships:
-  - organization: iac
-    roles: ["viewer"]
-
-- name: Benedict Diederich
-  username: beniroquai
-  password: my-other-name
-  active_organization: uc2
-  memberships:
-  - organization: uc2
+  - organization: default
     roles: ["admin"]
-
-- name: IAC-Bot
-  username: iacbot
-  password: my-other-name
-  active_organization: iac
-  memberships:
-  - organization: iac
-    roles: ["bot"]
 
 authentikate:
   issuers:
   - kind: rsa
     iss: lok
     kid: lok-key-1
-    public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDXx/g7dyiwmfIQvkBKvUAM+KBuL1KdvZfZMlYhbyrz9Auk2xao1gLYiQJ183joiXadUreL4BugUrasQVdR9JvBWXOBeqm2FD5Ehf9VvqXdzCOQ7/fUXkb9N8sqmz5YitQuheKGDh0weNmVcfdsCGU38sACEvFQg+5dv1tqLbm7EllT+vogntDVX16DmvpvFEX4HYHpT8qM/xuqSB6yQ8+wBuQd3K7WTFgUrUqQx6zFrSMUbSArPrrY5Z0GJAeDAHKp4+V+um4mSHpYM2nBJ5pn80wYpsf97KIL9P+UJzjb/indB8dCqpPkAk3HogBhj67Tp5JoqCMoaXHFU3tiYQCp
+    public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC5y2Qg6rRIvB6EeEBnvwArZfYYVq0cIzfs2d0G36n2y3QiHgADRsqXDXieFCGX4ps4rAjERRxmK4QqHcooOGMw8rwiguiBizjx9s8Cc2bHazBKKQLa8lIw+nZcVA9HZFo37Gk54QtIIl7hqIMAsqru+tykniP5Kan2PevVJrrIlhtvEzeilLr3GgyB3jaNiLJPgF1G/Z/xemkI+uh/Ids7QuubTY4yiKUNYPXDsNAVUnK+kVZu6PF0WZ5VHJauczBNXdTSnCyGXKkXwqdPMV8vgHM5b2pirZ39oNgAI85JbUHwM7/jmpCW4ugyFQcsI0XSwY3WT9yJt2G/zjDTeiI5 lok-example
   static_tokens: {}
 postgres:
   db_name: lok
@@ -111,18 +77,18 @@ account:
   mfa_trust_enabled: true
   # SPA URLs allauth points users at ({key} is filled in by allauth). Change the host per deployment.
   headless_frontend_urls:
-    account_confirm_email: https://jhnnsrs-lab.hyena-sole.ts.net/account/verify-email/{key}
-    account_reset_password_from_key: https://jhnnsrs-lab.hyena-sole.ts.net/account/password/reset/key/{key}
-    account_signup: https://jhnnsrs-lab.hyena-sole.ts.net/account/signup
+    account_confirm_email: http://localhost/account/verify-email/{key}
+    account_reset_password_from_key: http://localhost/account/password/reset/key/{key}
+    account_signup: http://localhost/account/signup
   social_provider_apps:
   - allauth.socialaccount.providers.orcid
   - allauth.socialaccount.providers.google
 
-# OIDC/OAuth2 clients provisioned on boot. Override the secret and redirect_uris per deployment.
+# OIDC/OAuth2 clients provisioned on boot. Provide the client(s), secret(s) and
+# redirect_uris per deployment (see the `ensureopenid` command).
 openid_apps:
-- client_name: Frankon Lok Frontend
+- client_name: Lok Frontend
   client_id: lok-frontend
-  client_secret: in0929sd0fn039j02n309n2309rn099n09n0s9n
+  client_secret: change-me-per-deployment
   redirect_uris:
   - http://localhost:3000/auth/callback
-  - https://ionscale.arkitekt.live/auth/callback

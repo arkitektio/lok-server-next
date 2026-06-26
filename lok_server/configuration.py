@@ -140,16 +140,16 @@ class HeadlessFrontendUrls(BaseModel):
     """Single-page-app URLs allauth-headless points users at (the ``{key}`` placeholders are filled in by allauth)."""
 
     account_confirm_email: str = Field(
-        default="https://jhnnsrs-lab.hyena-sole.ts.net/account/verify-email/{key}",
-        description="Email-verification link; {key} substituted by allauth.",
+        default="http://localhost/account/verify-email/{key}",
+        description="Email-verification link; {key} substituted by allauth. Set per deployment.",
     )
     account_reset_password_from_key: str = Field(
-        default="https://jhnnsrs-lab.hyena-sole.ts.net/account/password/reset/key/{key}",
-        description="Password-reset link; {key} substituted by allauth.",
+        default="http://localhost/account/password/reset/key/{key}",
+        description="Password-reset link; {key} substituted by allauth. Set per deployment.",
     )
     account_signup: str = Field(
-        default="https://jhnnsrs-lab.hyena-sole.ts.net/account/signup",
-        description="Signup page URL.",
+        default="http://localhost/account/signup",
+        description="Signup page URL. Set per deployment.",
     )
 
 
@@ -173,17 +173,6 @@ class OpenIDAppSettings(BaseModel):
     client_id: str = Field(description="OAuth2 client_id.")
     client_secret: str = Field(description="OAuth2 client secret. Override per deployment.")
     redirect_uris: List[str] = Field(default_factory=list, description="Allowed OAuth2 redirect URIs.")
-
-
-def _default_openid_apps() -> List[OpenIDAppSettings]:
-    return [
-        OpenIDAppSettings(
-            client_name="Frankon Lok Frontend",
-            client_id="lok-frontend",
-            client_secret="in0929sd0fn039j02n309n2309rn099n09n0s9n",
-            redirect_uris=["http://localhost:3000/auth/callback", "https://ionscale.arkitekt.live/auth/callback"],
-        )
-    ]
 
 
 class Settings(BaseSettings):
@@ -211,7 +200,7 @@ class Settings(BaseSettings):
     redeem_tokens: List[Dict[str, Any]] = Field(default_factory=list, description="Redeem tokens provisioned on boot.")
     kommunity_partners: List[Dict[str, Any]] = Field(default_factory=list, description="Pre-authorized kommunity partner apps.")
     system_messages: List[Dict[str, Any]] = Field(default_factory=list, description="System messages shown to users.")
-    openid_apps: List[OpenIDAppSettings] = Field(default_factory=_default_openid_apps, description="OIDC/OAuth2 clients provisioned on boot.")
+    openid_apps: List[OpenIDAppSettings] = Field(default_factory=list, description="OIDC/OAuth2 clients provisioned on boot. Provided per deployment.")
 
     @classmethod
     def settings_customise_sources(
