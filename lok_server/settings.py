@@ -217,6 +217,7 @@ if conf.email is not None:
 
 PRIVATE_KEY = conf.private_key
 PUBLIC_KEY = conf.lok.public_key
+KEY_ID = conf.lok.key_id
 
 
 AUTHENTIKATE = conf.authentikate.model_dump()

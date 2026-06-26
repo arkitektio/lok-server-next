@@ -24,7 +24,7 @@ class OpenIDCode(oidcgrants.OpenIDCode):
             "alg": "RS256",
             "iss": settings.OIDC_ISSUER,
             "exp": 3600,
-            "kid": "1",
+            "kid": settings.KEY_ID,
         }
 
     def generate_user_info(self, user: Membership, scope):

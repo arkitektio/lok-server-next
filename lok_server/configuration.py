@@ -74,6 +74,7 @@ class LokSettings(BaseModel):
     """Lok identity-provider key material used by this service."""
 
     public_key: Optional[str] = Field(default=None, description="Lok public key (SSH/PEM) used to verify issued tokens.")
+    key_id: str = Field(default="lok-key-1", description="JWK `kid` advertised in the JWKS and stamped into issued token headers. Must match the kid configured for the lok issuer in consumers' authentikate settings.")
     static_tokens: Dict[str, Any] = Field(default_factory=dict, description="Pre-shared static tokens (testing only).")
 
 
