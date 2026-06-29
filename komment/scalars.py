@@ -1,19 +1,23 @@
-from typing import NewType
+from typing import Any, NewType
 import strawberry
 
-Identifier = strawberry.scalar(
-    NewType("Identifier", str),
-    description="The `Identifier` scalasr typsse represents a reference to a store "
-    "previously created by the user n a datalayer",
-    serialize=lambda v: v,
-    parse_value=lambda v: v,
-)
+Identifier = NewType("Identifier", str)
+UnsafeChild = NewType("UnsafeChild", object)
 
 
-UnsafeChild = strawberry.scalar(
-    NewType("UnsafeChild", object),
-    description="The `Identifier` scalasr typsse represents a reference to a store "
-    "previously created by the user n a datalayer",
-    serialize=lambda v: v,
-    parse_value=lambda v: v,
-)
+scalar_map: dict[Any, Any] = {
+    Identifier: strawberry.scalar(
+        name="Identifier",
+        description="The `Identifier` scalasr typsse represents a reference to a store "
+        "previously created by the user n a datalayer",
+        serialize=lambda v: v,
+        parse_value=lambda v: v,
+    ),
+    UnsafeChild: strawberry.scalar(
+        name="UnsafeChild",
+        description="The `Identifier` scalasr typsse represents a reference to a store "
+        "previously created by the user n a datalayer",
+        serialize=lambda v: v,
+        parse_value=lambda v: v,
+    ),
+}

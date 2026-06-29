@@ -11,6 +11,9 @@ from fakts import models as fakts_models
 from .datalayer import DatalayerExtension
 from allauth.socialaccount import models as smodels
 from authapp.models import OAuth2Client
+from strawberry.schema.config import StrawberryConfig
+from fakts.scalars import scalar_map as fakts_scalar_map
+from .scalars import scalar_map as management_scalar_map
 
 
 @strawberry.type
@@ -390,4 +393,5 @@ schema = kante.Schema(
     extensions=[
         DatalayerExtension,
     ],
+    config=StrawberryConfig(scalar_map={**fakts_scalar_map, **management_scalar_map}),
 )

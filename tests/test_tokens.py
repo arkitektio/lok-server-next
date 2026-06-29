@@ -46,11 +46,14 @@ def test_get_audiences_is_rekuest():
 
 def test_get_jwks_exposes_signing_key():
     jwks = _generator().get_jwks()
-    assert jwks["kty"] == "RSA"
-    assert jwks["use"] == "sig"
-    assert jwks["kid"] == "1"
+    # get_jwks returns a JWK *set* so joserfc can stamp the key's kid into the
+    # JWT header; the signing key is the sole entry under "keys".
+    key = jwks["keys"][0]
+    assert key["kty"] == "RSA"
+    assert key["use"] == "sig"
+    assert key["kid"] == settings.KEY_ID
     # public modulus/exponent are present so consumers can verify signatures
-    assert jwks["n"] and jwks["e"]
+    assert key["n"] and key["e"]
 
 
 @pytest.mark.django_db

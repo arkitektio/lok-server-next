@@ -22,6 +22,10 @@ from pak.graphql import queries as pak_queries
 from karakter.datalayer import DatalayerExtension
 from strawberry_django.optimizer import DjangoOptimizerExtension
 from authapp.extension import AuthAppExtension
+from strawberry.schema.config import StrawberryConfig
+from fakts.scalars import scalar_map as fakts_scalar_map
+from karakter.scalars import scalar_map as karakter_scalar_map
+from komment.scalars import scalar_map as komment_scalar_map
 import kante
 
 
@@ -256,4 +260,5 @@ schema = kante.Schema(
     ],  # We really need to register
     # all the types here, otherwise the schema will not be able to resolve them
     # and will throw a cryptic error
+    config=StrawberryConfig(scalar_map={**fakts_scalar_map, **karakter_scalar_map, **komment_scalar_map}),
 )
