@@ -1,12 +1,11 @@
 import strawberry
-from pak import models, enums
-from strawberry import auto
+from pak import models
 from typing import Optional
 from strawberry_django.filters import FilterLookup
 import strawberry_django
 
 
-@strawberry_django.filter(models.StashItem)
+@strawberry_django.filter_type(models.StashItem)
 class StashItemFilter:
     search: str | None
     username: Optional[FilterLookup[str]] | None
@@ -29,7 +28,7 @@ class StashItemFilter:
         return queryset.filter(stashes__in=self.stashes)
 
 
-@strawberry_django.filter(models.Stash, description="__doc__")
+@strawberry_django.filter_type(models.Stash, description="__doc__")
 class StashFilter:
     """A Filterset to Filter Groups"""
 

@@ -28,7 +28,6 @@ from django.views.decorators.http import require_http_methods
 from authapp.server import server, resource_protector
 from authlib.oauth2 import OAuth2Error
 from django.views.decorators.csrf import csrf_exempt
-from .models import OAuth2Token
 from django.conf import settings
 from joserfc.jwk import RSAKey
 
@@ -36,7 +35,7 @@ from joserfc.jwk import RSAKey
 # Generate a JWK representation from the private key. We expose the
 # public part (is_private=False) as the published JWK set.
 jwk = RSAKey.import_key(settings.PUBLIC_KEY)
-jwk_dict = jwk.as_dict(is_private=False, kid="1", use="sig")  # use True for full private JWK
+jwk_dict = jwk.as_dict(private=False, kid=settings.KEY_ID, use="sig")  # published JWKS — public key only
 
 @csrf_exempt
 def jwks(request: HttpRequest) -> JsonResponse:

@@ -1,11 +1,5 @@
 from django.db import models
 import logging
-from django.conf import settings
-from karakter.datalayer import Datalayer
-from django.core.cache import cache
-from django.db import models
-from django.core.exceptions import ValidationError
-import re
 
 logger = logging.getLogger(__name__)
 

@@ -1,5 +1,4 @@
 from .models import Organization, Role, Membership, User, Scope
-from django.contrib.auth.models import Group
 
 
 def create_role(organization: Organization, identifier: str):

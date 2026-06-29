@@ -4,19 +4,15 @@ from django.contrib.auth import get_user_model
 from django_choices_field import TextChoicesField
 
 # Create your models here.
-from django.core.exceptions import ObjectDoesNotExist
 from typing import List
-from django.db.models import Q
 import uuid
-import _json
 from typing import Optional
 from fakts import fields, enums
-from django.contrib.auth.models import AbstractUser, Group
+from django.db.models import Q  # noqa: F401  (re-exported as fakts.models.Q)
+from django.contrib.auth.models import AbstractUser, Group  # noqa: F401  (AbstractUser re-exported as fakts.models.AbstractUser)
 from karakter.models import MediaStore, Organization
-from django.conf import settings
 from authapp.models import OAuth2Client
 from fakts import base_models, errors
-from fakts import enums
 
 
 class KommunityPartner(models.Model):
@@ -205,7 +201,7 @@ class ServiceInstance(models.Model):
         related_name="service_instances",
         help_text="The organization that owns this instance. If null the instance is global.",
     )
-    device = models.ForeignKey("ComputeNode", on_delete=models.CASCADE, null=True, blank=True, related_name="service_instances")
+    device = models.ForeignKey("Device", on_delete=models.CASCADE, null=True, blank=True, related_name="service_instances")
     template = models.TextField()
     denied_users = models.ManyToManyField(get_user_model(), related_name="denied_instances")
     denied_groups = models.ManyToManyField(Group, related_name="denied_instances")
@@ -346,11 +342,17 @@ class RedeemToken(models.Model):
     token = models.CharField(max_length=1000, unique=True, default=uuid.uuid4)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(null=True)
-    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="issued_tokens")
-    organization = models.ForeignKey(
-        Organization,
-        on_delete=models.CASCADE,        related_name="issued_tokens",
+    manifest_hash = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        help_text="SHA-256 hash of the manifest this token was first redeemed with. Used to detect manifest changes on re-redeem.",
     )
+    allow_reredeem = models.BooleanField(
+        default=False,
+        help_text="If set, this token may be re-redeemed even when the manifest hash differs from the originally redeemed one.",
+    )
+    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="issued_tokens")
     composition = models.ForeignKey(
         "Composition",
         on_delete=models.CASCADE,
@@ -402,6 +404,11 @@ class DeviceCode(models.Model):
         choices_enum=enums.ClientKindChoices,
         default=enums.ClientKindChoices.DEVELOPMENT.value,
         help_text="The kind of staging client",
+    )
+    staging_role = TextChoicesField(
+        choices_enum=enums.ClientRoleChoices,
+        default=enums.ClientRoleChoices.INTERFACE.value,
+        help_text="The operational role of the staging client (INTERFACE vs AGENT)",
     )
     staging_manifest = models.JSONField(default=dict)
     staging_logo = models.CharField(max_length=1000, null=True)
@@ -500,15 +507,15 @@ class DeviceGroup(models.Model):
         return f"{self.name} ({self.organization})"
 
 
-class ComputeNode(models.Model):
+class Device(models.Model):
     node_id = models.CharField(max_length=1000)
     name = models.CharField(max_length=1000, null=True, blank=True)
     organization = models.ForeignKey(
         Organization,
         on_delete=models.CASCADE,
-        related_name="compute_nodes",
+        related_name="devices",
     )
-    device_groups = models.ManyToManyField(DeviceGroup, related_name="compute_nodes", blank=True)
+    device_groups = models.ManyToManyField(DeviceGroup, related_name="devices", blank=True)
 
     class Meta:
         constraints = [
@@ -530,6 +537,11 @@ class Client(models.Model):
         default=enums.ClientKindChoices.DEVELOPMENT.value,
         help_text="The kind of transformation",
     )
+    role = TextChoicesField(
+        choices_enum=enums.ClientRoleChoices,
+        default=enums.ClientRoleChoices.INTERFACE.value,
+        help_text="Operational role: human INTERFACE vs autonomous task-receiving AGENT.",
+    )
     user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="clients")
     organization = models.ForeignKey(
         Organization,
@@ -545,7 +557,7 @@ class Client(models.Model):
     redirect_uris = models.CharField(max_length=1000, default=" ")
     public = models.BooleanField(default=False)
     token = models.CharField(default=uuid.uuid4, unique=True, max_length=10000)
-    node = models.ForeignKey(ComputeNode, null=True, related_name="clients", on_delete=models.SET_NULL)
+    node = models.ForeignKey(Device, null=True, related_name="clients", on_delete=models.SET_NULL)
     public_sources = models.JSONField(default=list)
     tenant = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="managed_clients")
     created_at = models.DateTimeField(auto_now_add=True)

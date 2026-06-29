@@ -14,12 +14,12 @@ from authlib.integrations.django_oauth2 import AuthorizationServer, BearerTokenV
 from .models import OAuth2Client, OAuth2Token
 from .grants import ClientCredentialsGrant, AuthorizationCodeGrant, OpenIDCode, RefreshTokenGrant
 from .token_generators import MyJWTBearerTokenGenerator
-from authlib.oidc.core import grants as oidcgrants, UserInfo
+from authlib.oidc.core import UserInfo
 from .token_generators import jwk_dict
 from authlib.oidc.core.userinfo import UserInfoEndpoint
 
 
-from authlib.oauth2.rfc9068 import JWTBearerTokenGenerator, JWTBearerTokenValidator
+from authlib.oauth2.rfc9068 import JWTBearerTokenValidator
 
 # The AuthorizationServer is backed by the project's OAuth2Client and
 # OAuth2Token models; these model classes implement the storage hooks

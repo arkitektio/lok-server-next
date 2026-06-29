@@ -1,9 +1,8 @@
-from typing import Any, AsyncGenerator, Type
-from fakts.logic import find_instance_for_requirement, find_instance_for_requirement_and_composition
+from fakts.logic import find_instance_for_requirement_and_composition
 import strawberry
 import strawberry_django
 from kante.types import Info
-from .types import ManagementOrganization, ManagementUser
+from .types import ManagementUser
 import api.management.mutations as mutations
 import api.management.types as types
 import kante
@@ -12,6 +11,9 @@ from fakts import models as fakts_models
 from .datalayer import DatalayerExtension
 from allauth.socialaccount import models as smodels
 from authapp.models import OAuth2Client
+from strawberry.schema.config import StrawberryConfig
+from fakts.scalars import scalar_map as fakts_scalar_map
+from .scalars import scalar_map as management_scalar_map
 
 
 @strawberry.type
@@ -175,8 +177,8 @@ class Query:
 
     @kante.django_field()
     def machine(self, info: Info, id: strawberry.ID) -> types.ManagementMachine:
-        from ionscale.repo import django_repo
-        machine = django_repo.get_machine(str(id))
+        from ionscale.repo import get_ionscale_repo
+        machine = get_ionscale_repo().get_machine(str(id))
 
         if machine.tailnet:
             try:
@@ -201,7 +203,7 @@ class Query:
 
     @kante.django_field()
     def device(self, info: Info, id: strawberry.ID) -> types.ManagementDevice:
-        return fakts_models.ComputeNode.objects.get(id=id)
+        return fakts_models.Device.objects.get(id=id)
 
     @kante.django_field()
     def service_release(self, info: Info, id: strawberry.ID) -> types.ManagementServiceRelease:
@@ -391,4 +393,5 @@ schema = kante.Schema(
     extensions=[
         DatalayerExtension,
     ],
+    config=StrawberryConfig(scalar_map={**fakts_scalar_map, **management_scalar_map}),
 )

@@ -1,12 +1,10 @@
 import datetime
-from enum import Enum
-from typing import Any, Dict, ForwardRef, List, Optional, cast
+from typing import List, Optional, cast
 from karakter.datalayer import get_current_datalayer
 import strawberry
 import strawberry_django
 from kante.types import Info
 from karakter import enums, models, scalars
-from strawberry import LazyType
 from allauth.socialaccount import models as smodels
 import kante
 from fakts import models as fakts_models
@@ -14,12 +12,11 @@ from fakts import filters as fakts_filters
 from fakts import scalars as fakts_scalars
 from fakts import base_models
 from api.management import filters, enums, scalars
-from karakter import models as karakter_models
 from karakter import filters as karakter_filters
 from strawberry.experimental import pydantic
 from authapp.models import OAuth2Client
-from ionscale.base_models import Machine, MachineDetail
-from ionscale.repo import django_repo
+from ionscale.base_models import Machine
+from ionscale.repo import get_ionscale_repo
 
 
 def build_prescoper(field="organization"):
@@ -320,8 +317,8 @@ class ManagementRole:
     organization: "ManagementOrganization"
     creating_instance: Optional["ManagementServiceInstance"]
     is_builtin: bool = strawberry.field(description="If this role is a built-in role that cannot be deleted (admin)")
-    memberships: List["ManagementMembership"] = strawberry.django.field(description="The memberships that have this role")
-    used_by: List["ManagementServiceInstance"] = strawberry.django.field(description="The service instances that use this role")
+    memberships: List["ManagementMembership"] = strawberry_django.field(description="The memberships that have this role")
+    used_by: List["ManagementServiceInstance"] = strawberry_django.field(description="The service instances that use this role")
 
     @kante.django_field()
     def description(self, info: Info) -> "str":
@@ -339,8 +336,8 @@ class ManagementScope:
     organization: "ManagementOrganization"
     creating_instance: Optional["ManagementServiceInstance"]
     is_builtin: bool = strawberry.field(description="If this scope is a built-in scope that cannot be deleted (admin)")
-    memberships: List["ManagementMembership"] = strawberry.django.field(description="The memberships that have this scope")
-    used_by: List["ManagementServiceInstance"] = strawberry.django.field(description="The service instances that use this scope")
+    memberships: List["ManagementMembership"] = strawberry_django.field(description="The memberships that have this scope")
+    used_by: List["ManagementServiceInstance"] = strawberry_django.field(description="The service instances that use this scope")
 
     @kante.django_field()
     def description(self, info: Info) -> "str":
@@ -787,7 +784,7 @@ class ManagementLayer:
     @strawberry.field(description="The machines associated with this layer (only works for IonscaleLayers)")
     def machines(self, info: Info) -> List[ManagementMachine]:
         if hasattr(self, "tailnet_name"):
-             machines = django_repo.list_machines(self.tailnet_name)
+             machines = get_ionscale_repo().list_machines(self.tailnet_name)
              return [ManagementMachine(instance=m, tailnet=self.tailnet_name, layer_id=self.id) for m in machines]
         return []
 
@@ -795,7 +792,7 @@ class ManagementLayer:
     def machine(self, info: Info, id: str) -> Optional[ManagementMachine]:
         if hasattr(self, "tailnet_name"):
              try:
-                machine = django_repo.get_machine(str(id))
+                machine = get_ionscale_repo().get_machine(str(id))
                 return ManagementMachine(instance=machine, tailnet=self.tailnet_name, layer_id=self.id)
              except Exception:
                  return None
@@ -855,14 +852,14 @@ class ManagementDeviceGroup:
 
     @strawberry_django.field(description="The number of devices in this device group.")
     def devices(self, info: Info) -> list["ManagementDevice"]:
-        return self.compute_nodes.all()
+        return self.devices.all()
 
     @classmethod
     def get_queryset(cls, queryset, info: Info):
         return queryset.filter(organization__memberships__user=info.context.request.user).distinct()
 
 
-@strawberry_django.type(fakts_models.ComputeNode, filters=filters.ManagementDeviceFilter, order=filters.ManagementDeviceOrder, pagination=True)
+@strawberry_django.type(fakts_models.Device, filters=filters.ManagementDeviceFilter, order=filters.ManagementDeviceOrder, pagination=True)
 class ManagementDevice:
     id: strawberry.ID
     name: str | None
@@ -908,6 +905,7 @@ class ManagementClient:
     functional: bool = strawberry_django.field(description="Is this client functional? A non-functional client cannot be used to authenticate users.")
     release: ManagementRelease = strawberry_django.field(description="The release that this client belongs to.")
     kind: str = strawberry_django.field(description="The kind of the client. The kind defines the authentication flow that is used to authenticate users with this client.")
+    role: str = strawberry_django.field(description="The operational role of the client: INTERFACE (a human interface operated by a user) vs AGENT (an autonomous client authorized once that then runs unattended, receiving tasks).")
     public: bool = strawberry_django.field(description="Is this client public? If a client is public ")
     user: ManagementUser | None = strawberry_django.field(description="If the client is a DEVELOPMENT client, which requires no further authentication, this is the user that is authenticated with the client.")
     organization: ManagementOrganization = strawberry_django.field(description="The client")
@@ -916,7 +914,7 @@ class ManagementClient:
     mappings: list["ManagementServiceInstanceMapping"] = strawberry_django.field(description="The mappings of the client. A mapping is a mapping of a service to a service instance. This is used to configure the composition.")
     used_aliases: list[ManagementUsedAlias] = strawberry_django.field(description="The aliases that are used by this client.")
     last_reported_at: datetime.datetime | None = strawberry_django.field(description="The last time the client reported in. This is used to determine if the client is active or not.")
-    scopes: list["ManagementScope"] = strawberry.django.field(description="The scopes that are granted to this client.")
+    scopes: list["ManagementScope"] = strawberry_django.field(description="The scopes that are granted to this client.")
 
     @strawberry_django.field(description="Check if the device code is still valid")
     def manifest(self, info: Info) -> ManagementStagingManifest:
@@ -926,12 +924,12 @@ class ManagementClient:
         return base_models.Manifest(**self.manifest)
 
     @strawberry.field(description="The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information.")
-    def token(self, info) -> str:
+    def token(self, info: Info) -> str:
         # TODO: Implement only tenant should be able to see the token
         return self.token
 
     @strawberry_django.field(description="The issue url of the client. This is the url where users can report issues and get more information about the client.")
-    def issue_url(self, info) -> str | None:
+    def issue_url(self, info: Info) -> str | None:
         for source in self.public_sources:
             if source.get("kind", "").lower() == "github":
                 return source.get("url") + "/issues/new"
@@ -939,7 +937,7 @@ class ManagementClient:
         return None
 
     @strawberry_django.field(description="The public sources of the client. These are the public sources where users can find more information about the client.")
-    def public_sources(self, info) -> list[ManagementPublicSource]:
+    def public_sources(self, info: Info) -> list[ManagementPublicSource]:
         sources = []
         for source in self.public_sources:
             sources.append(
@@ -951,7 +949,7 @@ class ManagementClient:
         return sources
 
     @strawberry_django.field(description="Check if the client is active")
-    def device(self, info) -> Optional["ManagementDevice"]:
+    def device(self, info: Info) -> Optional["ManagementDevice"]:
         return self.node
 
     @classmethod

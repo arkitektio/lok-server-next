@@ -1,5 +1,5 @@
 from authlib.oauth2.rfc6749 import grants
-from .models import OAuth2Client, OAuth2Token, AuthorizationCode
+from .models import OAuth2Token, AuthorizationCode
 from authlib.oidc.core import grants as oidcgrants, UserInfo
 from karakter.models import Membership
 from django.conf import settings
@@ -24,7 +24,7 @@ class OpenIDCode(oidcgrants.OpenIDCode):
             "alg": "RS256",
             "iss": settings.OIDC_ISSUER,
             "exp": 3600,
-            "kid": "1",
+            "kid": settings.KEY_ID,
         }
 
     def generate_user_info(self, user: Membership, scope):

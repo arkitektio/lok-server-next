@@ -1,27 +1,15 @@
-from typing import NewType
+from typing import Any, NewType
 import strawberry
 
-FlowHash = strawberry.scalar(
-    NewType("FlowHash", str),
-    description="The `ArrayLike` scalasr typsse represents a reference to a store "
-    "previously created by the user n a datalayer",
-    serialize=lambda v: v,
-    parse_value=lambda v: v,
-)
+ExtraData = NewType("ExtraData", object)
 
 
-ValueMap = strawberry.scalar(
-    NewType("ValueMap", object),
-    description="The `ArrayLike` scalasr typsse represents a reference to a store "
-    "previously created by the user n a datalayer",
-    serialize=lambda v: v,
-    parse_value=lambda v: v,
-)
-
-ExtraData = strawberry.scalar(
-    NewType("ExtraData", object),
-    description="The `ArrayLike` scalasr typsse represents a reference to a store "
-    "previously created by the user n a datalayer",
-    serialize=lambda v: v,
-    parse_value=lambda v: v,
-)
+scalar_map: dict[Any, Any] = {
+    ExtraData: strawberry.scalar(
+        name="ExtraData",
+        description="The `ArrayLike` scalasr typsse represents a reference to a store "
+        "previously created by the user n a datalayer",
+        serialize=lambda v: v,
+        parse_value=lambda v: v,
+    ),
+}

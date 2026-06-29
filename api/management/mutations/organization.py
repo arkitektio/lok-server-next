@@ -1,5 +1,4 @@
 from kante.types import Info
-import strawberry_django
 import strawberry
 from api.management import types
 from karakter import models, managers

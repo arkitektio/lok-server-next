@@ -1,6 +1,6 @@
 from fakts.models import IonscaleLayer
 from karakter.models import Membership
-from .repo import django_repo
+from .repo import get_ionscale_repo
 
 
 def sync(layer: IonscaleLayer) -> IonscaleLayer:
@@ -12,7 +12,7 @@ def sync(layer: IonscaleLayer) -> IonscaleLayer:
         "subs": [str(m.user.pk) for m in members]
     }
 
-    django_repo.update_policy(layer.tailnet_name, policy)
+    get_ionscale_repo().update_policy(layer.tailnet_name, policy)
 
     return layer
 

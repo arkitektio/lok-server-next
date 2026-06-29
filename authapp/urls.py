@@ -1,6 +1,6 @@
 # authapp/urls.py
 from django.urls import path
-from .views import CustomLoginView, logout_view, home_view, issue_token, jwks, user_info, open_id_configuration
+from .views import home_view, issue_token, jwks, user_info
 
 urlpatterns = [
     path("home/", home_view, name="home"),

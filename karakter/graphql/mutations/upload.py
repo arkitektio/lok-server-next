@@ -1,11 +1,9 @@
 from kante.types import Info
 import strawberry
 
-from fakts import types, models, scalars
+from fakts import types, models
 from karakter.datalayer import get_current_datalayer
-import json
 from django.conf import settings
-from django.contrib.auth import get_user_model
 
 
 @strawberry.input()
@@ -20,18 +18,6 @@ def request_media_upload(
     """Request upload credentials for a given key"""
 
     datalayer = get_current_datalayer()
-    policy = {
-        "Version": "2012-10-17",
-        "Statement": [
-            {
-                "Sid": "AllowAllS3ActionsInUserFolder",
-                "Effect": "Allow",
-                "Principal": "*",
-                "Action": ["s3:*"],
-                "Resource": "arn:aws:s3:::*",
-            },
-        ],
-    }
 
     response = datalayer.s3v4.generate_presigned_post(
         Bucket=settings.MEDIA_BUCKET,
@@ -40,8 +26,6 @@ def request_media_upload(
         Conditions=None,
         ExpiresIn=50000,
     )
-
-    print(response)
 
     path = f"s3://{settings.MEDIA_BUCKET}/{input.key}"
 

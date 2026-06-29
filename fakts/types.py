@@ -1,22 +1,13 @@
 import strawberry_django
 import strawberry
-from enum import Enum
 from typing import Optional
-from pydantic import BaseModel, Field
-from strawberry.experimental import pydantic
-from typing import Any, Dict
-from typing import ForwardRef
-from strawberry import LazyType
-from typing import Literal, Union
 from karakter import types
-import datetime
-from fakts import models, scalars, enums, filters, enums
-from karakter.datalayer import get_current_datalayer
+from fakts import models, scalars, filters, enums
 from authapp import types as atypes
+from kante.types import Info
 
 
 def build_prescoped_queryset(info, queryset, field="organization"):
-    print(info)
     if info.variable_values.get("filters", {}).get("scope") is None:
         queryset = queryset.filter(**{field: info.context.request.organization})
         return queryset
@@ -227,7 +218,7 @@ class Client:
     user: types.User | None = strawberry_django.field(description="If the client is a DEVELOPMENT client, which requires no further authentication, this is the user that is authenticated with the client.")
     logo: types.MediaStore | None = strawberry_django.field(description="The logo of the release. This should be a url to a logo that can be used to represent the release.")
     name: str = strawberry_django.field(description="The name of the client. This is a human readable name of the client.")
-    node: Optional["ComputeNode"] = strawberry_django.field(description="The node this runs on")
+    node: Optional["Device"] = strawberry_django.field(description="The node this runs on")
     mappings: list["ServiceInstanceMapping"] = strawberry_django.field(description="The mappings of the client. A mapping is a mapping of a service to a service instance. This is used to configure the composition.")
 
 
@@ -236,7 +227,7 @@ class Client:
 
 
     @strawberry_django.field(description="The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information.")
-    def kind(self, info) -> enums.ClientKind:
+    def kind(self, info: Info) -> enums.ClientKind:
         if self.kind == "website":
             return enums.ClientKind.WEBSITE
         if self.kind == "desktop":
@@ -244,22 +235,27 @@ class Client:
         if self.kind == "development":
             return enums.ClientKind.DEVELOPMENT
 
+    @strawberry_django.field(description="The operational role of the client. INTERFACE clients are human interfaces operated by a user in real time. AGENT clients are authorized once and then run unattended, receiving and processing tasks on the user's behalf.")
+    def role(self, info: Info) -> enums.ClientRole:
+        if self.role == "agent":
+            return enums.ClientRole.AGENT
+        return enums.ClientRole.INTERFACE
+
     @strawberry.field(description="The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information.")
-    def token(self, info) -> str:
+    def token(self, info: Info) -> str:
         # TODO: Implement only tenant should be able to see the token
         return self.token
 
     @strawberry_django.field(description="The issue url of the client. This is the url where users can report issues and get more information about the client.")
-    def issue_url(self, info) -> str | None:
+    def issue_url(self, info: Info) -> str | None:
         for source in self.public_sources:
-            print(source)
             if source.get("kind").lower() == "github":
                 return source.get("url") + "/issues/new"
 
         return None
 
     @strawberry_django.field(description="The public sources of the client. These are the public sources where users can find more information about the client.")
-    def public_sources(self, info) -> list[PublicSource]:
+    def public_sources(self, info: Info) -> list[PublicSource]:
         sources = []
         for source in self.public_sources:
             sources.append(
@@ -281,22 +277,22 @@ class DeviceGroup:
     id: strawberry.ID
     name: str = strawberry.field(description="The name of the device group.")
     description: str | None = strawberry.field(description="The description of the device group.")
-    compute_nodes: list["ComputeNode"] = strawberry_django.field(description="The compute nodes that belong to this device group.")
+    devices: list["Device"] = strawberry_django.field(description="The devices that belong to this device group.")
 
     def get_queryset(cls, info) -> models.DeviceGroup:
         return models.DeviceGroup.objects.filter(organization=info.context.request.organization)
 
 
-@strawberry_django.type(models.ComputeNode, filters=filters.ComputeNodeFilter, pagination=True)
-class ComputeNode:
+@strawberry_django.type(models.Device, filters=filters.DeviceFilter, pagination=True)
+class Device:
     id: strawberry.ID
     name: str | None
     node_id: strawberry.ID
     clients: list[Client]
-    device_groups: list[DeviceGroup] = strawberry_django.field(description="The device groups that belong to this compute node.")
+    device_groups: list[DeviceGroup] = strawberry_django.field(description="The device groups that belong to this device.")
 
-    def get_queryset(cls, info) -> models.ComputeNode:
-        return models.ComputeNode.objects.filter(organization=info.context.request.organization)
+    def get_queryset(cls, info) -> models.Device:
+        return models.Device.objects.filter(organization=info.context.request.organization)
 
 
 @strawberry_django.type(models.RedeemToken, filters=filters.RedeemTokenFilter, pagination=True)
@@ -307,4 +303,4 @@ class RedeemToken:
     user: types.User = strawberry.field(description="The user that this redeem token belongs to.")
 
     def get_queryset(cls, info) -> models.RedeemToken:
-        return models.RedeemToken.objects.filter(user=info.context.request.user, organization=info.context.request.organization)
+        return models.RedeemToken.objects.filter(user=info.context.request.user, composition__organization=info.context.request.organization)

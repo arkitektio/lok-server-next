@@ -1,12 +1,8 @@
 import strawberry_django
-from komment import models, scalars, enums, filters
+from komment import models, scalars, enums
 import strawberry
-from enum import Enum
 from typing import Optional
-from typing import Any, Dict
-from typing import ForwardRef
-from strawberry import LazyType
-from typing import Literal, Union
+from typing import Annotated, Literal, Union
 import datetime
 from strawberry.experimental import pydantic
 from pydantic import BaseModel, Field
@@ -28,7 +24,7 @@ class Descendant:
     kind: enums.DescendantKind = strawberry.field(
         description="The Kind of a Descendant"
     )
-    children: list[LazyType["Descendant", __name__]] | None = strawberry.field(
+    children: list[Annotated["Descendant", strawberry.lazy(__name__)]] | None = strawberry.field(
         default=None, description="The children of this descendant. Always empty for leafs"
     )
 
@@ -92,10 +88,10 @@ DescendantUnion = Union[
     LeafDescendantModel, MentionDescendantModel, ParagraphDescendantModel
 ]
 
-DescendantModel.update_forward_refs()
-LeafDescendantModel.update_forward_refs()
-MentionDescendantModel.update_forward_refs()
-ParagraphDescendantModel.update_forward_refs()
+DescendantModel.model_rebuild()
+LeafDescendantModel.model_rebuild()
+MentionDescendantModel.model_rebuild()
+ParagraphDescendantModel.model_rebuild()
 
 
 class Serializer(BaseModel):

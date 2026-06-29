@@ -16,15 +16,11 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import path
-from django.urls import include, path
+from django.urls import include
 from fakts.views import WellKnownFakts
 from django.shortcuts import render
-from django.conf import settings
 from kante.path import dynamicpath
-from django.conf import settings
-from django.conf.urls.static import static
-from health_check.views import MainView
+from health_check.views import HealthCheckView
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from strawberry.django.views import AsyncGraphQLView
@@ -40,7 +36,6 @@ def fakts_challenge(request):
     return HttpResponse("Fakts Challenge Endpoint", status=200)
 
 
-from django.urls import path, include, re_path
 
 
 # Bootstrap Backend
@@ -66,11 +61,11 @@ urlpatterns = [
     dynamicpath("admin/", admin.site.urls),
     dynamicpath("f/", include("fakts.urls", namespace="fakts")),
     dynamicpath("o/", include("authapp.urls")),  # /auth/login/, /auth/logout/
-    dynamicpath("ht", csrf_exempt(MainView.as_view()), name="health_check"),
+    dynamicpath("ht", csrf_exempt(HealthCheckView.as_view(checks=["health_check.checks.Database"])), name="health_check"),
     dynamicpath("accounts/", include("allauth.urls")),
     dynamicpath("accounts/", include("karakter.urls")),
     dynamicpath("_allauth/", include("allauth.headless.urls")),
     dynamicpath(".well-known/fakts-challenge", fakts_challenge, name="fakts-challenge"),
     dynamicpath(".well-known/fakts", WellKnownFakts.as_view()),
     dynamicpath(".well-known/openid-configuration", open_id_configuration, name="openid_configuration"),
-] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+]

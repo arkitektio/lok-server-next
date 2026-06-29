@@ -1,9 +1,7 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 from typing import Dict, List, Optional, Literal, Union
 from django.conf import settings
-from enum import Enum
 from fakts import enums
-from typing import Literal
 
 
 class Layer(BaseModel):
@@ -21,7 +19,6 @@ class WellKnownFakts(BaseModel):
     claim: str
     base_url: str
     frontend_url: str
-    ca_crt: str | None = None
 
 
 class Requirement(BaseModel):
@@ -121,6 +118,7 @@ class DeviceCodeStartRequest(BaseModel):
     expiration_time_seconds: int = 300
     redirect_uris: list[str] = Field(default_factory=list)
     requested_client_kind: enums.ClientKindVanilla = enums.ClientKindVanilla.DEVELOPMENT
+    requested_client_role: enums.ClientRoleVanilla = enums.ClientRoleVanilla.INTERFACE
     request_public: bool = False
     supported_layers: List[str] = Field(default_factory=lambda: ["web"])
 
@@ -194,6 +192,7 @@ class ReedeemTokenRequest(BaseModel):
 
     token: str
     manifest: Manifest
+    requested_client_role: enums.ClientRoleVanilla = enums.ClientRoleVanilla.INTERFACE
     supported_layers: List[str] = Field(default_factory=lambda: ["web"])
 
 
@@ -267,6 +266,7 @@ class ServerLinkingContext(BaseModel):
 
 class ClientConfig(BaseModel):
     kind: enums.ClientKindVanilla
+    role: enums.ClientRoleVanilla = enums.ClientRoleVanilla.INTERFACE
     token: str
     tenant: str
 

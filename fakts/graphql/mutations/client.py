@@ -1,16 +1,11 @@
-import hashlib
-import json
 import logging
 import uuid
-
-import namegenerator
 import strawberry
-import strawberry_django
 from kante.types import Info
 
-from fakts import enums, inputs, models, scalars, types
-from fakts.base_models import DevelopmentClientConfig, Manifest, Requirement
-from fakts.builders import create_client
+from fakts import enums, inputs, types
+from fakts.base_models import DevelopmentClientConfig, Manifest
+from fakts.services.clients import create_client
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +15,7 @@ def create_developmental_client(info: Info, input: inputs.DevelopmentClientInput
 
     config = DevelopmentClientConfig(
         kind=enums.ClientKindVanilla.DEVELOPMENT.value,
+        role=enums.ClientRoleVanilla[input.role.name].value if input.role else enums.ClientRoleVanilla.INTERFACE.value,
         token=token,
         tenant=info.context.request.user.username,
         user=info.context.request.user.username,

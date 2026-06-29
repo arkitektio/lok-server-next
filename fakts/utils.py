@@ -3,10 +3,9 @@ import collections.abc
 from urllib.request import urlopen
 from django.core.files import File
 from django.core.files.temp import NamedTemporaryFile
-from karakter.datalayer import get_current_datalayer, Datalayer
+from karakter.datalayer import get_current_datalayer
 from karakter.models import MediaStore
 from django.conf import settings
-from django.core.cache import cache
 
 def update_nested(d, u):
     """Update a nested dictionary or similar mapping."""
@@ -44,17 +43,3 @@ def download_logo(url: str) -> File:
     store.put_file(get_current_datalayer(), img_tmp)
         
     return store
-    
-   
-        
-
-
-def download_placeholder(identifier: str, version: str) -> File:
-    """Download a placeholder logo from a URL and return a Django File object, that can be
-    uses directly in a model."""
-    return download_logo(
-        f"https://eu.ui-avatars.com/api/?name={identifier}&background=random"
-    )
-
-
-

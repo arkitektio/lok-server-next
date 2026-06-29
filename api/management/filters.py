@@ -1,18 +1,19 @@
 import strawberry
 import strawberry_django
 from fakts import models as fakts_models
+from fakts import enums as fakts_enums
 from allauth.socialaccount import models as smodels
 from karakter import models as karakter_models
 
 
-@strawberry_django.order(fakts_models.KommunityPartner)
+@strawberry_django.order_type(fakts_models.KommunityPartner)
 class ManagementKommunityPartnerOrder:
     name: strawberry.auto
     created_at: strawberry.auto
     last_reported_at: strawberry.auto
 
 
-@strawberry_django.filter(fakts_models.KommunityPartner)
+@strawberry_django.filter_type(fakts_models.KommunityPartner)
 class ManagementKommunityPartnerFilter:
     search: str | None = None
     ids: list[strawberry.ID] | None = None
@@ -60,14 +61,14 @@ class ManagementKommunityPartnerFilter:
         return queryset.filter(id__in=applicable_ids)
 
 
-@strawberry_django.order(fakts_models.IonscaleLayer)
+@strawberry_django.order_type(fakts_models.IonscaleLayer)
 class ManagementLayerOrder:
     name: strawberry.auto
     created_at: strawberry.auto
     last_reported_at: strawberry.auto
 
 
-@strawberry_django.filter(fakts_models.IonscaleLayer)
+@strawberry_django.filter_type(fakts_models.IonscaleLayer)
 class ManagementLayerFilter:
     search: str | None
     ids: list[strawberry.ID] | None
@@ -89,14 +90,14 @@ class ManagementLayerFilter:
         return queryset.filter(organization__id=self.organization)
 
 
-@strawberry_django.order(fakts_models.DeviceGroup)
+@strawberry_django.order_type(fakts_models.DeviceGroup)
 class ManagementDeviceGroupOrder:
     name: strawberry.auto
     created_at: strawberry.auto
     last_reported_at: strawberry.auto
 
 
-@strawberry_django.filter(fakts_models.DeviceGroup)
+@strawberry_django.filter_type(fakts_models.DeviceGroup)
 class ManagementDeviceGroupFilter:
     search: str | None
     ids: list[strawberry.ID] | None
@@ -118,14 +119,14 @@ class ManagementDeviceGroupFilter:
         return queryset.filter(organization__id=self.organization)
 
 
-@strawberry_django.order(fakts_models.Composition)
+@strawberry_django.order_type(fakts_models.Composition)
 class ManagementCompositionOrder:
     name: strawberry.auto
     created_at: strawberry.auto
     last_reported_at: strawberry.auto
 
 
-@strawberry_django.filter(fakts_models.Composition)
+@strawberry_django.filter_type(fakts_models.Composition)
 class ManagementCompositionFilter:
     search: str | None
     ids: list[strawberry.ID] | None
@@ -147,14 +148,14 @@ class ManagementCompositionFilter:
         return queryset.filter(organization__id=self.organization)
 
 
-@strawberry_django.order(fakts_models.ComputeNode)
+@strawberry_django.order_type(fakts_models.Device)
 class ManagementDeviceOrder:
     name: strawberry.auto
     created_at: strawberry.auto
     last_reported_at: strawberry.auto
 
 
-@strawberry_django.filter(fakts_models.ComputeNode)
+@strawberry_django.filter_type(fakts_models.Device)
 class ManagementDeviceFilter:
     search: str | None
     ids: list[strawberry.ID] | None
@@ -176,14 +177,14 @@ class ManagementDeviceFilter:
         return queryset.filter(organization__id=self.organization)
 
 
-@strawberry_django.order(karakter_models.Membership)
+@strawberry_django.order_type(karakter_models.Membership)
 class ManagementMembershipOrder:
     name: strawberry.auto
     created_at: strawberry.auto
     last_reported_at: strawberry.auto
 
 
-@strawberry_django.filter(karakter_models.Membership)
+@strawberry_django.filter_type(karakter_models.Membership)
 class ManagementMembershipFilter:
     search: str | None
     ids: list[strawberry.ID] | None
@@ -205,19 +206,20 @@ class ManagementMembershipFilter:
         return queryset.filter(organization__id=self.organization)
 
 
-@strawberry_django.order(fakts_models.Client)
+@strawberry_django.order_type(fakts_models.Client)
 class ManagementClientOrder:
     name: strawberry.auto
     created_at: strawberry.auto
     last_reported_at: strawberry.auto
 
 
-@strawberry_django.filter(fakts_models.Client)
+@strawberry_django.filter_type(fakts_models.Client)
 class ManagementClientFilter:
     search: str | None
     ids: list[strawberry.ID] | None
     functional: bool | None
     organization: strawberry.ID | None
+    role: fakts_enums.ClientRole | None
 
     def filter_ids(self, queryset, info):
         if self.ids is None:
@@ -234,20 +236,25 @@ class ManagementClientFilter:
             return queryset
         return queryset.filter(functional=self.functional)
 
+    def filter_role(self, queryset, info):
+        if self.role is None:
+            return queryset
+        return queryset.filter(role=self.role.value)
+
     def filter_organization(self, queryset, info):
         if self.organization is None:
             return queryset
         return queryset.filter(organization__id=self.organization)
 
 
-@strawberry_django.order(fakts_models.InstanceAlias)
+@strawberry_django.order_type(fakts_models.InstanceAlias)
 class ManagementInstanceAliasOrder:
     name: strawberry.auto
     created_at: strawberry.auto
     updated_at: strawberry.auto
 
 
-@strawberry_django.filter(fakts_models.InstanceAlias)
+@strawberry_django.filter_type(fakts_models.InstanceAlias)
 class ManagementInstanceAliasFilter:
     search: str | None
     ids: list[strawberry.ID] | None
@@ -269,14 +276,14 @@ class ManagementInstanceAliasFilter:
         return queryset.filter(functional=self.functional)
 
 
-@strawberry_django.order(fakts_models.ServiceInstanceMapping)
+@strawberry_django.order_type(fakts_models.ServiceInstanceMapping)
 class ManagementServiceInstanceMappingOrder:
     name: strawberry.auto
     created_at: strawberry.auto
     updated_at: strawberry.auto
 
 
-@strawberry_django.filter(fakts_models.ServiceInstanceMapping)
+@strawberry_django.filter_type(fakts_models.ServiceInstanceMapping)
 class ServiceInstanceMappingFilter:
     search: str | None
     ids: list[strawberry.ID] | None
@@ -298,14 +305,14 @@ class ServiceInstanceMappingFilter:
         return queryset.filter(organization__id=self.organization)
 
 
-@strawberry_django.order(fakts_models.ServiceInstance)
+@strawberry_django.order_type(fakts_models.ServiceInstance)
 class ManagementServiceInstanceOrder:
     name: strawberry.auto
     created_at: strawberry.auto
     updated_at: strawberry.auto
 
 
-@strawberry_django.filter(fakts_models.ServiceInstance)
+@strawberry_django.filter_type(fakts_models.ServiceInstance)
 class ManagementServiceInstanceFilter:
     search: str | None
     ids: list[strawberry.ID] | None
@@ -327,14 +334,14 @@ class ManagementServiceInstanceFilter:
         return queryset.filter(organization__id=self.organization)
 
 
-@strawberry_django.order(smodels.SocialAccount)
+@strawberry_django.order_type(smodels.SocialAccount)
 class ManagementSocialAccountOrder:
     name: strawberry.auto
     created_at: strawberry.auto
     updated_at: strawberry.auto
 
 
-@strawberry_django.filter(smodels.SocialAccount)
+@strawberry_django.filter_type(smodels.SocialAccount)
 class ManagementSocialAccountFilter:
     search: str | None
     ids: list[strawberry.ID] | None
@@ -356,14 +363,14 @@ class ManagementSocialAccountFilter:
         return queryset.filter(organization__id=self.organization)
 
 
-@strawberry_django.order(karakter_models.Role)
+@strawberry_django.order_type(karakter_models.Role)
 class ManagementRoleOrder:
     name: strawberry.auto
     created_at: strawberry.auto
     updated_at: strawberry.auto
 
 
-@strawberry_django.filter(karakter_models.Role)
+@strawberry_django.filter_type(karakter_models.Role)
 class ManagementRoleFilter:
     search: str | None
     ids: list[strawberry.ID] | None
@@ -391,14 +398,14 @@ class ManagementRoleFilter:
         return queryset.filter(creating_instance__id=self.creating_instance)
 
 
-@strawberry_django.order(karakter_models.Scope)
+@strawberry_django.order_type(karakter_models.Scope)
 class ManagementScopeOrder:
     name: strawberry.auto
     created_at: strawberry.auto
     updated_at: strawberry.auto
 
 
-@strawberry_django.filter(karakter_models.Scope)
+@strawberry_django.filter_type(karakter_models.Scope)
 class ManagementScopeFilter:
     search: str | None
     ids: list[strawberry.ID] | None
@@ -426,13 +433,13 @@ class ManagementScopeFilter:
         return queryset.filter(creating_instance__id=self.creating_instance)
 
 
-@strawberry_django.order(fakts_models.IonscaleAuthKey)
+@strawberry_django.order_type(fakts_models.IonscaleAuthKey)
 class ManagementIonscaleAuthKeyOrder:
     created_at: strawberry.auto
     ephemeral: strawberry.auto
 
 
-@strawberry_django.filter(fakts_models.IonscaleAuthKey)
+@strawberry_django.filter_type(fakts_models.IonscaleAuthKey)
 class ManagementIonscaleAuthKeyFilter:
     search: str | None
     ids: list[strawberry.ID] | None

@@ -2,8 +2,6 @@ from kante import Info
 import strawberry
 from api.management import types
 from karakter import models
-from django.utils import timezone
-from datetime import timedelta
 import kante
 from fakts import models as fakts_models
 
@@ -69,8 +67,8 @@ def add_device_to_group(info: Info, input: AddDeviceToGroupInput) -> types.Manag
         raise Exception("Invalid device group ID")
 
     try:
-        device = fakts_models.ComputeNode.objects.get(id=input.device)
-    except fakts_models.ComputeNode.DoesNotExist:
+        device = fakts_models.Device.objects.get(id=input.device)
+    except fakts_models.Device.DoesNotExist:
         raise Exception("Invalid device ID")
 
     device.device_groups.add(dg)

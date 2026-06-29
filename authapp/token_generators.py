@@ -16,7 +16,7 @@ Notes:
   signing and must remain secret in settings.
 """
 
-from authlib.oauth2.rfc9068 import JWTBearerTokenGenerator, JWTBearerTokenValidator
+from authlib.oauth2.rfc9068 import JWTBearerTokenGenerator
 from authlib.oauth2.rfc6749.errors import InvalidClientError
 from joserfc.jwk import RSAKey
 from cryptography.hazmat.primitives import serialization
@@ -29,10 +29,12 @@ from django.core.exceptions import ObjectDoesNotExist
 # contain the PEM-encoded private key string.
 private_key = serialization.load_pem_private_key(settings.PRIVATE_KEY.encode("utf-8"), password=None, backend=default_backend())
 
-# Generate a JWK representation from the private key. We expose the
-# public part (is_private=False) as the published JWK set.
+# Generate a JWK representation from the private key. This JWK is the
+# signing key returned by get_jwks(); it must retain the private material
+# (private=True). The public JWK set published to consumers is built
+# separately from settings.PUBLIC_KEY in authapp/views.py.
 jwk = RSAKey.import_key(settings.PRIVATE_KEY)
-jwk_dict = jwk.as_dict(is_private=False, kid="1", use="sig")  # use True for full private JWK
+jwk_dict = jwk.as_dict(private=True, kid=settings.KEY_ID, use="sig")  # signing key — MUST include private material
 
 
 class MyJWTBearerTokenGenerator(JWTBearerTokenGenerator):
@@ -43,13 +45,17 @@ class MyJWTBearerTokenGenerator(JWTBearerTokenGenerator):
     """
 
     def get_jwks(self) -> dict:
-        """Return a JWK set (public keys) used by token consumers.
+        """Return the JWK set used to sign issued access tokens.
+
+        authlib signs with the key returned here. Returning a JWK *set*
+        (``{"keys": [...]}``) rather than a bare key lets joserfc stamp the
+        key's ``kid`` into the JWT header, which consumers require to select
+        the verification key.
 
         Returns:
-            dict: a JWK dictionary suitable for publishing as part of a
-            JWKS endpoint.
+            dict: a JWKS dict containing the (private) signing key.
         """
-        return jwk_dict
+        return {"keys": [jwk_dict]}
 
     def _get_fakts_client(self, client: Any) -> Any | None:
         try:
@@ -105,6 +111,7 @@ class MyJWTBearerTokenGenerator(JWTBearerTokenGenerator):
             "client_app": fakts_client.release.app.identifier if fakts_client and fakts_client.release and fakts_client.release.app else None,
             "client_release": fakts_client.release.version if fakts_client and fakts_client.release else None,
             "client_device": fakts_client.node.node_id if fakts_client and fakts_client.node else None,
+            "client_role": fakts_client.role if fakts_client else None,
         }
 
     def get_audiences(self, client: Any, user: Any, scope: Optional[str]) -> str | list[str]:

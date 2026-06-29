@@ -1,10 +1,6 @@
-import os
-from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.conf import settings
-from fakts import models, builders, base_models
-import json
-import omegaconf
+from fakts import models
 from pydantic import BaseModel
 
 

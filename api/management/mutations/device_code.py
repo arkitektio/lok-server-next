@@ -3,9 +3,7 @@ import strawberry
 from api.management import types
 from karakter import models
 from fakts import models as fakts_models
-from fakts import logic, builders, base_models, enums
-from django.utils import timezone
-from datetime import timedelta
+from fakts import logic
 import kante
 
 

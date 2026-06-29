@@ -3,7 +3,6 @@ from django.core.management.base import BaseCommand
 from django.conf import settings
 from karakter.base_models import OrganizationConfig
 from karakter.models import Organization
-from fakts.models import KommunityPartner
 from fakts.logic import auto_configure_kommunity_partners
 
 User = get_user_model()

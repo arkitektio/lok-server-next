@@ -1,17 +1,10 @@
-import hashlib
-import json
 import logging
 import uuid
 
-import namegenerator
 import strawberry
-import strawberry_django
 from kante.types import Info
-import kante
 
-from fakts import enums, inputs, models, scalars, types
-from fakts.base_models import DevelopmentClientConfig, Manifest, Requirement
-from fakts.builders import create_client
+from fakts import models, types
 
 logger = logging.getLogger(__name__)
 
@@ -25,18 +18,16 @@ def create_redeem_token(info: Info, input: RedeemTokenInput) -> types.RedeemToke
     uuid_token = uuid.uuid4().hex
 
     user = info.context.request.user
-    org = info.context.request.organization
+    composition = info.context.request.client.composition
 
     token, _ = models.RedeemToken.objects.update_or_create(
         token=uuid_token,
         defaults={
             "user": user,
-            "organization": org,
-            "composition": info.context.request.client.composition,
-            
+            "composition": composition,
         },
     )
 
-    print(f"Token {token} created for user {user} and organization {org}")
+    print(f"Token {token} created for user {user} and composition {composition}")
 
     return token

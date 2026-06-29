@@ -3,7 +3,6 @@ from strawberry.experimental import pydantic
 from fakts.base_models import Manifest, LinkingContext, LinkingRequest, PublicSource
 from typing import Optional
 from pydantic import BaseModel, Field
-import uuid
 from fakts import enums
 import enum
 
@@ -51,6 +50,7 @@ class DevelopmentClientInputModel(BaseModel):
     composition: str | None = None
     requirements: list[RequirementModel] = Field(default_factory=list)
     layers: list[str] = Field(default_factory=lambda: ["web"])
+    role: enums.ClientRoleVanilla | None = None
 
 
 @pydantic.input(DevelopmentClientInputModel)
@@ -58,6 +58,7 @@ class DevelopmentClientInput:
     manifest: ManifestInput
     composition: strawberry.ID | None = None
     layers: list[str] | None = None
+    role: enums.ClientRole | None = None
 
 
 class ScanBackendInputModel(BaseModel):
@@ -134,13 +135,13 @@ class UpdateServiceInstanceInput:
     denied_users: list[strawberry.ID] | None = None
 
 
-class UpdateComputeNodeInputModel(BaseModel):
+class UpdateDeviceInputModel(BaseModel):
     id: str
     name: str | None
 
 
-@pydantic.input(UpdateComputeNodeInputModel)
-class UpdateComputeNodeInput:
+@pydantic.input(UpdateDeviceInputModel)
+class UpdateDeviceInput:
     id: strawberry.ID
     name: str | None
 

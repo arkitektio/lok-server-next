@@ -1,4 +1,3 @@
-from typing import Any, AsyncGenerator, Type
 
 import strawberry
 import strawberry_django
@@ -6,10 +5,10 @@ from kante.types import Info
 from fakts import types as fakts_types
 from fakts.graphql import mutations as fakts_mutations
 from fakts.graphql import queries as fakts_queries
-from fakts.graphql import subscriptions as fakts_subscriptions
 from fakts import models as fakts_models
 from karakter import types as karakter_types
 from karakter import models as karakter_models
+from karakter.hashers import hash_device_id
 from karakter.graphql import mutations as karakter_mutations
 from karakter.graphql import queries as karakter_queries
 from karakter.graphql import subscriptions as karakter_subscriptions
@@ -20,10 +19,13 @@ from komment.graphql import subscriptions as komment_subscriptions
 from pak import types as pak_types
 from pak.graphql import mutations as pak_mutations
 from pak.graphql import queries as pak_queries
-from pak.graphql import subscriptions as pak_subscriptions
 from karakter.datalayer import DatalayerExtension
 from strawberry_django.optimizer import DjangoOptimizerExtension
 from authapp.extension import AuthAppExtension
+from strawberry.schema.config import StrawberryConfig
+from fakts.scalars import scalar_map as fakts_scalar_map
+from karakter.scalars import scalar_map as karakter_scalar_map
+from komment.scalars import scalar_map as komment_scalar_map
 import kante
 
 
@@ -37,7 +39,7 @@ class Query:
 
     mycontext = strawberry_django.field(resolver=karakter_queries.mycontext)
 
-    compute_nodes: list[fakts_types.ComputeNode] = strawberry_django.field()
+    devices: list[fakts_types.Device] = strawberry_django.field()
     apps: list[fakts_types.App] = strawberry_django.field()
     releases: list[fakts_types.Release] = strawberry_django.field()
     clients: list[fakts_types.Client] = strawberry_django.field()
@@ -79,7 +81,6 @@ class Query:
 
     @kante.django_field()
     def hallo(self, info: Info) -> str:
-        print("hallosss")
         return "hallo"
 
     @kante.django_field(name="service")
@@ -87,13 +88,14 @@ class Query:
         return fakts_models.Service.objects.get(id=id)
 
     @kante.django_field()
-    def compute_node(self, info: Info, id: strawberry.ID) -> fakts_types.ComputeNode:
-        return fakts_models.ComputeNode.objects.get(id=id)
+    def device(self, info: Info, id: strawberry.ID) -> fakts_types.Device:
+        return fakts_models.Device.objects.get(id=id)
     
     
     @kante.django_field()
-    def device_by_device_id(self, info: Info, id: strawberry.ID) -> fakts_types.ComputeNode:
-        return fakts_models.ComputeNode.objects.get(node_id=id, organization=info.context.request.organization)
+    def device_by_device_id(self, info: Info, id: strawberry.ID) -> fakts_types.Device:
+        organization = info.context.request.organization
+        return fakts_models.Device.objects.get(node_id=hash_device_id(id, organization), organization=organization)
 
     @kante.django_field()
     def device_group(self, info: Info, id: strawberry.ID) -> fakts_types.DeviceGroup:
@@ -118,7 +120,7 @@ class Query:
 
     @kante.django_field()
     def my_redeem_tokens(self, info: Info) -> list[fakts_types.RedeemToken]:
-        return fakts_models.RedeemToken.objects.filter(user=info.context.request.user, organization=info.context.request.organization)
+        return fakts_models.RedeemToken.objects.filter(user=info.context.request.user, composition__organization=info.context.request.organization)
 
     @kante.django_field()
     def layer(self, info: Info, id: strawberry.ID) -> fakts_types.Layer:
@@ -236,7 +238,7 @@ class Mutation:
         resolver=karakter_mutations.update_organization,
     )
 
-    update_compute_node = strawberry_django.mutation(resolver=fakts_mutations.update_compute_node)
+    update_device = strawberry_django.mutation(resolver=fakts_mutations.update_device)
 
 
 @strawberry.type
@@ -258,4 +260,5 @@ schema = kante.Schema(
     ],  # We really need to register
     # all the types here, otherwise the schema will not be able to resolve them
     # and will throw a cryptic error
+    config=StrawberryConfig(scalar_map={**fakts_scalar_map, **karakter_scalar_map, **komment_scalar_map}),
 )
