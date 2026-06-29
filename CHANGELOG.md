@@ -1,6 +1,25 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.4 (2026-06-29)
+
+### Bug Fixes
+
+- Authentikate update
+  ([`ea4341e`](https://github.com/arkitektio/lok-server-next/commit/ea4341ea6f890dedca6b832d454f559085a4ecab))
+
+- Fix settings
+  ([`0ddffa9`](https://github.com/arkitektio/lok-server-next/commit/0ddffa96a1d0a4e5fbda5032640f01e50fcc428c))
+
+- Sclars to sclaar_map plus fix authentiikate
+  ([`c8b24b2`](https://github.com/arkitektio/lok-server-next/commit/c8b24b26966063a7b26cf12688f818a55f965dc9))
+
+### Features
+
+- Removal of stale migrations
+  ([`089dafd`](https://github.com/arkitektio/lok-server-next/commit/089dafd02625efa3b32fccd37838d9dd99af28b6))
+
+
 ## v1.0.0-rc.3 (2026-06-26)
 
 
