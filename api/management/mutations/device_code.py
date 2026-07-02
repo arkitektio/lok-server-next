@@ -13,6 +13,7 @@ class AcceptDeviceCodeInput:
 
     device_code: strawberry.ID
     composition: strawberry.ID
+    device_name: str | None = strawberry.field(default=None, description="Name to give a newly created device (ignored if the device already exists).")
     declined_requirements: list[str] = strawberry.field(default_factory=list)
     """Requirement keys the user has explicitly declined (optional requirements only)."""
 
@@ -35,6 +36,7 @@ def accept_device_code(info: Info, input: AcceptDeviceCodeInput) -> types.Manage
         user=user,
         organization=organization,
         composition=composition,
+        device_name=input.device_name,
         declined_requirements=input.declined_requirements,
     )
 

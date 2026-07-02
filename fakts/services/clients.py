@@ -101,6 +101,7 @@ def create_client(
     organization: models.Organization,
     composition: models.Composition | None = None,
     declined_requirements: list[str] | None = None,
+    device_name: str | None = None,
 ) -> models.Client:
     from fakts.utils import download_logo
 
@@ -125,7 +126,11 @@ def create_client(
     )
 
     if manifest.node_id:
-        node = models.Device.objects.get_or_create(organization=organization, node_id=hash_device_id(manifest.node_id, organization))[0]
+        node = models.Device.objects.get_or_create(
+            organization=organization,
+            node_id=hash_device_id(manifest.node_id, organization),
+            defaults={"name": device_name},
+        )[0]
     else:
         node = None
 

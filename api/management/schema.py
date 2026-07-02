@@ -7,6 +7,7 @@ import api.management.mutations as mutations
 import api.management.types as types
 import kante
 from karakter import models as karakter_models
+from karakter.hashers import hash_device_id
 from fakts import models as fakts_models
 from .datalayer import DatalayerExtension
 from allauth.socialaccount import models as smodels
@@ -109,8 +110,22 @@ class Query:
 
         mappings: list[types.PotentialMapping] = []
 
+        # Devices are keyed by (organization, hashed node_id). Surface the existing device
+        # (if any) so the client knows whether accepting will create a new device.
+        existing_device = None
+        if manifest.node_id:
+            existing_device = fakts_models.Device.objects.filter(
+                organization=composition_obj.organization,
+                node_id=hash_device_id(manifest.node_id, composition_obj.organization),
+            ).first()
+
         if not manifest.requirements:
-            return types.ValidationResult(valid=True, mappings=[], reason="Manifest has no requirements")
+            return types.ValidationResult(
+                valid=True,
+                mappings=[],
+                reason="Manifest has no requirements",
+                existing_device=existing_device,
+            )
 
         for req in manifest.requirements:
             try:
@@ -146,6 +161,7 @@ class Query:
             valid=len(errors) == 0,
             mappings=mappings,
             reason="\n".join(errors) if errors else "All requirements satisfied.",
+            existing_device=existing_device,
         )
 
     @kante.django_field()

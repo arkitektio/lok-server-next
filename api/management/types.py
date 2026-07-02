@@ -584,6 +584,13 @@ class ValidationResult:
     valid: bool
     reason: str | None
     mappings: list[PotentialMapping]
+    existing_device: Optional["ManagementDevice"] = strawberry.field(
+        default=None,
+        description=(
+            "The device that already exists for this node in the selected composition's "
+            "organization. If null, accepting will create a new device."
+        ),
+    )
 
 
 @strawberry_django.type(

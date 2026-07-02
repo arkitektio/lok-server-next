@@ -69,6 +69,28 @@ def test_validate_device_code_creates_client():
 
 
 @pytest.mark.django_db
+def test_validate_device_code_uses_provided_name_for_node_device():
+    composition = factories.make_composition()
+    user = composition.creator
+    organization = composition.organization
+    device_code = factories.make_device_code(
+        staging_manifest={
+            "identifier": "com.example.node",
+            "version": "1.0.0",
+            "scopes": [],
+            "requirements": [],
+            "node_id": "node-123",
+        },
+    )
+
+    result = device_codes.validate_device_code(device_code, user, organization, composition, device_name="Workbench")
+
+    assert result.client is not None
+    assert result.client.node is not None
+    assert result.client.node.name == "Workbench"
+
+
+@pytest.mark.django_db
 def test_auto_compose_noop_without_requirements():
     client = factories.make_client()
     out = rendering.auto_compose(client, _manifest(), client.user, client.organization)

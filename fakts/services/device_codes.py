@@ -88,13 +88,14 @@ def validate_device_code(
     user: models.AbstractUser,
     organization: models.Organization,
     composition: models.Composition,
+    device_name: str | None = None,
     declined_requirements: list[str] | None = None,
 ) -> models.DeviceCode:
     manifest = device_code.manifest_as_model
 
     node_id = manifest.node_id
     if node_id:
-        node, _ = models.Device.objects.get_or_create(organization=organization, node_id=hash_device_id(node_id, organization))
+        node, _ = models.Device.objects.get_or_create(organization=organization, node_id=hash_device_id(node_id, organization), defaults=dict(name=device_name))
     else:
         node = None
 
@@ -136,6 +137,7 @@ def validate_device_code(
             organization=organization,
             composition=composition,
             declined_requirements=declined_requirements,
+            device_name=device_name,
         )
 
     else:
