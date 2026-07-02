@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.6 (2026-07-02)
+
+### Bug Fixes
+
+- Device by device_id not salted
+  ([`26b4368`](https://github.com/arkitektio/lok-server-next/commit/26b43686ee9565fe54106eafcb2e6e162af8636c))
+
+
 ## v1.0.0-rc.5 (2026-07-02)
 
 ### Bug Fixes
