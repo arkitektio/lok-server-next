@@ -1,9 +1,15 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.8 (2026-07-02)
+
+
 ## v1.0.0-rc.7 (2026-07-02)
 
 ### Bug Fixes
+
+- Async errors
+  ([`eb74404`](https://github.com/arkitektio/lok-server-next/commit/eb744043183b18f8c33afdba4bc3d1933338a89b))
 
 - Update
   ([`476ebca`](https://github.com/arkitektio/lok-server-next/commit/476ebca7749c0aac851e4c1a734d9d6e5137f53a))
