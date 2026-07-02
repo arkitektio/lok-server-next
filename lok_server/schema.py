@@ -95,7 +95,7 @@ class Query:
     @kante.django_field()
     def device_by_device_id(self, info: Info, id: strawberry.ID) -> fakts_types.Device:
         organization = info.context.request.organization
-        return fakts_models.Device.objects.get(node_id=hash_device_id(id, organization), organization=organization)
+        return fakts_models.Device.objects.get(node_id=id, organization=organization)
 
     @kante.django_field()
     def device_group(self, info: Info, id: strawberry.ID) -> fakts_types.DeviceGroup:
