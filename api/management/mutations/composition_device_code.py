@@ -5,6 +5,7 @@ from karakter import models
 from karakter.hashers import hash_device_id
 from fakts import models as fakts_models
 from fakts import logic, builders, base_models, enums
+from fakts.services import aliases as alias_services
 import kante
 
 
@@ -97,7 +98,7 @@ def accept_composition_device_code(info: Info, input: AcceptCompositionDeviceCod
             sc.used_by.add(instance)
 
         for alias in servicer.aliases:
-            fakts_models.InstanceAlias.objects.update_or_create(instance=instance, host=alias.host, port=alias.port, ssl=alias.ssl, path=alias.path, kind=alias.kind, scope=alias.scope, challenge=alias.challenge)
+            alias_services.upsert_instance_alias(instance, alias)
 
     for clr in manifest.clients:
         user = info.context.request.user

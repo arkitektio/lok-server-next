@@ -133,14 +133,15 @@ class ServiceInstance:
 )
 class InstanceAlias:
     id: strawberry.ID
-    layer: Layer = strawberry.field(description="The layer that this alias belongs to.")
+    layer: Optional[Layer] = strawberry.field(description="The layer that this alias belongs to, if any.")
     instance: ServiceInstance = strawberry.field(description="The instance that this alias belongs to.")
-    kind: str = strawberry.field(description="The name of the alias. This is a human readable name of the alias.")
+    kind: str = strawberry.field(description="The kind of alias. If relative, the alias is resolved against the layer's domain/port/path; if absolute, it is a full URL.")
     host: Optional[str] = strawberry.field(description="The host of the alias, if its a ABSOLUTE alias (e.g. 'example.com'). If not set, the alias is relative to the layer's domain.")
     port: Optional[int] = strawberry.field(description="The port of the alias, if its a ABSOLUTE alias (e.g. 'example.com:8080'). If not set, the alias is relative to the layer's port.")
     path: Optional[str] = strawberry.field(description="The path of the alias, if its a ABSOLUTE alias (e.g. 'example.com/path'). If not set, the alias is relative to the layer's path.")
     ssl: bool = strawberry.field(description="Is this alias using SSL? If true, the alias will be accessed via https:// instead of http://. This is used to indicate that the alias is secure and should be accessed via SSL")
     challenge: str = strawberry.field(description="The challenge of the alias. This is used to verify that the alias is reachable. If set, the alias will be accessed via the challenge URL (e.g. 'example.com/.well-known/challenge'). If not set, the alias will be accessed via the instance's URL.")
+    public: bool = strawberry.field(description="Is this alias publicly reachable? If true, the coordination server can also check the alias's health directly, enabling health checks from the kontrol interface.")
 
 
 @strawberry_django.type(

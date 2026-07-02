@@ -193,13 +193,6 @@ class Mutation:
         resolver=fakts_mutations.update_service_instance,
     )
 
-    create_instance_alias = strawberry_django.mutation(
-        resolver=fakts_mutations.create_instance_alias,
-    )
-    update_instance_alias = strawberry_django.mutation(
-        resolver=fakts_mutations.update_instance_alias,
-    )
-
     request_media_upload = strawberry_django.mutation(
         resolver=karakter_mutations.request_media_upload,
     )

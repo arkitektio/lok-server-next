@@ -7,28 +7,28 @@ from fakts import models as fakts_models
 
 @kante.input
 class CreateAliasInput:
-    """Input for creating a single-use magic invite link for an organization"""
+    """Input for creating an alias for a service instance."""
 
-    service_instance: strawberry.ID  # Service Instance ID to create the alias for
+    instance: strawberry.ID  # Service Instance ID to create the alias for
     port: int
     host: str
     kind: str
     path: str | None = None
+    public: bool = False
 
 
 def create_alias(info: Info, input: CreateAliasInput) -> types.ManagementInstanceAlias:
-    """ """
+    """Create an alias for a service instance."""
 
-    user = info.context.request.user
-    service_instance = fakts_models.ServiceInstance.objects.get(id=input.service_instance)
+    instance = fakts_models.ServiceInstance.objects.get(id=input.instance)
 
     alias = fakts_models.InstanceAlias.objects.create(
-        service_instance=service_instance,
+        instance=instance,
         port=input.port,
         host=input.host,
         kind=input.kind,
         path=input.path,
-        created_by=user,
+        public=input.public,
     )
 
     return alias
@@ -43,18 +43,19 @@ class UpdateAliasInput:
     host: str
     kind: str
     path: str | None = None
+    public: bool | None = None
 
 
 def update_alias(info: Info, input: UpdateAliasInput) -> types.ManagementInstanceAlias:
-    """ """
-
-    user = info.context.request.user
+    """Update an existing alias for a service instance."""
 
     alias = fakts_models.InstanceAlias.objects.get(id=input.id)
     alias.port = input.port
     alias.host = input.host
     alias.kind = input.kind
     alias.path = input.path
+    if input.public is not None:
+        alias.public = input.public
     alias.save()
 
     return alias
@@ -62,17 +63,13 @@ def update_alias(info: Info, input: UpdateAliasInput) -> types.ManagementInstanc
 
 @kante.input
 class DeleteAliasInput:
-    """Input for accepting an organization invite"""
+    """Input for deleting an alias."""
 
     id: strawberry.ID
 
 
 def delete_alias(info: Info, input: DeleteAliasInput) -> strawberry.ID:
-    """
-    Accept an invite to join an organization.
-
-    Validates the invite token and adds the user to the organization.
-    """
+    """Delete an alias for a service instance, returning the deleted alias id."""
     try:
         alias = fakts_models.InstanceAlias.objects.get(id=input.id)
     except fakts_models.InstanceAlias.DoesNotExist:

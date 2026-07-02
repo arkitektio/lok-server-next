@@ -250,15 +250,12 @@ class ManagementClientFilter:
 @strawberry_django.order_type(fakts_models.InstanceAlias)
 class ManagementInstanceAliasOrder:
     name: strawberry.auto
-    created_at: strawberry.auto
-    updated_at: strawberry.auto
 
 
 @strawberry_django.filter_type(fakts_models.InstanceAlias)
 class ManagementInstanceAliasFilter:
     search: str | None
     ids: list[strawberry.ID] | None
-    functional: bool | None
 
     def filter_ids(self, queryset, info):
         if self.ids is None:
@@ -269,11 +266,6 @@ class ManagementInstanceAliasFilter:
         if self.search is None:
             return queryset
         return queryset.filter(name__contains=self.search)
-
-    def filter_functional(self, queryset, info):
-        if self.functional is None:
-            return queryset
-        return queryset.filter(functional=self.functional)
 
 
 @strawberry_django.order_type(fakts_models.ServiceInstanceMapping)

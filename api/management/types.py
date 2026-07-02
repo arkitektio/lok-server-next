@@ -472,10 +472,11 @@ class StagingAlias:
     name: Optional[str]
     host: Optional[str]
     port: Optional[int]
-    ssl: bool = False
+    ssl: bool = True
     path: Optional[str] = None
     challenge: Optional[str] = None
     scope: str = "local"
+    public: bool = False
 
 @pydantic.type(base_models.ServiceManifest)
 class ManagementStagingServiceManifest:
@@ -674,6 +675,7 @@ class ManagementInstanceAlias:
     challenge: str = strawberry.field(description="The challenge of the alias. This is used to verify that the alias is reachable.")
     usages: list["ManagementUsedAlias"] = strawberry_django.field(description="The usages of this alias by clients.")
     scope: str = strawberry.field(description="The scope of the alias. E.g 'local' means that the alias can only be used within the local network.")
+    public: bool = strawberry.field(description="Is this alias publicly reachable? If true, the coordination server can also check the alias's health directly, enabling health checks from the kontrol interface.")
 
     @strawberry_django.field(description="The organization that owns this alias (via the instance).")
     def organization(self) -> "ManagementOrganization":
@@ -880,7 +882,7 @@ class ManagementPublicSource:
     url: str = strawberry.field(description="The url of the public source.")
 
 
-@strawberry_django.type(fakts_models.UsedAlias, filters=filters.ManagementDeviceFilter, pagination=True)
+@strawberry_django.type(fakts_models.UsedAlias, pagination=True)
 class ManagementUsedAlias:
     id: strawberry.ID
     key: str

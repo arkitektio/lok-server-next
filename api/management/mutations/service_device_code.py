@@ -5,6 +5,7 @@ from karakter import models
 from karakter.hashers import hash_device_id
 from fakts import models as fakts_models
 from fakts import logic
+from fakts.services import aliases as alias_services
 import kante
 
 
@@ -90,9 +91,8 @@ def accept_service_device_code(info: Info, input: AcceptServiceDeviceCodeInput) 
         instance.public_key = manifest.challenge_key
         instance.save()
 
-    print("Creating aliases:", aliases)
     for alias in aliases:
-        fakts_models.InstanceAlias.objects.update_or_create(instance=instance, host=alias.host, port=alias.port, ssl=alias.ssl, path=alias.path, kind=alias.kind)
+        alias_services.upsert_instance_alias(instance, alias)
 
     device_code.instance = instance
     device_code.save()

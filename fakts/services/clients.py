@@ -249,7 +249,6 @@ def report_client(claim: base_models.ReportRequest) -> models.Client:
                 "alias": alias,
                 "valid": alias_report.valid,
                 "reason": alias_report.reason,
-                "used_at": timezone.now(),
             },
         )
 

@@ -283,6 +283,10 @@ class InstanceAlias(models.Model):
         default=True,
         help_text="If the alias is available over SSL or not. If not set, the alias is assumed to be available over SSL.",
     )
+    public = models.BooleanField(
+        default=False,
+        help_text="If the alias is publicly reachable. If true, the coordination server can also check the alias's health directly (in addition to client-side reports), which allows checking its health from the kontrol interface.",
+    )
     challenge = models.TextField(
         default="ht",
         help_text=""""A challenge URL to verify the alias on the client. If it returns a 200 OK, the alias is valid. It can additionally return a JSON object with a `challenge
@@ -297,7 +301,7 @@ class InstanceAlias(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["instance", "host", "port", "ssl", "path", "kind"],
-                name="Only one alias per instance and name",
+                name="Only one alias per instance host port ssl path kind",
             )
         ]
 
@@ -312,6 +316,7 @@ class InstanceAlias(models.Model):
                 port=self.port if self.port else linking.request.port,
                 path=self.path,
                 challenge=self.challenge,
+                public=self.public,
             )
         else:
             return base_models.Alias(
@@ -321,6 +326,7 @@ class InstanceAlias(models.Model):
                 port=self.port,
                 path=self.path,
                 challenge=self.challenge,
+                public=self.public,
             )
 
     def __str__(self) -> str:
@@ -600,16 +606,15 @@ class ServiceInstanceMapping(models.Model):
 
 
 class UsedAlias(models.Model):
-    """
-    Docstring for UsedAlias
-    """
+    """A client's most recent self-report for one requirement key: which alias it
+    resolved to and whether it was reachable."""
 
     valid = models.BooleanField(default=True)
     alias = models.ForeignKey(InstanceAlias, on_delete=models.CASCADE, related_name="usages", null=True, blank=True)
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="used_aliases")
     key = models.CharField(max_length=1000)
     reason = models.TextField(null=True, blank=True)
-    used_at = models.DateTimeField(auto_now_add=True)
+    used_at = models.DateTimeField(auto_now=True, help_text="When the client last reported this usage.")
 
     def __str__(self):
         return f"{self.alias} used in {self.key} at {self.used_at}"

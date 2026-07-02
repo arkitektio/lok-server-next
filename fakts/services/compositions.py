@@ -12,6 +12,7 @@ from django.db import transaction
 
 from fakts import models
 from fakts.base_models import CompositionManifest
+from fakts.services import aliases
 from fakts.services.tokens import create_api_token  # noqa: F401  (kept for shim parity)
 from ionscale.repo import get_ionscale_repo
 from karakter import models as karakter_models
@@ -160,18 +161,7 @@ def create_composition_from_manifest(
                 logger.info(f"    {'Created' if scope_created else 'Updated'} scope: {scope.identifier}")
 
         for alias in instance_request.aliases:
-            alias_obj, alias_created = models.InstanceAlias.objects.update_or_create(
-                instance=instance,
-                name=alias.name or alias.id,
-                defaults={
-                    "host": alias.host,
-                    "port": alias.port,
-                    "ssl": alias.ssl if alias.ssl is not None else True,
-                    "path": alias.path,
-                    "kind": alias.kind,
-                    "challenge": alias.challenge,
-                },
-            )
+            alias_obj, alias_created = aliases.upsert_instance_alias(instance, alias)
             logger.info(f"    {'Created' if alias_created else 'Updated'} alias: {alias_obj.name}")
 
     return composition

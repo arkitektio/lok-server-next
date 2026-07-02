@@ -133,6 +133,8 @@ class StagingAlias(BaseModel):
     challenge: Optional[str] = None
     kind: str = "absolute"
     scope: Literal["local", "network", "public", "ionscale"] = "local"
+    public: bool = False
+    """If the alias is publicly reachable, the coordination server can also check its health directly (enabling health checks from the kontrol interface)."""
 
 
 class ServiceDeviceCodeStartRequest(BaseModel):
@@ -345,6 +347,8 @@ class Alias(BaseModel):
     challenge: str = Field(
         description="A challenge url to verify the alias on the client. If it returns a 200 OK, the alias is valid. It can additionally return a JSON object with a `challenge` key that contains the challenge to be solved by the client.",
     )
+    public: bool = False
+    """If the alias is publicly reachable, the coordination server can also check its health directly (enabling health checks from the kontrol interface)."""
 
 
 class InstanceClaim(BaseModel):
