@@ -46,14 +46,26 @@ class Manifest(BaseModel):
     """ The identifier is a unique string that identifies the client. """
     version: str
     """ The version is a string that identifies the version of the client. """
+    title: Optional[str] = None
+    """ A human readable display name for the app. Used as the name of the App and Release. """
+    description: Optional[str] = None
+    """ A human readable description of what the app does. """
     logo: Optional[str] = None
     """ The logo is a url to a logo that should be used for the client. """
     scopes: list[str] = Field(default_factory=list)
     """ The scopes are a list of scopes that the client can request. """
     requirements: list[Requirement] = Field(default_factory=list)
     """ The requirements are a list of requirements that the client needs to run on (e.g. needs GPU)"""
-    node_id: Optional[str] = None 
+    node_id: Optional[str] = None
     """ The node_id is the id of the node that the runs on """
+    authors: list[str] = Field(default_factory=list)
+    """ The authors that created and maintain the app. """
+    keywords: list[str] = Field(default_factory=list)
+    """ Keywords/tags that describe the app and help with discoverability. """
+    license: Optional[str] = None
+    """ The license of the app (SPDX identifier or free text). """
+    homepage: Optional[str] = None
+    """ The homepage url of the app (repo_url already tracks the issue tracker). """
     repo_url: Optional[str] = None
     """ The repo_url is the url to track issues and get more information about the client. """
     public_sources: Optional[List[PublicSource]] = None

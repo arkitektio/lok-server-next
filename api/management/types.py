@@ -443,11 +443,16 @@ class ManagementStagingPublicSource:
 class ManagementStagingManifest:
     version: str
     identifier: str
+    title: str | None = None
     description: str | None = None
     url: str | None = None
     logo: str | None = None
     scopes: list[str]
     node_id: strawberry.ID
+    authors: list[str]
+    keywords: list[str]
+    license: str | None = None
+    homepage: str | None = None
     repo_url: str | None = None
     public_sources: list[ManagementStagingPublicSource] | None = strawberry.field(description="Public sources for this staging service")
     requirements: list[ManagementStagingRequirement]
@@ -601,7 +606,7 @@ class ValidationResult:
 )
 class ManagementServiceRelease:
     id: strawberry.ID
-    service: ManagementService = strawberry.field(description="The service that this instance belongs to.")
+    service: ManagementService = strawberry_django.field(description="The service that this instance belongs to.")
     version: str = strawberry.field(description="The version of the service release.")
     instances: list["ManagementServiceInstance"] = strawberry_django.field(
         description="The instances of the service release. A service instance is a configured instance of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."
@@ -617,8 +622,8 @@ class ManagementServiceRelease:
 )
 class ManagementServiceInstance:
     id: strawberry.ID
-    release: ManagementServiceRelease = strawberry.field(description="The service that this instance belongs to.")
-    organization: "ManagementOrganization" = strawberry.field(description="The organization that owns this instance.")
+    release: ManagementServiceRelease = strawberry_django.field(description="The service that this instance belongs to.")
+    organization: "ManagementOrganization" = strawberry_django.field(description="The organization that owns this instance.")
     device: Optional["ManagementDevice"] = strawberry.field(description="The device that this instance is associated with, if any.")
     instance_id: str = strawberry.field(description="The identifier of the instance. This is a unique string that identifies the instance. It is used to identify the instance in the code and in the database.")
     allowed_users: list[ManagementUser] = strawberry_django.field(description="The users that are allowed to use this instance.")
@@ -650,8 +655,8 @@ class ManagementComposition:
     name: str = strawberry.field(description="The name of the composition")
     description: str | None = strawberry.field(description="The description of the composition. This should be a human readable description of the composition.")
     token: str = strawberry.field(description="The token used to claim this composition")
-    creator: ManagementUser = strawberry.field(description="The user who created this composition")
-    organization: "ManagementOrganization" = strawberry.field(description="The organization that owns this composition.")
+    creator: ManagementUser = strawberry_django.field(description="The user who created this composition")
+    organization: "ManagementOrganization" = strawberry_django.field(description="The organization that owns this composition.")
     instances: list["ManagementServiceInstance"] = strawberry_django.field(
         description="The instances of the composition. A service instance is a configured instance of a service."
     )
@@ -672,7 +677,7 @@ class ManagementComposition:
 class ManagementInstanceAlias:
     id: strawberry.ID
     layer: Optional["ManagementLayer"] = strawberry.field(description="The layer that this alias belongs to.")
-    instance: ManagementServiceInstance = strawberry.field(description="The instance that this alias belongs to.")
+    instance: ManagementServiceInstance = strawberry_django.field(description="The instance that this alias belongs to.")
     name: Optional[str] = strawberry.field(description="The name of the alias.")
     kind: str = strawberry.field(description="The kind of alias (relative or absolute).")
     host: Optional[str] = strawberry.field(description="The host of the alias, if its a ABSOLUTE alias (e.g. 'example.com'). If not set, the alias is relative to the layer's domain.")
@@ -696,8 +701,8 @@ class ManagementInstanceAlias:
 )
 class ManagementServiceInstanceMapping:
     id: strawberry.ID
-    instance: ManagementServiceInstance = strawberry.field(description="The service that this instance belongs to.")
-    client: "ManagementClient" = strawberry.field(description="The client that this instance belongs to.")
+    instance: ManagementServiceInstance = strawberry_django.field(description="The service that this instance belongs to.")
+    client: "ManagementClient" = strawberry_django.field(description="The client that this instance belongs to.")
     key: str = strawberry.field(description="The key of the instance. This is a unique string that identifies the instance. It is used to identify the instance in the code and in the database.")
     optional: bool = strawberry.field(description="Is this mapping optional? If a mapping is optional, you can configure the client without this mapping.")
 
@@ -713,7 +718,7 @@ class ManagementApp:
     name: str = strawberry.field(description="The name of the app")
     identifier: fakts_scalars.AppIdentifier = strawberry.field(description="The identifier of the app. This should be a globally unique string that identifies the app. We encourage you to use the reverse domain name notation. E.g. `com.example.myapp`")
 
-    releases: list["ManagementRelease"] = strawberry.field(description="The releases of the app. A release is a version of the app that can be installed by a user.")
+    releases: list["ManagementRelease"] = strawberry_django.field(description="The releases of the app. A release is a version of the app that can be installed by a user.")
 
     logo: ManagementMediaStore | None = strawberry.field(description="The logo of the app. This should be a url to a logo that can be used to represent the app.")
 
@@ -776,7 +781,7 @@ class ManagementMachine:
 )
 class ManagementLayer:
     id: strawberry.ID
-    organization: "ManagementOrganization" = strawberry.field(description="The organization that owns this alias.")
+    organization: "ManagementOrganization" = strawberry_django.field(description="The organization that owns this alias.")
     kind: enums.LayerKind = strawberry.field(description="The kind of the layer. E.g. `VPN` or `TOR`")
     name: str = strawberry.field(description="The name of the layer")
     description: str | None = strawberry.field(description="The description of the layer. This should be a human readable description of the layer.")
@@ -838,13 +843,13 @@ class ManagementIonscaleAuthKey:
 )
 class ManagementRelease:
     id: strawberry.ID
-    app: ManagementApp = strawberry.field(description="The app that this release belongs to.")
+    app: ManagementApp = strawberry_django.field(description="The app that this release belongs to.")
     version: fakts_scalars.Version = strawberry.field(description="The version of the release. This should be a string that identifies the version of the release. We enforce semantic versioning notation. E.g. `0.1.0`. The version is unique per app.")
     name: str = strawberry.field(description="The name of the release. This should be a string that identifies the release beyond the version number. E.g. `canary`.")
     logo: ManagementMediaStore | None = strawberry.field(description="The logo of the release. This should be a url to a logo that can be used to represent the release.")
     scopes: list[str] = strawberry.field(description="The scopes of the release. Scopes are used to limit the access of a client to a user's data. They represent app-level permissions.")
     requirements: list[str] = strawberry.field(description="The requirements of the release. Requirements are used to limit the access of a client to a user's data. They represent app-level permissions.")
-    clients: list["ManagementClient"] = strawberry.field(description="The clients of the release")
+    clients: list["ManagementClient"] = strawberry_django.field(description="The clients of the release")
 
 
 @strawberry_django.type(
@@ -874,13 +879,17 @@ class ManagementDevice:
     name: str | None
     node_id: strawberry.ID
     clients: list["ManagementClient"]
-    organization: "ManagementOrganization" = strawberry.field(description="The organization that owns this compute node.")
+    organization: "ManagementOrganization" = strawberry_django.field(description="The organization that owns this compute node.")
     service_instances: list[ManagementServiceInstance] = strawberry_django.field(description="The service instances that are associated with this compute node.")
     device_groups: list[ManagementDeviceGroup] = strawberry_django.field(description="The device groups that belong to this compute node.")
 
     @classmethod
     def get_queryset(cls, queryset, info: Info):
-        return queryset.filter(organization__memberships__user=info.context.request.user).distinct()
+        # Devices are always scoped to the caller's active (current) organization;
+        # we never surface devices from the user's other organizations. Uses the raw
+        # FK id (no lazy relation load in the async context) and falls back to an empty
+        # queryset (never "all devices") when no active org is set.
+        return queryset.filter(organization_id=info.context.request.user.active_organization_id)
 
 
 @strawberry.type(description="A Public Source is a source of information about a client that is publicly available. E.g. a GitHub repository or a website.")
@@ -894,7 +903,7 @@ class ManagementUsedAlias:
     id: strawberry.ID
     key: str
     alias: Optional[ManagementInstanceAlias] = strawberry.field(description="The alias that is used.")
-    client: "ManagementClient" = strawberry.field(description="The client that is using the alias.")
+    client: "ManagementClient" = strawberry_django.field(description="The client that is using the alias.")
     valid: bool = strawberry.field(description="Is the alias valid for the client?")
     reason: Optional[str] = strawberry.field(description="If the alias is not valid, the reason why it is not valid.")
 
@@ -932,7 +941,7 @@ class ManagementClient:
 
         return base_models.Manifest(**self.manifest)
 
-    @strawberry.field(description="The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information.")
+    @strawberry_django.field(description="The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information.")
     def token(self, info: Info) -> str:
         # TODO: Implement only tenant should be able to see the token
         return self.token
@@ -1047,9 +1056,9 @@ class ManagementRedeemToken:
     created_at: datetime.datetime
     expires_at: datetime.datetime | None
     token: str = strawberry.field(description="The token of the redeem token")
-    composition: ManagementComposition = strawberry.field(description="The composition that this redeem token grants access to.")
+    composition: ManagementComposition = strawberry_django.field(description="The composition that this redeem token grants access to.")
     client: ManagementClient | None = strawberry.field(description="The client that this redeem token belongs to.")
-    user: ManagementUser = strawberry.field(description="The user that this redeem token belongs to.")
+    user: ManagementUser = strawberry_django.field(description="The user that this redeem token belongs to.")
 
     @classmethod
     def get_queryset(cls, queryset, info: Info):

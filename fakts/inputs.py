@@ -38,10 +38,17 @@ class PublicSourceInput:
 class ManifestInput:
     identifier: str
     version: str
+    title: Optional[str] = None
+    description: Optional[str] = None
     logo: Optional[str] = None
     scopes: list[str]
     node_id: Optional[str] = None
     requirements: list[RequirementInput] = Field(default_factory=list)
+    authors: list[str] = Field(default_factory=list)
+    keywords: list[str] = Field(default_factory=list)
+    license: Optional[str] = None
+    homepage: Optional[str] = None
+    repo_url: Optional[str] = None
     public_sources: list[PublicSourceInput] | None = None
 
 

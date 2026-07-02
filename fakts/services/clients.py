@@ -110,15 +110,28 @@ def create_client(
     except Exception as e:
         raise ValueError(f"Could not download logo {e}")
 
-    app, _ = models.App.objects.get_or_create(identifier=manifest.identifier)
+    display_name = manifest.title or manifest.identifier
+
+    app, _ = models.App.objects.get_or_create(
+        identifier=manifest.identifier,
+        defaults={"name": display_name},
+    )
+    dirty = False
     if logo:
         app.logo = logo
+        dirty = True
+    # Backfill/refresh the app name once a manifest actually carries a title.
+    if manifest.title and app.name != manifest.title:
+        app.name = manifest.title
+        dirty = True
+    if dirty:
         app.save()
 
     release, _ = models.Release.objects.update_or_create(
         app=app,
         version=manifest.version,
         defaults={
+            "name": manifest.title or manifest.version,
             "logo": logo,
             "scopes": manifest.scopes,
             "requirements": manifest.model_dump()["requirements"],
