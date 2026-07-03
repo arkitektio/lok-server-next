@@ -71,4 +71,11 @@ def create_organization(info: Info, input: CreateOrganizationInput) -> types.Org
         roles=["admin"],
     )
 
+    # The ionscale mesh is enabled by default for every organization; clients still
+    # opt in to *join* it. Guarded: a no-op when ionscale isn't configured and never
+    # fails org creation. Deferred import to avoid app load-order coupling.
+    from ionscale.manager import ensure_org_mesh
+
+    ensure_org_mesh(organization)
+
     return organization

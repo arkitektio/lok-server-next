@@ -212,10 +212,64 @@ django-allauth flows. All optional with sensible defaults.
 | Key | Env var | Type | Default | Description |
 |---|---|---|---|---|
 | `email_verification` | `ACCOUNT__EMAIL_VERIFICATION` | str | `none` | `ACCOUNT_EMAIL_VERIFICATION` (`none` / `optional` / `mandatory`). |
+| `login_methods` | `ACCOUNT__LOGIN_METHODS` | list[str] | `["username"]` | `ACCOUNT_LOGIN_METHODS` — identifier(s) users log in with (`username` / `email` / `phone`). Set to `["email"]` to enable login via email. |
+| `signup_fields` | `ACCOUNT__SIGNUP_FIELDS` | list[str] | derived | `ACCOUNT_SIGNUP_FIELDS`, e.g. `["email*", "password1*", "password2*"]` (`*` = required). When omitted, derived from `login_methods`. |
 | `login_by_code_enabled` | `ACCOUNT__LOGIN_BY_CODE_ENABLED` | bool | `true` | Enable login by emailed code (`ACCOUNT_LOGIN_BY_CODE_ENABLED`). |
 | `mfa_trust_enabled` | `ACCOUNT__MFA_TRUST_ENABLED` | bool | `true` | Allow trusted devices (`MFA_TRUST_ENABLED`). |
 | `headless_frontend_urls` | `ACCOUNT__HEADLESS_FRONTEND_URLS__*` | object | see below | SPA URLs for allauth-headless flows. |
 | `social_provider_apps` | — (use YAML) | list[str] | `["allauth.socialaccount.providers.orcid", "allauth.socialaccount.providers.google"]` | allauth social provider apps appended to `INSTALLED_APPS`. |
+
+#### Username world vs email world
+
+Switching which identifier users log in with is a one-flag change — flip
+`account.login_methods` (the SPA login/signup forms adapt automatically):
+
+```yaml
+# Username world (default): classic username + password
+account:
+  login_methods: [username]
+
+# Email world: users provide and log in with an email
+account:
+  login_methods: [email]        # signup_fields auto-derives to [email*, password1*, password2*]
+  # email_verification: optional # optional; add `mandatory` to force confirmation (see below)
+```
+
+Notes for the email world:
+- Give every seeded `users:` entry an `email:` — otherwise that user has no email
+  identifier to log in with. `ensureusers` provisions it as a **verified, primary**
+  `EmailAddress`, so seeded users (e.g. `demo`) work even under `mandatory`
+  verification without any manual confirmation step.
+- With `email_verification: mandatory`, an SMTP `email:` block is **required** (see
+  next section) — enforced at config load.
+
+#### Enabling login via email with account verification
+
+Switch login to email and require users to confirm their address before they can
+sign in:
+
+```yaml
+account:
+  login_methods: [email]
+  email_verification: mandatory   # block sign-in until the email is verified
+  # signup_fields omitted → derived to [email*, password1*, password2*]
+email:                            # REQUIRED when verification is mandatory
+  host: smtp.example.com
+  port: 587
+  user: apikey
+  password: <secret>
+  email: no-reply@example.com
+```
+
+Notes:
+- `email_verification: mandatory` **requires** an `email:` SMTP block — otherwise
+  verification mails can't be sent and users are permanently locked out. Config
+  loading fails fast if it is missing.
+- `login_by_code_enabled` (on by default) also sends email, but is **not**
+  enforced the same way: if mail can't be sent, password login still works, so it
+  is left as a soft dependency rather than a hard failure.
+- `signup_fields` must collect an email (`email*`) whenever `login_methods`
+  includes `email`; this is validated on load.
 
 #### `account.headless_frontend_urls` — SPA URLs allauth-headless points users at
 
@@ -273,7 +327,7 @@ list/object fields below are provisioning data applied on boot — express them 
 | `private_key` 🔒 | `PRIVATE_KEY` | str (PEM) | **required** | OIDC/OAuth2 RSA private signing key. Lok refuses to start without it. |
 | `oidc_issuer` | `OIDC_ISSUER` | str | `http://lok` | OIDC issuer URL advertised by lok. |
 | `kontrol_frontend_url` | `KONTROL_FRONTEND_URL` | str | `/` | Frontend URL used for redirects. |
-| `socialaccount_providers` | — (use YAML) | map | `{}` | django-allauth social provider config. |
+| `socialaccount_providers` | — (use YAML) | map[str, provider] | `{}` | `SOCIALACCOUNT_PROVIDERS`, keyed by provider id. Typed — see [Social login providers](#social-login-providers). |
 | `organizations` | — (use YAML) | list[object] | `[]` | Organizations ensured on boot. |
 | `users` | — (use YAML) | list[object] | `[]` | Users ensured on boot. |
 | `memberships` | — (use YAML) | list[object] | `[]` | User/organization memberships ensured on boot. |
@@ -287,12 +341,94 @@ list/object fields below are provisioning data applied on boot — express them 
 Each entry provisions an OAuth2 client (see the `ensureopenid` command). Provide the
 client(s), secret(s) and redirect URIs **per deployment** — none are created by default.
 
+**Every OIDC relying party that logs in through lok (the SPA, ionscale, external
+apps) needs an entry here whose `client_id` and `client_secret` match that
+service's own config.** If it's missing, lok's OpenID flow fails with **"client
+does not exist"**. See [docs/openid_clients](./docs/openid_clients/README.md) for
+the full setup, the values that must match across services, and troubleshooting.
+
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `client_name` | str | **required** | Human-readable client name. |
-| `client_id` | str | **required** | OAuth2 `client_id`. |
-| `client_secret` 🔒 | str | **required** | OAuth2 client secret. Override per deployment. |
-| `redirect_uris` | list[str] | `[]` | Allowed OAuth2 redirect URIs. |
+| `client_id` | str | **required** | OAuth2 `client_id`. Must match the relying party's `client_id`. |
+| `client_secret` 🔒 | str | **required** | OAuth2 client secret. Must match the relying party's secret. Override per deployment. |
+| `redirect_uris` | list[str] | `[]` | Allowed OAuth2 redirect URIs (the relying party's callback URL). |
+
+---
+
+## Social login providers
+
+Lets users sign in with Google, GitHub, ORCID, etc. via
+[django-allauth](https://docs.allauth.org/). Adding a provider is **two coupled
+steps** — miss either and the button won't appear or login will 500:
+
+1. **Install the provider app** — add its dotted path to
+   `account.social_provider_apps` (appended to `INSTALLED_APPS`).
+2. **Configure its OAuth app** — add a typed entry under
+   `socialaccount_providers`, keyed by the provider id, carrying the `client_id`
+   / `secret` you got from the provider (and any scopes).
+
+```yaml
+account:
+  social_provider_apps:
+    - allauth.socialaccount.providers.google
+    - allauth.socialaccount.providers.github
+
+socialaccount_providers:
+  google:
+    APP:
+      client_id: "1234567890-abc.apps.googleusercontent.com"
+      secret: "GOCSPX-your-secret"   # 🔒 set per deployment (env: SOCIALACCOUNT_PROVIDERS__… or a secret file)
+    SCOPE: [profile, email]
+    AUTH_PARAMS: { access_type: online }
+    OAUTH_PKCE_ENABLED: true
+  github:
+    APP:
+      client_id: "Iv1.your-app-id"
+      secret: "your-github-secret"   # 🔒
+    SCOPE: [read:user, user:email]
+```
+
+### `socialaccount_providers.<provider>` — typed fields
+
+Common keys are validated (a mistyped `client_id` or unknown `APP` key is
+rejected at boot with the exact path); provider-specific extras (e.g.
+`FETCH_USERINFO`) are still accepted verbatim.
+
+| Key | Type | Description |
+|---|---|---|
+| `APP` | object | A single OAuth app credential (below). Use this for one app. |
+| `APPS` | list[object] | Multiple app credentials — rarely needed. |
+| `SCOPE` | list[str] | OAuth scopes to request. |
+| `AUTH_PARAMS` | map | Extra query params on the authorize request. |
+| `OAUTH_PKCE_ENABLED` | bool | Enable PKCE where supported (recommended). |
+| `VERIFIED_EMAIL` | bool | Treat the provider's email as already verified. |
+| `EMAIL_AUTHENTICATION` | bool | Match logins to existing accounts by email. |
+
+`APP` (and each entry of `APPS`) — field names match allauth exactly:
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `client_id` | str | **required** | OAuth client id / consumer key from the provider. |
+| `secret` 🔒 | str | `""` | OAuth client secret. Set per deployment. |
+| `key` | str | `""` | Extra key a few providers require; usually blank. |
+| `name` | str | provider id | Human-readable app name. |
+| `provider_id` | str | — | Sub-provider instance id (OpenID Connect / SAML only). |
+| `settings` | map | `{}` | Provider-app-specific settings blob. |
+
+Once configured, the provider's button shows on the SPA login/signup pages
+automatically (the frontend reads the enabled providers from the allauth
+capability config). The **redirect / callback URL** to register with the
+provider is `https://<your-host>/lok/accounts/<provider>/login/callback/`.
+
+> **⚠️ 2026 disclaimer.** OAuth provider consoles, endpoint URLs, required
+> scopes, and app-verification/review policies change frequently and differ per
+> provider. The snippets above are illustrative and were accurate as of **2026**
+> — always follow the provider's current developer documentation and
+> [allauth's per-provider docs](https://docs.allauth.org/en/latest/socialaccount/providers/index.html)
+> for the exact `client_id`/`secret` fields, scopes, and callback-URL format,
+> and treat every `secret` as sensitive (inject via environment or a secret
+> file, never commit it).
 
 ---
 

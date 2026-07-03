@@ -16,6 +16,15 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         apps = settings.ENSURED_OPENID_APPS or []
 
+        if not apps:
+            self.stdout.write(
+                self.style.WARNING(
+                    "No OpenID clients configured (`openid_apps` is empty). OIDC relying "
+                    "parties (e.g. ionscale) will fail with 'client does not exist'. Add an "
+                    "`openid_apps` entry per relying party to the lok config."
+                )
+            )
+
         for app in apps:
             config = OpenIDAppConfig(**app)
 

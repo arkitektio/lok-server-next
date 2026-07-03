@@ -32,7 +32,10 @@ def accept_authorize_code(info: Info, input: AcceptAuthorizeCodeInput) -> str:
     try:
         client = OAuth2Client.objects.get(client_id=input.client_id)
     except OAuth2Client.DoesNotExist:
-        raise Exception("Client not found")
+        raise Exception(
+            f"OAuth2 client '{input.client_id}' is not registered. Add it to `openid_apps` "
+            f"in the lok config and restart — `ensureopenid` provisions it on boot."
+        )
 
     if not client.check_redirect_uri(input.redirect_uri):
         raise Exception("Invalid redirect URI")

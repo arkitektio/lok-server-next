@@ -15,6 +15,7 @@ from fakts.base_models import CompositionManifest
 from fakts.services import aliases
 from fakts.services.tokens import create_api_token  # noqa: F401  (kept for shim parity)
 from ionscale.repo import get_ionscale_repo
+from ionscale.manager import get_org_mesh
 from karakter import models as karakter_models
 
 logger = logging.getLogger(__name__)
@@ -243,12 +244,16 @@ def auto_configure_kommunity_partners(
 
 
 def create_composition_auth_key(user: karakter_models.User, composition: models.Composition, ephemeral: bool = False, tags: list[str] = None) -> models.IonscaleAuthKey:
-    layer = models.IonscaleLayer.objects.filter(
-        organization=composition.organization,
-    ).first()
+    # The mesh is a per-organization singleton, provisioned on explicit opt-in.
+    # Read-only here: a composition uses the org's mesh if it has one, but does not
+    # silently create a tailnet.
+    layer = get_org_mesh(composition.organization)
 
     if not layer:
-        raise Exception("No Ionscale layer found for organization")
+        raise Exception(
+            "This organization has no mesh. Enable the ionscale mesh for the "
+            "organization (or bring your own), or configure ionscale on this deployment."
+        )
 
     tags = ["tag:composition-" + str(composition.pk)] if tags is None else tags
 

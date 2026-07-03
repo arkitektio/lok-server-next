@@ -98,7 +98,13 @@ class Query:
 
     @kante.django_field()
     def oauth2_client_by_client_id(self, info: Info, client_id: str) -> types.ManagementOAuth2Client:
-        return OAuth2Client.objects.get(client_id=client_id)
+        try:
+            return OAuth2Client.objects.get(client_id=client_id)
+        except OAuth2Client.DoesNotExist:
+            raise Exception(
+                f"OAuth2 client '{client_id}' is not registered. Add it to `openid_apps` "
+                f"in the lok config and restart — `ensureopenid` provisions it on boot."
+            )
 
     @kante.django_field()
     def validate_device_code(self, info: Info, device_code: strawberry.ID, composition: strawberry.ID) -> types.ValidationResult:
@@ -201,7 +207,7 @@ class Query:
                 layer = fakts_models.IonscaleLayer.objects.get(tailnet_name=machine.tailnet)
                 if not layer.organization.memberships.filter(user=info.context.request.user).exists():
                      raise PermissionError("You are not a member of the organization that owns this layer.")
-                return types.ManagementMachineDetail(instance=machine, tailnet=machine.tailnet, layer_id=layer.id)
+                return types.ManagementMachine(instance=machine, tailnet=machine.tailnet, layer_id=layer.id)
             except fakts_models.IonscaleLayer.DoesNotExist:
                  # What if the machine belongs to a tailnet that is not managed by lok?
                  # For now we fail

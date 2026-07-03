@@ -38,6 +38,9 @@ users:
 - name: Demo User
   username: demo
   password: demo
+  # An email lets the demo user also log in under the email world
+  # (login_methods: [email]); it is provisioned as verified + primary.
+  email: demo@example.com
   active_organization: default
   memberships:
   - organization: default
@@ -73,6 +76,12 @@ datalayer:
 
 account:
   email_verification: none
+  # Identifier(s) users log in with. Default is username login.
+  # To enable login via email with verification, set:
+  #   login_methods: [email]
+  #   email_verification: mandatory   # requires the `email:` SMTP block below
+  # signup_fields is derived from login_methods when omitted.
+  login_methods: [username]
   login_by_code_enabled: true
   mfa_trust_enabled: true
   # SPA URLs allauth points users at ({key} is filled in by allauth). Change the host per deployment.

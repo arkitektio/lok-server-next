@@ -1,47 +1,34 @@
 from kante import Info
 import strawberry
-from api.management import types, enums
+from api.management import types
 import kante
 from fakts import models as fakts_models
 from ionscale.repo import get_ionscale_repo
-from ionscale import base_models as ionscale_models
-from ionscale.manager import sync
+from ionscale.manager import sync, ensure_org_mesh
 from karakter import models as karakter_models
 
 
 @kante.input
 class CreateIonscaleLayerInput:
-    """Input for creating a single-use magic invite link for an organization"""
+    """Input for enabling the ionscale mesh for an organization"""
 
-    organization_id: strawberry.ID = strawberry.field(description="The ID of the organization to create the tailnet layer for.")
-    name: str | None = strawberry.field(description="The name of the tailnet layer.")
+    organization_id: strawberry.ID = strawberry.field(description="The ID of the organization to enable the mesh for.")
+    name: str | None = strawberry.field(description="Deprecated — the mesh is a per-organization singleton; ignored.")
 
 
 def create_ionscale_layer(info: Info, input: CreateIonscaleLayerInput) -> types.ManagementLayer:
-    """ """
+    """Enable (opt in to) the organization's ionscale mesh.
+
+    The mesh is a per-organization singleton: if one already exists it is
+    returned unchanged; otherwise it is provisioned. See `ensure_org_mesh`.
+    """
     organization = fakts_models.Organization.objects.get(id=input.organization_id)
 
-    name = input.name or "default"
-    validated_name = name.strip().lower().replace(" ", "-")
-
-    tailnet_name = f"{organization.slug or organization.pk}-{validated_name}"
-
-    get_ionscale_repo().create_tailnet(
-        ionscale_models.TailnetCreate(
-            name=tailnet_name,
+    layer = ensure_org_mesh(organization)
+    if layer is None:
+        raise Exception(
+            "Could not enable the mesh: ionscale is not configured on this deployment."
         )
-    )
-
-    layer = fakts_models.IonscaleLayer.objects.create(
-        organization=organization,
-        name=name or "Default",
-        kind=enums.LayerKind.IONSCALE.value,
-        identifier=tailnet_name,
-        tailnet_name=tailnet_name,
-    )
-
-    sync(layer)
-
     return layer
 
 

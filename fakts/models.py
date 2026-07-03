@@ -308,7 +308,9 @@ class InstanceAlias(models.Model):
     def to_url(self, linking: base_models.LinkingContext) -> base_models.Alias:
         """Convert the alias to a URL based on the linking context."""
         if self.kind == enums.AliasKindChoices.RELATIVE.value:
-            # Relative alias, use the layer's domain
+            # Relative alias: resolved against the coordination server (the linking
+            # request host), not any layer. The client reaches it and health-checks
+            # the `challenge` directly — no layer indirection.
             return base_models.Alias(
                 id=str(self.id),
                 ssl=linking.request.is_secure,

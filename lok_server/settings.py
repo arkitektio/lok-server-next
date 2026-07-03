@@ -104,6 +104,11 @@ HEADLESS_FRONTEND_URLS = conf.account.headless_frontend_urls.model_dump()
 
 ACCOUNT_EMAIL_VERIFICATION = conf.account.email_verification  # default "none": no SMTP server by default
 
+# Which identifier(s) users log in with, and which fields signup collects.
+# Set account.login_methods to ["email"] in config.yaml to enable login via email.
+ACCOUNT_LOGIN_METHODS = set(conf.account.login_methods)
+ACCOUNT_SIGNUP_FIELDS = conf.account.signup_fields  # always populated (derived if omitted)
+
 # Authentikate section
 
 AUTH_USER_MODEL = "karakter.User"
@@ -331,4 +336,9 @@ SYSTEM_MESSAGES = conf.system_messages or [
     }
 ]
 
-SOCIALACCOUNT_PROVIDERS = conf.socialaccount_providers
+# Rebuild the plain dict allauth expects from the typed config. exclude_none drops
+# unset optional keys so allauth falls back to its own defaults for them.
+SOCIALACCOUNT_PROVIDERS = {
+    provider: cfg.model_dump(exclude_none=True)
+    for provider, cfg in conf.socialaccount_providers.items()
+}
