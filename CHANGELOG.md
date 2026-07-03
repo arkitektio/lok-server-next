@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.9 (2026-07-03)
+
+### Features
+
+- Fix ionscale supprto
+  ([`25675f6`](https://github.com/arkitektio/lok-server-next/commit/25675f61b08404700e1a7c11f2b571c17b23fe34))
+
+
 ## v1.0.0-rc.8 (2026-07-02)
 
 
