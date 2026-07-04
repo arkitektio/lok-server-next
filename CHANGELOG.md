@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.10 (2026-07-04)
+
+### Bug Fixes
+
+- Better filters
+  ([`c0cb040`](https://github.com/arkitektio/lok-server-next/commit/c0cb040d32075b2bb7bc5e17d093fec0e898cab7))
+
+
 ## v1.0.0-rc.9 (2026-07-03)
 
 ### Features
