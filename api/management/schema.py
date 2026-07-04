@@ -177,7 +177,12 @@ class Query:
 
     @kante.django_field()
     def invite_by_code(self, info: Info, invite_code: str) -> types.ManagementInvite:
-        return karakter_models.Invite.objects.get(token=invite_code)
+        invite = karakter_models.Invite.objects.get(token=invite_code)
+        # Public invites can be previewed by anyone with the link before signing in;
+        # private invites reveal nothing until the visitor is authenticated.
+        if not info.context.request.user.is_authenticated and not invite.public:
+            raise Exception("Please sign in to view this invitation")
+        return invite
 
     @kante.django_field()
     def invite(self, info: Info, id: strawberry.ID) -> types.ManagementInvite:

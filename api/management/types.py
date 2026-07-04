@@ -442,6 +442,7 @@ class ManagementInvite:
     created_for: ManagementOrganization
     created_at: datetime.datetime
     expires_at: datetime.datetime | None
+    public: bool
     status: str
     accepted_by: ManagementUser | None
     declined_by: ManagementUser | None

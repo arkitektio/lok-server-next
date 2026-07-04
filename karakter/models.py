@@ -357,6 +357,12 @@ class Invite(models.Model):
     created_for = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="invites")
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField(null=True, blank=True)
+    public = models.BooleanField(
+        default=False,
+        help_text="If true, anyone with the link can preview the invitation "
+        "(organization, inviter, expiry) before signing in. Private invites "
+        "require authentication before any details are shown.",
+    )
 
     # Status tracking
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
