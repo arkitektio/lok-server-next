@@ -14,7 +14,7 @@ class CreateInviteInput:
     organization: strawberry.ID | None
     expires_in_days: int | None = 7
     roles: list[str] | None = None  # Role identifiers to assign
-    public: bool = False  # If true, the invite can be previewed before signing in
+    public: bool = True  # If true, the invite can be previewed before signing in (default)
 
 
 def create_invite(info: Info, input: CreateInviteInput) -> types.ManagementInvite:

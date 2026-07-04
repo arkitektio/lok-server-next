@@ -106,6 +106,25 @@ class Role(models.Model):
         unique_together = ("identifier", "organization")
 
 
+class RoleSet(models.Model):
+    """A named bundle of Roles within an organization.
+
+    Lets an owner group several roles together so they can be applied at once —
+    either to seed an invite (the invitee receives every role in the set) or to
+    grant to an existing member in a single action.
+    """
+
+    name = models.CharField(max_length=1000)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, related_name="role_sets")
+    roles = models.ManyToManyField(Role, related_name="role_sets", blank=True)
+
+    class Meta:
+        unique_together = ("name", "organization")
+
+    def __str__(self):
+        return f"{self.name} ({self.organization})"
+
+
 class Scope(models.Model):
     identifier = models.CharField(max_length=1000, null=True, blank=True)
     description = models.CharField(max_length=4000, null=True, blank=True)

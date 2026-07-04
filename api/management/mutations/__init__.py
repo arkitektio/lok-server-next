@@ -37,6 +37,11 @@ from .device_group import (
     add_device_to_group,
     remove_device_from_group,
 )
+from .role_set import (
+    create_role_set,
+    update_role_set,
+    delete_role_set,
+)
 from .service_device_code import (
     accept_service_device_code,
     decline_service_device_code,

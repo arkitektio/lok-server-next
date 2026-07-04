@@ -413,6 +413,15 @@ class Mutation:
     remove_device_from_group = strawberry_django.mutation(
         resolver=mutations.remove_device_from_group,
     )
+    create_role_set = strawberry_django.mutation(
+        resolver=mutations.create_role_set,
+    )
+    update_role_set = strawberry_django.mutation(
+        resolver=mutations.update_role_set,
+    )
+    delete_role_set = strawberry_django.mutation(
+        resolver=mutations.delete_role_set,
+    )
 
     request_media_upload = strawberry_django.mutation(
         resolver=mutations.request_media_upload,

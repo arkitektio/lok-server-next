@@ -331,6 +331,18 @@ class ManagementRole:
         return queryset.filter(organization__memberships__user=info.context.request.user).distinct()
 
 
+@strawberry_django.type(models.RoleSet, pagination=True, description="""A RoleSet is a named bundle of roles within an organization that can be applied together — to seed an invite or to grant to a member in one action.""")
+class ManagementRoleSet:
+    id: strawberry.ID
+    name: str
+    organization: "ManagementOrganization"
+    roles: List["ManagementRole"] = strawberry_django.field(description="The roles bundled in this set")
+
+    @classmethod
+    def get_queryset(cls, queryset, info: Info):
+        return queryset.filter(organization__memberships__user=info.context.request.user).distinct()
+
+
 @strawberry_django.type(models.Scope, filters=filters.ManagementScopeFilter, ordering=filters.ManagementScopeOrdering, pagination=True, description="""A Scope represents a permission or capability that can be granted to clients and users. It is used to define what access level a user or client has in the system.""")
 class ManagementScope:
     id: strawberry.ID
@@ -414,6 +426,10 @@ class ManagementOrganization:
     @strawberry_django.field(description="The roles that are available in the organization")
     def roles(self) -> List["ManagementRole"]:
         return self.roles.all()
+
+    @strawberry_django.field(description="The role sets (named bundles of roles) defined in the organization")
+    def role_sets(self) -> List["ManagementRoleSet"]:
+        return self.role_sets.all()
 
     @strawberry_django.field(description="Whether the currently authenticated user is the owner of this organization.")
     def am_i_owner(self, info: Info) -> bool:
