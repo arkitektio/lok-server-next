@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.11 (2026-07-04)
+
+### Bug Fixes
+
+- More updates to the request role
+  ([`007d05e`](https://github.com/arkitektio/lok-server-next/commit/007d05ec6282b269405e30a3b6ca200fc459e704))
+
+
 ## v1.0.0-rc.10 (2026-07-04)
 
 ### Bug Fixes
