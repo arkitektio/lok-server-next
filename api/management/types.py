@@ -1,5 +1,6 @@
 import datetime
 from typing import List, Optional, cast
+from django.db.models import Q
 from karakter.datalayer import get_current_datalayer
 import strawberry
 import strawberry_django
@@ -364,6 +365,35 @@ class ManagementMembership:
     organization: "ManagementOrganization"
     roles: List["ManagementRole"] = strawberry.field(description="The roles that the user has in the organization")
     created_through: Optional["ManagementInvite"] = strawberry.field(description="The invite that created this membership")
+    brand_hue: Optional[float] = strawberry.field(description="The member's personal brand hue (0–360) for this organization, if set.")
+    role_requests: List["ManagementRoleRequest"] = strawberry_django.field(description="The role requests this member has made in the organization")
+
+
+@strawberry_django.type(
+    models.RoleRequest,
+    filters=filters.ManagementRoleRequestFilter,
+    ordering=filters.ManagementRoleRequestOrdering,
+    pagination=True,
+    description="""A member's request to be granted an additional role in their organization. The organization owner approves or declines it.""",
+)
+class ManagementRoleRequest:
+    id: strawberry.ID
+    membership: "ManagementMembership"
+    role: "ManagementRole"
+    reason: Optional[str] = strawberry.field(description="An optional note from the member explaining the request.")
+    status: str = strawberry.field(description="The status of the request: pending, approved, or declined.")
+    created_at: datetime.datetime
+    resolved_by: Optional[ManagementUser] = strawberry.field(description="The owner who approved or declined the request.")
+    responded_at: Optional[datetime.datetime]
+
+    @classmethod
+    def get_queryset(cls, queryset, info: Info):
+        # A caller may see a role request only if it is their own, or if they own
+        # the organization it targets (so owners can review their inbox).
+        user = info.context.request.user
+        return queryset.filter(
+            Q(membership__user=user) | Q(membership__organization__owner=user)
+        ).distinct()
 
 
 @strawberry_django.type(models.Organization, filters=karakter_filters.OrganizationFilter, pagination=True, description="""An Organization is a group of users that can work together on a project.""", ordering=filters.ManagementOrganizationOrdering)
@@ -372,6 +402,7 @@ class ManagementOrganization:
     slug: str
     name: str | None = strawberry.field(description="The name of this organization")
     description: str | None = strawberry.field(description="A short description of the organization")
+    brand_hue: Optional[float] = strawberry.field(description="The organization's default brand hue (0–360), if set. Members can override it per-membership.")
     users: List[ManagementUser] = strawberry.field(description="The users that are part of the organization")
     active_users: List[ManagementUser] = strawberry.field(description="The users that are currently active in the organization")
     profile: Optional["ManagementOrganizationProfile"] = strawberry.field(description="The profile of the organization")

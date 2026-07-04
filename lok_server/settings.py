@@ -52,12 +52,15 @@ if conf.ionscale is not None:
     IONSCALE_REPOSITORY = conf.ionscale.repository
     # Configured -> validate the ionscale repository at startup (fail fast).
     IONSCALE_EAGER_INIT = conf.ionscale.eager_init
+    # Auto-provision each new organization's mesh on creation.
+    IONSCALE_AUTO_CREATE_MESH = conf.ionscale.auto_create_mesh
 else:
     IONSCALE_SERVER_URL = None
     IONSCALE_ADMIN_KEY = None
     IONSCALE_COORD_URL = None
     IONSCALE_REPOSITORY = None
     IONSCALE_EAGER_INIT = False
+    IONSCALE_AUTO_CREATE_MESH = False
 
 # IONSCALE_REPOSITORY: dotted path to a zero-arg factory returning an
 # ionscale.repo.IonscaleRepo. When None, the real CLI-backed IonscaleRepository is

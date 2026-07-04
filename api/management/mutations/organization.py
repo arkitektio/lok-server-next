@@ -16,6 +16,7 @@ class UpdateOrganizationInput:
     description: str | None = None
     avatar: strawberry.ID | None = None
     slug: str | None = None
+    brand_hue: float | None = None
 
 
 def create_random_slug(name: str) -> str:
@@ -29,8 +30,13 @@ def create_random_slug(name: str) -> str:
 
 
 def update_organization(info: Info, input: UpdateOrganizationInput) -> types.ManagementOrganization:
-    """Update an organization's details including name, description, slug, and avatar."""
+    """Update an organization's details including name, description, slug, and avatar.
+
+    Only the organization owner may change these org-wide settings (including the
+    default brand hue).
+    """
     organization = models.Organization.objects.get(pk=input.id)
+    assert organization.owner == info.context.request.user, "You must own the organization to update it."
 
     if input.name is not None:
         organization.name = input.name
@@ -44,6 +50,9 @@ def update_organization(info: Info, input: UpdateOrganizationInput) -> types.Man
     if input.avatar is not None:
         organization.avatar = models.MediaStore.objects.get(pk=input.avatar)
 
+    if input.brand_hue is not None:
+        organization.brand_hue = input.brand_hue
+
     organization.save()
     logger.info(f"Updated Organization: {organization.id} with name: {organization.name}")
     return organization
@@ -53,6 +62,7 @@ def update_organization(info: Info, input: UpdateOrganizationInput) -> types.Man
 class CreateOrganizationInput:
     name: str
     description: str | None = None
+    brand_hue: float | None = None
 
 
 def create_organization(info: Info, input: CreateOrganizationInput) -> types.ManagementOrganization:
@@ -61,6 +71,7 @@ def create_organization(info: Info, input: CreateOrganizationInput) -> types.Man
         slug=create_random_slug(input.name),
         name=input.name,
         description=input.description,
+        brand_hue=input.brand_hue,
         owner=info.context.request.user,
     )
     logger.info(f"Created Organization: {organization.id} with name: {organization.name}")
@@ -70,6 +81,17 @@ def create_organization(info: Info, input: CreateOrganizationInput) -> types.Man
         organization=organization,
         roles=["admin"],
     )
+
+    # Provision the organization's mesh up front when enabled (IONSCALE_AUTO_CREATE_MESH).
+    # ensure_org_mesh is idempotent and degrades gracefully if ionscale isn't
+    # configured, so a failed/misconfigured mesh never breaks org creation.
+    from django.conf import settings as django_settings
+
+    if getattr(django_settings, "IONSCALE_AUTO_CREATE_MESH", False):
+        from ionscale.manager import ensure_org_mesh
+
+        ensure_org_mesh(organization)
+
     return organization
 
 

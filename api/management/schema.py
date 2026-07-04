@@ -37,6 +37,7 @@ class Query:
     instance_aliases: list[types.ManagementInstanceAlias] = kante.django_field()
     social_accounts: list[types.ManagementSocialAccount] = kante.django_field()
     memberships: list[types.ManagementMembership] = kante.django_field()
+    role_requests: list[types.ManagementRoleRequest] = kante.django_field()
     scopes: list[types.ManagementScope] = kante.django_field()
     roles: list[types.ManagementRole] = kante.django_field()
     compositions: list[types.ManagementComposition] = kante.django_field()
@@ -305,6 +306,22 @@ class Mutation:
     )
     delete_membership = strawberry_django.mutation(
         resolver=mutations.delete_membership,
+    )
+    set_membership_brand_hue = strawberry_django.mutation(
+        resolver=mutations.set_membership_brand_hue,
+    )
+
+    request_role = strawberry_django.mutation(
+        resolver=mutations.request_role,
+    )
+    approve_role_request = strawberry_django.mutation(
+        resolver=mutations.approve_role_request,
+    )
+    decline_role_request = strawberry_django.mutation(
+        resolver=mutations.decline_role_request,
+    )
+    cancel_role_request = strawberry_django.mutation(
+        resolver=mutations.cancel_role_request,
     )
 
     # Compsition Device Code Mutations

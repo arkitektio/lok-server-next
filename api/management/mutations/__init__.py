@@ -11,7 +11,13 @@ from .invite import (
     decline_invite,
     cancel_invite,
 )
-from .membership import update_membership, delete_membership
+from .membership import update_membership, delete_membership, set_membership_brand_hue
+from .role_request import (
+    request_role,
+    approve_role_request,
+    decline_role_request,
+    cancel_role_request,
+)
 from .device_code import (
     accept_device_code,
     decline_device_code,

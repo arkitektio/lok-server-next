@@ -161,6 +161,31 @@ class ManagementMembershipFilter:
         return Q(**{f"{prefix}organization__id": value})
 
 
+@strawberry_django.order_type(karakter_models.RoleRequest)
+class ManagementRoleRequestOrdering:
+    id: strawberry.auto
+    created_at: strawberry.auto
+
+
+@strawberry_django.filter_type(karakter_models.RoleRequest)
+class ManagementRoleRequestFilter:
+    @strawberry_django.filter_field
+    def ids(self, value: list[strawberry.ID], prefix: str) -> Q:
+        return Q(**{f"{prefix}id__in": value})
+
+    @strawberry_django.filter_field
+    def organization(self, value: strawberry.ID, prefix: str) -> Q:
+        return Q(**{f"{prefix}membership__organization__id": value})
+
+    @strawberry_django.filter_field
+    def membership(self, value: strawberry.ID, prefix: str) -> Q:
+        return Q(**{f"{prefix}membership__id": value})
+
+    @strawberry_django.filter_field
+    def status(self, value: str, prefix: str) -> Q:
+        return Q(**{f"{prefix}status": value})
+
+
 @strawberry_django.order_type(fakts_models.Client)
 class ManagementClientOrdering:
     id: strawberry.auto

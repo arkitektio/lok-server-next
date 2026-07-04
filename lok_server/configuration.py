@@ -106,6 +106,11 @@ class IonscaleSettings(BaseModel):
     coord_url: str = Field(description="Public coordination URL advertised to clients.")
     repository: Optional[str] = Field(default=None, description="Dotted path to an IonscaleRepo factory (tests).")
     eager_init: bool = Field(default=False, description="Eagerly initialize the ionscale repo on boot (tests).")
+    auto_create_mesh: bool = Field(
+        default=True,
+        description="Automatically provision the mesh for each new organization on creation. "
+        "Requires ionscale to be configured; when disabled, meshes are only created on explicit opt-in.",
+    )
 
 
 class DatalayerBucket(BaseModel):
