@@ -929,11 +929,11 @@ class ManagementDevice:
 
     @classmethod
     def get_queryset(cls, queryset, info: Info):
-        # Devices are always scoped to the caller's active (current) organization;
-        # we never surface devices from the user's other organizations. Uses the raw
-        # FK id (no lazy relation load in the async context) and falls back to an empty
-        # queryset (never "all devices") when no active org is set.
-        return queryset.filter(organization_id=info.context.request.user.active_organization_id)
+        # Devices are scoped to every organization the caller is a member of (matching
+        # ManagementDeviceGroup / ManagementClient). Callers narrow to a single org via
+        # the `organization` filter (e.g. the /organization/:orgId/devices page); scoping
+        # to only the active org would hide devices of orgs the user is legitimately in.
+        return queryset.filter(organization__memberships__user=info.context.request.user).distinct()
 
 
 @strawberry.type(description="A Public Source is a source of information about a client that is publicly available. E.g. a GitHub repository or a website.")

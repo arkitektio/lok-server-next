@@ -75,3 +75,30 @@ def add_device_to_group(info: Info, input: AddDeviceToGroupInput) -> types.Manag
     device.save()
 
     return device
+
+
+@kante.input
+class RemoveDeviceFromGroupInput:
+    """Input for removing a device from a device group"""
+
+    device: strawberry.ID
+    device_group: strawberry.ID
+
+
+def remove_device_from_group(info: Info, input: RemoveDeviceFromGroupInput) -> types.ManagementDevice:
+    """ """
+
+    try:
+        dg = fakts_models.DeviceGroup.objects.get(id=input.device_group)
+    except fakts_models.DeviceGroup.DoesNotExist:
+        raise Exception("Invalid device group ID")
+
+    try:
+        device = fakts_models.Device.objects.get(id=input.device)
+    except fakts_models.Device.DoesNotExist:
+        raise Exception("Invalid device ID")
+
+    device.device_groups.remove(dg)
+    device.save()
+
+    return device

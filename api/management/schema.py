@@ -405,6 +405,9 @@ class Mutation:
     add_device_to_group = strawberry_django.mutation(
         resolver=mutations.add_device_to_group,
     )
+    remove_device_from_group = strawberry_django.mutation(
+        resolver=mutations.remove_device_from_group,
+    )
 
     request_media_upload = strawberry_django.mutation(
         resolver=mutations.request_media_upload,

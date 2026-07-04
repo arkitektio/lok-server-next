@@ -17,6 +17,7 @@ class UpdateOrganizationInput:
     avatar: strawberry.ID | None = None
     slug: str | None = None
     brand_hue: float | None = None
+    sync_mine: bool = False
 
 
 def create_random_slug(name: str) -> str:
@@ -54,6 +55,17 @@ def update_organization(info: Info, input: UpdateOrganizationInput) -> types.Man
         organization.brand_hue = input.brand_hue
 
     organization.save()
+
+    # sync_mine: also copy the new default hue onto the owner's own membership, so
+    # the owner's personal colour matches the org default they just set. Snapshots
+    # the value (does not make the membership permanently follow the default).
+    if input.sync_mine and input.brand_hue is not None:
+        membership, _ = models.Membership.objects.get_or_create(
+            user=info.context.request.user, organization=organization
+        )
+        membership.brand_hue = input.brand_hue
+        membership.save(update_fields=["brand_hue"])
+
     logger.info(f"Updated Organization: {organization.id} with name: {organization.name}")
     return organization
 

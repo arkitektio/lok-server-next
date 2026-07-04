@@ -35,6 +35,7 @@ from .device_group import (
     create_device_group,
     delete_device_group,
     add_device_to_group,
+    remove_device_from_group,
 )
 from .service_device_code import (
     accept_service_device_code,
