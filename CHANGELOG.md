@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.14 (2026-07-04)
+
+### Bug Fixes
+
+- Add rolesets
+  ([`6c3e847`](https://github.com/arkitektio/lok-server-next/commit/6c3e847c890f5a20e3e780ce2ec39a1cdfc82172))
+
+
 ## v1.0.0-rc.13 (2026-07-04)
 
 
