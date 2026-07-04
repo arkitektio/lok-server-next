@@ -40,6 +40,7 @@ class Scope:
 
 @strawberry_django.type(
     models.Layer,
+    ordering=filters.LayerOrdering,
     description="A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself.",
     pagination=True,
     filters=filters.LayerFilter,
@@ -58,6 +59,7 @@ class Layer:
 
 @strawberry_django.type(
     models.Composition,
+    ordering=filters.CompositionOrdering,
     description="A Composition is a specific configuration of a Service. It contains the configuration for a particular version of the service.",
     pagination=True,
     filters=filters.CompositionFilter,
@@ -73,6 +75,7 @@ class Composition:
 
 @strawberry_django.type(
     models.Service,
+    ordering=filters.ServiceOrdering,
     description="A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself.",
     pagination=True,
     filters=filters.ServiceFilter,
@@ -90,6 +93,7 @@ class Service:
 
 @strawberry_django.type(
     models.ServiceRelease,
+    ordering=filters.ServiceReleaseOrdering,
     description="A ServiceRelease is a specific release of a Service. It contains the configuration for a particular version of the service.",
     pagination=True,
     filters=filters.ServiceReleaseFilter,
@@ -107,6 +111,7 @@ class ServiceRelease:
 
 @strawberry_django.type(
     models.ServiceInstance,
+    ordering=filters.ServiceInstanceOrdering,
     description="A ServiceInstance is a configured instance of a Service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information.",
     pagination=True,
     filters=filters.ServiceInstanceFilter,
@@ -129,6 +134,7 @@ class ServiceInstance:
 
 @strawberry_django.type(
     models.InstanceAlias,
+    ordering=filters.InstanceAliasOrdering,
     description="An alias for a service instance. This is used to provide a more user-friendly name for the instance.",
 )
 class InstanceAlias:
@@ -146,6 +152,7 @@ class InstanceAlias:
 
 @strawberry_django.type(
     models.ServiceInstanceMapping,
+    ordering=filters.ServiceInstanceMappingOrdering,
     description="A ServiceInstance is a configured instance of a Service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information.",
 )
 class ServiceInstanceMapping:
@@ -165,6 +172,7 @@ class DefinedValue:
 
 @strawberry_django.type(
     models.App,
+    ordering=filters.AppOrdering,
     filters=filters.AppFilter,
     description="An App is the Arkitekt equivalent of a Software Application. It is a collection of `Releases` that can be all part of the same application. E.g the App `Napari` could have the releases `0.1.0` and `0.2.0`.",
     pagination=True,
@@ -181,6 +189,7 @@ class App:
 
 @strawberry_django.type(
     models.Release,
+    ordering=filters.ReleaseOrdering,
     description="A Release is a version of an app. Releases might change over time. E.g. a release might be updated to fix a bug, and the release might be updated to add a new feature. This is why they are the home for `scopes` and `requirements`, which might change over the release cycle.",
 )
 class Release:
@@ -202,6 +211,7 @@ class PublicSource:
 
 @strawberry_django.type(
     models.Client,
+    ordering=filters.ClientOrdering,
     description="""A client is a way of authenticating users with a release.
  The strategy of authentication is defined by the kind of client. And allows for different authentication flow. 
  E.g a client can be a DESKTOP app, that might be used by multiple users, or a WEBSITE that wants to connect to a user's account, 
@@ -270,6 +280,7 @@ class Client:
 
 @strawberry_django.type(
     models.DeviceGroup,
+    ordering=filters.DeviceGroupOrdering,
     description="A DeviceGroup is a group of compute nodes that can be used to run clients. DeviceGroups can be used to group compute nodes by location, hardware type, or any other criteria.",
     pagination=True,
     filters=filters.DeviceGroupFilter,
@@ -284,7 +295,7 @@ class DeviceGroup:
         return models.DeviceGroup.objects.filter(organization=info.context.request.organization)
 
 
-@strawberry_django.type(models.Device, filters=filters.DeviceFilter, pagination=True)
+@strawberry_django.type(models.Device, filters=filters.DeviceFilter, pagination=True, ordering=filters.DeviceOrdering)
 class Device:
     id: strawberry.ID
     name: str | None
@@ -296,7 +307,7 @@ class Device:
         return models.Device.objects.filter(organization=info.context.request.organization)
 
 
-@strawberry_django.type(models.RedeemToken, filters=filters.RedeemTokenFilter, pagination=True)
+@strawberry_django.type(models.RedeemToken, filters=filters.RedeemTokenFilter, pagination=True, ordering=filters.RedeemTokenOrdering)
 class RedeemToken:
     id: strawberry.ID
     token: str = strawberry.field(description="The token of the redeem token")

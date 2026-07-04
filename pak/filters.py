@@ -3,44 +3,48 @@ from pak import models
 from typing import Optional
 from strawberry_django.filters import FilterLookup
 import strawberry_django
+from django.db.models import Q
 
 
 @strawberry_django.filter_type(models.StashItem)
 class StashItemFilter:
-    search: str | None
     username: Optional[FilterLookup[str]] | None
-    ids: list[strawberry.ID] | None
-    stashes: Optional[list[strawberry.ID]] | None
 
-    def filter_ids(self, queryset, info):
-        if self.ids is None:
-            return queryset
-        return queryset.filter(id__in=self.ids)
+    @strawberry_django.filter_field
+    def ids(self, value: list[strawberry.ID], prefix: str) -> Q:
+        return Q(**{f"{prefix}id__in": value})
 
-    def filter_search(self, queryset, info):
-        if self.search is None:
-            return queryset
-        return queryset.filter(username__contains=self.search)
+    @strawberry_django.filter_field
+    def search(self, value: str, prefix: str) -> Q:
+        return Q(**{f"{prefix}username__contains": value})
 
-    def filter_stashes(self, queryset, info):
-        if self.stashes is None:
-            return queryset
-        return queryset.filter(stashes__in=self.stashes)
+    @strawberry_django.filter_field
+    def stashes(self, value: list[strawberry.ID], prefix: str) -> Q:
+        return Q(**{f"{prefix}stashes__in": value})
 
 
 @strawberry_django.filter_type(models.Stash, description="__doc__")
 class StashFilter:
     """A Filterset to Filter Groups"""
 
-    search: str | None
-    ids: list[strawberry.ID] | None
+    @strawberry_django.filter_field
+    def ids(self, value: list[strawberry.ID], prefix: str) -> Q:
+        return Q(**{f"{prefix}id__in": value})
 
-    def filter_ids(self, queryset, info):
-        if self.ids is None:
-            return queryset
-        return queryset.filter(id__in=self.ids)
+    @strawberry_django.filter_field
+    def search(self, value: str, prefix: str) -> Q:
+        return Q(**{f"{prefix}name__contains": value})
 
-    def filter_search(self, queryset, info):
-        if self.search is None:
-            return queryset
-        return queryset.filter(name__contains=self.search)
+
+@strawberry_django.order_type(models.StashItem)
+class StashItemOrdering:
+    id: strawberry.auto
+    updated_at: strawberry.auto
+
+
+@strawberry_django.order_type(models.Stash)
+class StashOrdering:
+    id: strawberry.auto
+    name: strawberry.auto
+    created_at: strawberry.auto
+    updated_at: strawberry.auto

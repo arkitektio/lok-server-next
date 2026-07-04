@@ -60,6 +60,7 @@ class ManagementMediaStore:
 
 @strawberry_django.type(
     models.User,
+    ordering=filters.ManagementUserOrdering,
     filters=karakter_filters.UserFilter,
     pagination=True,
     description="""
@@ -310,7 +311,7 @@ class ManagementSystemMessage:
     user: ManagementUser
 
 
-@strawberry_django.type(models.Role, filters=filters.ManagementRoleFilter, order=filters.ManagementRoleOrder, pagination=True, description="""A Role is a set of permissions that can be assigned to a user. It is used to define what a user can do in the system.""")
+@strawberry_django.type(models.Role, filters=filters.ManagementRoleFilter, ordering=filters.ManagementRoleOrdering, pagination=True, description="""A Role is a set of permissions that can be assigned to a user. It is used to define what a user can do in the system.""")
 class ManagementRole:
     id: strawberry.ID
     identifier: str
@@ -329,7 +330,7 @@ class ManagementRole:
         return queryset.filter(organization__memberships__user=info.context.request.user).distinct()
 
 
-@strawberry_django.type(models.Scope, filters=filters.ManagementScopeFilter, order=filters.ManagementScopeOrder, pagination=True, description="""A Scope represents a permission or capability that can be granted to clients and users. It is used to define what access level a user or client has in the system.""")
+@strawberry_django.type(models.Scope, filters=filters.ManagementScopeFilter, ordering=filters.ManagementScopeOrdering, pagination=True, description="""A Scope represents a permission or capability that can be granted to clients and users. It is used to define what access level a user or client has in the system.""")
 class ManagementScope:
     id: strawberry.ID
     identifier: str
@@ -351,7 +352,7 @@ class ManagementScope:
 @strawberry_django.type(
     models.Membership,
     filters=filters.ManagementMembershipFilter,
-    order=filters.ManagementMembershipOrder,
+    ordering=filters.ManagementMembershipOrdering,
     pagination=True,
     description="""
 A Membership is a relation between a User and an Organization. It can have multiple Roles assigned to it.
@@ -365,7 +366,7 @@ class ManagementMembership:
     created_through: Optional["ManagementInvite"] = strawberry.field(description="The invite that created this membership")
 
 
-@strawberry_django.type(models.Organization, filters=karakter_filters.OrganizationFilter, pagination=True, description="""An Organization is a group of users that can work together on a project.""")
+@strawberry_django.type(models.Organization, filters=karakter_filters.OrganizationFilter, pagination=True, description="""An Organization is a group of users that can work together on a project.""", ordering=filters.ManagementOrganizationOrdering)
 class ManagementOrganization:
     id: strawberry.ID
     slug: str
@@ -382,6 +383,13 @@ class ManagementOrganization:
     @strawberry_django.field(description="The roles that are available in the organization")
     def roles(self) -> List["ManagementRole"]:
         return self.roles.all()
+
+    @strawberry_django.field(description="Whether the currently authenticated user is the owner of this organization.")
+    def am_i_owner(self, info: Info) -> bool:
+        user = info.context.request.user
+        if not user.is_authenticated:
+            return False
+        return self.owner_id == user.id
 
     @classmethod
     def get_queryset(cls, queryset, info: Info):
@@ -520,6 +528,7 @@ class ManagementCompositionManifest:
 
 @strawberry_django.type(
     fakts_models.Service,
+    ordering=filters.ManagementServiceOrdering,
     description="A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself.",
     pagination=True,
     filters=fakts_filters.ServiceFilter,
@@ -540,7 +549,7 @@ class ManagementService:
     description="A KommunityPartner represents a pre-configured partner that can provide compositions and services to organizations. Partners can be auto-configured to automatically create compositions for new organizations.",
     pagination=True,
     filters=filters.ManagementKommunityPartnerFilter,
-    order=filters.ManagementKommunityPartnerOrder,
+    ordering=filters.ManagementKommunityPartnerOrdering,
 )
 class ManagementKommunityPartner:
     id: strawberry.ID
@@ -600,6 +609,7 @@ class ValidationResult:
 
 @strawberry_django.type(
     fakts_models.ServiceRelease,
+    ordering=filters.ManagementServiceReleaseOrdering,
     description="A ServiceInstance is a configured instance of a Service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information.",
     pagination=True,
     filters=fakts_filters.ServiceInstanceFilter,
@@ -618,7 +628,7 @@ class ManagementServiceRelease:
     description="A ServiceInstance is a configured instance of a Service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information.",
     pagination=True,
     filters=filters.ManagementServiceInstanceFilter,
-    order=filters.ManagementServiceInstanceOrder,
+    ordering=filters.ManagementServiceInstanceOrdering,
 )
 class ManagementServiceInstance:
     id: strawberry.ID
@@ -648,7 +658,7 @@ class ManagementServiceInstance:
     description="A Composition is a collection of service instances and clients that work together. It represents a deployable configuration for an organization.",
     pagination=True,
     filters=filters.ManagementCompositionFilter,
-    order=filters.ManagementCompositionOrder,
+    ordering=filters.ManagementCompositionOrdering,
 )
 class ManagementComposition:
     id: strawberry.ID
@@ -671,7 +681,7 @@ class ManagementComposition:
     fakts_models.InstanceAlias,
     description="An alias for a service instance. This is used to provide a more user-friendly name for the instance.",
     filters=filters.ManagementInstanceAliasFilter,
-    order=filters.ManagementInstanceAliasOrder,
+    ordering=filters.ManagementInstanceAliasOrdering,
     pagination=True,
 )
 class ManagementInstanceAlias:
@@ -695,6 +705,7 @@ class ManagementInstanceAlias:
 
 @strawberry_django.type(
     fakts_models.ServiceInstanceMapping,
+    ordering=filters.ManagementServiceInstanceMappingOrdering,
     filters=filters.ServiceInstanceMappingFilter,
     pagination=True,
     description="A ServiceInstance is a configured instance of a Service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information.",
@@ -709,6 +720,7 @@ class ManagementServiceInstanceMapping:
 
 @strawberry_django.type(
     fakts_models.App,
+    ordering=filters.ManagementAppOrdering,
     filters=fakts_filters.AppFilter,
     description="An App is the Arkitekt equivalent of a Software Application. It is a collection of `Releases` that can be all part of the same application. E.g the App `Napari` could have the releases `0.1.0` and `0.2.0`.",
     pagination=True,
@@ -777,7 +789,7 @@ class ManagementMachine:
     description="A Layer is a transport layer that needs to be used to reach an alias. E.g a VPN layer or a Tor layer.",
     pagination=True,
     filters=filters.ManagementLayerFilter,
-    order=filters.ManagementLayerOrder,
+    ordering=filters.ManagementLayerOrdering,
 )
 class ManagementLayer:
     id: strawberry.ID
@@ -820,7 +832,7 @@ class ManagementLayer:
 @strawberry_django.type(
     fakts_models.IonscaleAuthKey,
     filters=filters.ManagementIonscaleAuthKeyFilter,
-    order=filters.ManagementIonscaleAuthKeyOrder,
+    ordering=filters.ManagementIonscaleAuthKeyOrdering,
     pagination=True,
 )
 class ManagementIonscaleAuthKey:
@@ -839,6 +851,7 @@ class ManagementIonscaleAuthKey:
 
 @strawberry_django.type(
     fakts_models.Release,
+    ordering=filters.ManagementReleaseOrdering,
     description="A Release is a version of an app. Releases might change over time. E.g. a release might be updated to fix a bug, and the release might be updated to add a new feature. This is why they are the home for `scopes` and `requirements`, which might change over the release cycle.",
 )
 class ManagementRelease:
@@ -857,7 +870,7 @@ class ManagementRelease:
     description="A DeviceGroup is a group of compute nodes that can be used to run clients. DeviceGroups can be used to group compute nodes by location, hardware type, or any other criteria.",
     pagination=True,
     filters=filters.ManagementDeviceGroupFilter,
-    order=filters.ManagementDeviceGroupOrder,
+    ordering=filters.ManagementDeviceGroupOrdering,
 )
 class ManagementDeviceGroup:
     id: strawberry.ID
@@ -873,7 +886,7 @@ class ManagementDeviceGroup:
         return queryset.filter(organization__memberships__user=info.context.request.user).distinct()
 
 
-@strawberry_django.type(fakts_models.Device, filters=filters.ManagementDeviceFilter, order=filters.ManagementDeviceOrder, pagination=True)
+@strawberry_django.type(fakts_models.Device, filters=filters.ManagementDeviceFilter, ordering=filters.ManagementDeviceOrdering, pagination=True)
 class ManagementDevice:
     id: strawberry.ID
     name: str | None
@@ -898,7 +911,7 @@ class ManagementPublicSource:
     url: str = strawberry.field(description="The url of the public source.")
 
 
-@strawberry_django.type(fakts_models.UsedAlias, pagination=True)
+@strawberry_django.type(fakts_models.UsedAlias, pagination=True, ordering=filters.ManagementUsedAliasOrdering)
 class ManagementUsedAlias:
     id: strawberry.ID
     key: str
@@ -915,7 +928,7 @@ class ManagementUsedAlias:
  E.g a client can be a DESKTOP app, that might be used by multiple users, or a WEBSITE that wants to connect to a user's account, 
  but also a DEVELOPMENT client that is used by a developer to test the app. The client model thinly wraps the oauth2 client model, which is used to authenticate users.""",
     filters=filters.ManagementClientFilter,
-    order=filters.ManagementClientOrder,
+    ordering=filters.ManagementClientOrdering,
     pagination=True,
 )
 class ManagementClient:
@@ -1050,7 +1063,7 @@ class ManagementCompositionDeviceCode:
         return base_models.CompositionManifest(**self.manifest)
 
 
-@strawberry_django.type(fakts_models.RedeemToken, pagination=True)
+@strawberry_django.type(fakts_models.RedeemToken, filters=filters.ManagementRedeemTokenFilter, pagination=True, ordering=filters.ManagementRedeemTokenOrdering)
 class ManagementRedeemToken:
     id: strawberry.ID
     created_at: datetime.datetime
@@ -1062,4 +1075,4 @@ class ManagementRedeemToken:
 
     @classmethod
     def get_queryset(cls, queryset, info: Info):
-        return queryset.filter(organization__memberships__user=info.context.request.user).distinct()
+        return queryset.filter(composition__organization__memberships__user=info.context.request.user).distinct()

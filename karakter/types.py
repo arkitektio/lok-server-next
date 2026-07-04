@@ -28,6 +28,7 @@ def build_prescoper(field="organization"):
 
 @strawberry_django.type(
     models.Group,
+    ordering=filters.GroupOrdering,
     filters=filters.GroupFilter,
     pagination=True,
     description="""
@@ -60,6 +61,7 @@ class MediaStore:
 
 @strawberry_django.type(
     models.User,
+    ordering=filters.UserOrdering,
     filters=filters.UserFilter,
     pagination=True,
     description="""
@@ -300,7 +302,7 @@ class SystemMessage:
     user: User
 
 
-@strawberry_django.type(models.Role, filters=filters.RoleFilter, pagination=True, description="""A Role is a set of permissions that can be assigned to a user. It is used to define what a user can do in the system.""")
+@strawberry_django.type(models.Role, filters=filters.RoleFilter, pagination=True, description="""A Role is a set of permissions that can be assigned to a user. It is used to define what a user can do in the system.""", ordering=filters.RoleOrdering)
 class Role:
     id: strawberry.ID
     identifier: str
@@ -317,6 +319,7 @@ class Role:
 
 @strawberry_django.type(
     models.Membership,
+    ordering=filters.MembershipOrdering,
     filters=filters.MembershipFilter,
     pagination=True,
     description="""
@@ -338,7 +341,7 @@ class Membership:
         return build_prescoped_queryset(info, queryset, field="organization")
 
 
-@strawberry_django.type(models.Organization, filters=filters.OrganizationFilter, pagination=True, description="""An Organization is a group of users that can work together on a project.""")
+@strawberry_django.type(models.Organization, filters=filters.OrganizationFilter, pagination=True, description="""An Organization is a group of users that can work together on a project.""", ordering=filters.OrganizationOrdering)
 class Organization:
     id: strawberry.ID
     slug: str
@@ -363,13 +366,13 @@ class Organization:
         return queryset.filter(memberships__organization=info.context.request.organization).distinct()
 
 
-@strawberry_django.type(models.ComChannel, filters=filters.OrganizationFilter, pagination=True, description="""An Organization is a group of users that can work together on a project.""")
+@strawberry_django.type(models.ComChannel, filters=filters.OrganizationFilter, pagination=True, description="""An Organization is a group of users that can work together on a project.""", ordering=filters.ComChannelOrdering)
 class ComChannel:
     id: strawberry.ID
     user: User
 
 
-@strawberry_django.type(models.Invite, filters=filters.OrganizationFilter, pagination=True, description="""A single-use magic invite link that allows one person to join an organization.""")
+@strawberry_django.type(models.Invite, filters=filters.OrganizationFilter, pagination=True, description="""A single-use magic invite link that allows one person to join an organization.""", ordering=filters.InviteOrdering)
 class Invite:
     id: strawberry.ID
     token: str

@@ -1,5 +1,5 @@
 import strawberry_django
-from komment import models, scalars, enums
+from komment import models, scalars, enums, filters
 import strawberry
 from typing import Optional
 from typing import Annotated, Literal, Union
@@ -103,7 +103,7 @@ class Serializer(BaseModel):
     )
 
 
-@strawberry_django.type(models.Comment)
+@strawberry_django.type(models.Comment, ordering=filters.CommentOrdering)
 class Comment:
     id: strawberry.ID
     object: str

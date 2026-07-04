@@ -8,6 +8,7 @@ from kante.types import Info
 
 @strawberry_django.type(
     models.StashItem,
+    ordering=filters.StashItemOrdering,
     filters=filters.StashItemFilter,
     pagination=True,
     description="""
@@ -25,6 +26,7 @@ class StashItem:
 
 @strawberry_django.type(
     models.Stash,
+    ordering=filters.StashOrdering,
     filters=filters.StashFilter,
     pagination=True,
     description="""
