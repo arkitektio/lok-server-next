@@ -1,12 +1,18 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.13 (2026-07-04)
+
+
 ## v1.0.0-rc.12 (2026-07-04)
 
 ### Bug Fixes
 
 - Device group
   ([`a720b12`](https://github.com/arkitektio/lok-server-next/commit/a720b12eb3b804e45c5db5abe96068cb09f2051f))
+
+- Public invites
+  ([`6115a29`](https://github.com/arkitektio/lok-server-next/commit/6115a298147f7c0e2d8cd493d62bd3b43ff0662d))
 
 
 ## v1.0.0-rc.11 (2026-07-04)
