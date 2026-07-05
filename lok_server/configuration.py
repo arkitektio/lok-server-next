@@ -294,8 +294,9 @@ class Settings(BaseSettings):
         missing rather than locking users out at runtime.
 
         Note: ``account.login_by_code_enabled`` has the same email dependency but
-        is intentionally not enforced here — when it can't send, password login
-        still works, so a hard failure would be too strict (see CONFIG.md)."""
+        is not hard-failed here — password login still works without it. Instead it
+        is soft-disabled (effective value ``False``) when no ``email:`` block is
+        present; see ``ACCOUNT_LOGIN_BY_CODE_ENABLED`` in settings.py and CONFIG.md."""
         if self.account.email_verification == "mandatory" and self.email is None:
             raise ValueError(
                 "account.email_verification is 'mandatory' but no `email:` SMTP block "

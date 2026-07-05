@@ -144,7 +144,14 @@ MIDDLEWARE = [
 ]
 
 
-ACCOUNT_LOGIN_BY_CODE_ENABLED = conf.account.login_by_code_enabled  # Enable login by code
+# Login-by-code emails the user a one-time code, so it needs a working outbound
+# mail path. With no `email:` SMTP block, Django falls back to the default
+# localhost SMTP backend (which can't send), so advertising the option would only
+# surface a flow that always fails. Soft-disable it in that case — password login
+# still works, matching the "soft dependency" note in configuration.py / CONFIG.md.
+# allauth's /config endpoint reports this effective value, so the SPA hides the
+# "Send me a sign-in code" option automatically.
+ACCOUNT_LOGIN_BY_CODE_ENABLED = conf.account.login_by_code_enabled and conf.email is not None
 MFA_TRUST_ENABLED = conf.account.mfa_trust_enabled  # Allow trusted devices
 
 # S3_PUBLIC_DOMAIN = f"{conf.s3.public.host}:{conf.s3.public.port}"  # TODO: FIx

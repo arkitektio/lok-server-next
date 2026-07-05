@@ -265,9 +265,10 @@ Notes:
 - `email_verification: mandatory` **requires** an `email:` SMTP block — otherwise
   verification mails can't be sent and users are permanently locked out. Config
   loading fails fast if it is missing.
-- `login_by_code_enabled` (on by default) also sends email, but is **not**
-  enforced the same way: if mail can't be sent, password login still works, so it
-  is left as a soft dependency rather than a hard failure.
+- `login_by_code_enabled` (on by default) also sends email, but is a **soft**
+  dependency rather than a hard failure: when no `email:` block is configured it
+  is automatically disabled (the "Send me a sign-in code" option is hidden) instead
+  of advertising a flow that can't deliver a code. Password login still works.
 - `signup_fields` must collect an email (`email*`) whenever `login_methods`
   includes `email`; this is validated on load.
 
