@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.15 (2026-07-06)
+
+### Bug Fixes
+
+- Better .well-known plus privace guards
+  ([`b87d6e0`](https://github.com/arkitektio/lok-server-next/commit/b87d6e0c203e60a2e23c97b2cd135bc3c07aab7a))
+
+
 ## v1.0.0-rc.14 (2026-07-04)
 
 ### Bug Fixes
