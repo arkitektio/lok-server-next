@@ -94,6 +94,15 @@ class DeploymentSettings(BaseModel):
 
     name: str = Field(default="default", description="Deployment name.")
     description: str = Field(default="A Basic Arkitekt Deployment", description="Deployment description.")
+    configure_url: str = Field(
+        default="/configure/{code}",
+        description="URL template the fakts well-known advertises as the device-code "
+        "`configure` endpoint; the literal `{code}` placeholder is substituted by the "
+        "client with the device code. A root-relative path (`/configure/{code}`) is "
+        "resolved against the deployment's base domain; a value carrying a scheme "
+        "(`https://…`) is used verbatim; a bare host (`go.arkitekt.live/configure/{code}`) "
+        "is treated as https. The well-known always advertises the resolved *absolute* URL.",
+    )
 
 
 class IonscaleSettings(BaseModel):
@@ -274,6 +283,14 @@ class Settings(BaseSettings):
     private_key: str = Field(description="OIDC/OAuth2 RSA private signing key (PEM). Secret — must be set.")
     oidc_issuer: str = Field(default="http://lok", description="OIDC issuer URL advertised by lok.")
     kontrol_frontend_url: str = Field(default="/", description="Frontend URL used for redirects.")
+    privacy_guards: Literal["strict", "opt-in", "disabled"] = Field(
+        default="opt-in",
+        description="Policy for integrated login widgets (e.g. Google One Tap) that load "
+        "third-party scripts and can identify/track the visitor before any click. "
+        "'strict' = never load; 'opt-in' = show a consent prompt first (default, matches "
+        "the SPA's current behavior); 'disabled' = load freely with no prompt. Reported "
+        "verbatim on the allauth headless /config endpoint so the SPA gates the widget.",
+    )
     socialaccount_providers: Dict[str, SocialProviderConfig] = Field(
         default_factory=dict,
         description="django-allauth SOCIALACCOUNT_PROVIDERS, keyed by provider id (e.g. 'google'). "

@@ -1,5 +1,10 @@
 deployment:
   name: default
+  # URL the fakts well-known advertises as its `configure` endpoint. `{code}` is
+  # substituted by the client. Absolute (with scheme or a bare host) is used as-is;
+  # a `/`-relative path resolves against the deployment's base domain. The
+  # well-known always advertises the resolved absolute URL.
+  configure_url: go.arkitekt.live/configure/{code}
 django:
   admin:
     email: admin@admin.com
@@ -92,6 +97,11 @@ account:
   social_provider_apps:
   - allauth.socialaccount.providers.orcid
   - allauth.socialaccount.providers.google
+
+# Policy for integrated login widgets that load third-party scripts and can track
+# before a click (e.g. Google One Tap). strict = never load; opt-in = consent
+# prompt first (default); disabled = load freely. Redirect buttons are unaffected.
+privacy_guards: opt-in
 
 # OIDC/OAuth2 clients provisioned on boot. Provide the client(s), secret(s) and
 # redirect_uris per deployment (see the `ensureopenid` command).

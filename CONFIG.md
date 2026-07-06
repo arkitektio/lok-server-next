@@ -288,6 +288,21 @@ The `{key}` placeholders are substituted by allauth. Change the host per deploym
 |---|---|---|---|---|
 | `name` | `DEPLOYMENT__NAME` | str | `default` | Deployment name. |
 | `description` | `DEPLOYMENT__DESCRIPTION` | str | `A Basic Arkitekt Deployment` | Deployment description. |
+| `configure_url` | `DEPLOYMENT__CONFIGURE_URL` | str | `/configure/{code}` | URL template the fakts well-known (`/.well-known/fakts`) advertises as its `configure` endpoint. `{code}` is substituted by the client with the device code. |
+
+The `configure_url` is what the fakts well-known hands clients to point a user at the
+device-code configure page. It is always advertised as an **absolute** URL, resolved
+from one of three shapes:
+
+- **root-relative** (`/configure/{code}`, the default) — joined to the deployment's
+  base domain (the same base as the deprecated `frontend_url`);
+- **absolute with scheme** (`https://go.arkitekt.live/configure/{code}`) — used verbatim;
+- **bare host** (`go.arkitekt.live/configure/{code}`) — promoted to `https://`.
+
+Prefer an absolute value when lok sits behind a reverse proxy, since the base domain is
+otherwise derived from the incoming request and can be wrong. The well-known's older
+`frontend_url` / `base_url` fields are kept for back-compat but are **deprecated** in
+favour of the explicit `configure` field.
 
 ### `email` — outbound SMTP (optional)
 
@@ -328,6 +343,7 @@ list/object fields below are provisioning data applied on boot — express them 
 | `private_key` 🔒 | `PRIVATE_KEY` | str (PEM) | **required** | OIDC/OAuth2 RSA private signing key. Lok refuses to start without it. |
 | `oidc_issuer` | `OIDC_ISSUER` | str | `http://lok` | OIDC issuer URL advertised by lok. |
 | `kontrol_frontend_url` | `KONTROL_FRONTEND_URL` | str | `/` | Frontend URL used for redirects. |
+| `privacy_guards` | `PRIVACY_GUARDS` | str | `opt-in` | Policy for *integrated* login widgets (e.g. Google One Tap) — `strict` / `opt-in` / `disabled`. See [Integrated login widgets](#integrated-login-widgets-google-one-tap). |
 | `socialaccount_providers` | — (use YAML) | map[str, provider] | `{}` | `SOCIALACCOUNT_PROVIDERS`, keyed by provider id. Typed — see [Social login providers](#social-login-providers). |
 | `organizations` | — (use YAML) | list[object] | `[]` | Organizations ensured on boot. |
 | `users` | — (use YAML) | list[object] | `[]` | Users ensured on boot. |
@@ -430,6 +446,27 @@ provider is `https://<your-host>/lok/accounts/<provider>/login/callback/`.
 > for the exact `client_id`/`secret` fields, scopes, and callback-URL format,
 > and treat every `secret` as sensitive (inject via environment or a secret
 > file, never commit it).
+
+### Integrated login widgets (Google One Tap)
+
+Some providers offer an *integrated* sign-in widget — most notably **Google One
+Tap** — that loads a third-party script (`accounts.google.com/gsi/client`) and can
+identify or track the visitor **before they click anything**. This is a different
+privacy profile from the ordinary redirect buttons above, which only do anything
+on an explicit click. `privacy_guards` controls how the SPA treats these widgets;
+it does **not** affect the normal redirect provider buttons.
+
+| Value | Behaviour |
+|---|---|
+| `strict` | The widget is never rendered and its third-party script is never loaded. |
+| `opt-in` *(default)* | The SPA shows a "Mind your privacy" consent prompt first and only loads the script after the user clicks *Enable*. |
+| `disabled` | Guards off — the widget loads immediately, with no consent prompt. |
+
+The value is advertised to the SPA on the allauth headless capability config
+(`/lok/_allauth/browser/v1/config`, key `privacy_guards`), so changing it takes
+effect on the frontend without a rebuild. Enabling Google One Tap itself is still
+the two-step provider setup above (install the app + configure its OAuth `APP`);
+`privacy_guards` only decides whether the SPA is allowed to surface it.
 
 ---
 

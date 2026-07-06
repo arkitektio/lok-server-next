@@ -228,8 +228,23 @@ class Client:
     public: bool = strawberry_django.field(description="Is this client public? If a client is public ")
     user: types.User | None = strawberry_django.field(description="If the client is a DEVELOPMENT client, which requires no further authentication, this is the user that is authenticated with the client.")
     logo: types.MediaStore | None = strawberry_django.field(description="The logo of the release. This should be a url to a logo that can be used to represent the release.")
-    name: str = strawberry_django.field(description="The name of the client. This is a human readable name of the client.")
     node: Optional["Device"] = strawberry_django.field(description="The node this runs on")
+
+    @strawberry_django.field(
+        description="A human-readable label for the client that folds in the app, version, "
+        "operator and device — e.g. `com.example.app:v0.1.1 by Johannes on my-laptop`.",
+        select_related=["release__app", "user", "tenant", "node"],
+    )
+    def name(self, info: Info) -> str:
+        release = self.release
+        label = f"{release.app.identifier}:v{release.version}" if release else (self.name or "Unknown client")
+        person = self.user or self.tenant
+        if person:
+            full = f"{person.first_name or ''} {person.last_name or ''}".strip()
+            label += f" by {full or person.username}"
+        if self.node and self.node.name:
+            label += f" on {self.node.name}"
+        return label
     mappings: list["ServiceInstanceMapping"] = strawberry_django.field(description="The mappings of the client. A mapping is a mapping of a service to a service instance. This is used to configure the composition.")
 
 

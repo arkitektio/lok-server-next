@@ -68,3 +68,20 @@ def test_social_provider_rejects_bad_app_credentials():
     """A missing/mistyped APP credential key is caught at load time."""
     with pytest.raises(ValidationError):
         Settings(socialaccount_providers={"google": {"APP": {"clientid": "typo"}}})
+
+
+def test_privacy_guards_defaults_to_opt_in():
+    """Integrated-widget policy defaults to the current consent-prompt behavior."""
+    assert Settings().privacy_guards == "opt-in"
+
+
+def test_privacy_guards_accepts_known_policies():
+    """The three supported policies validate."""
+    for policy in ("strict", "opt-in", "disabled"):
+        assert Settings(privacy_guards=policy).privacy_guards == policy
+
+
+def test_privacy_guards_rejects_unknown_policy():
+    """An unrecognized policy value is caught at load time (typed Literal)."""
+    with pytest.raises(ValidationError):
+        Settings(privacy_guards="loose")

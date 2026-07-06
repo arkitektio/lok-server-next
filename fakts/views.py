@@ -32,6 +32,27 @@ def _status(status, message):
     return JsonResponse({"status": status, "message": message})
 
 
+def _absolute_configure_url(template: str, base_url: str) -> str:
+    """Resolve the configured `configure_url` to an **absolute** URL for the client.
+
+    The well-known must always hand the client an absolute URL, so we resolve the
+    three shapes a deployment may configure:
+
+    - a value with a scheme (``https://host/configure/{code}``) is used verbatim;
+    - a root-relative path (``/configure/{code}``) is joined to ``base_url`` (the
+      deployment's base domain);
+    - a bare host (``go.arkitekt.live/configure/{code}``) is promoted to ``https``.
+
+    The literal ``{code}`` placeholder is preserved — the client substitutes it with
+    the device code, so we only ever concatenate, never ``.format()`` it here.
+    """
+    if "://" in template:
+        return template
+    if template.startswith("/"):
+        return base_url.rstrip("/") + template
+    return "https://" + template
+
+
 def _poll_device_code(device_code, result_attr):
     """Shared polling response for the device-code challenge endpoints."""
     if timezone.now() > device_code.expires_at:
@@ -52,12 +73,16 @@ def _poll_device_code(device_code, result_attr):
 
 @method_decorator(csrf_exempt, name="dispatch")
 class WellKnownFakts(View):
-    """Well Known fakts Viewset (only allows get). Sends
-    back the well known configuration for the fakts server Describing
-    endpoints for "Claim" and "Configure" as well as the name and version.
-    Of the Fakts Protocol"""
+    """Well Known fakts Viewset (only allows get). Sends back the well known
+    configuration for the fakts server, describing the endpoints for "Claim",
+    "Configure", the device-code "start" and "challenge" flows, as well as the
+    name and version of the Fakts Protocol."""
 
     def get(self, request, format=None):
+        # The deployment's base domain — also the base a root-relative configure_url
+        # resolves against. (frontend_url is kept for back-compat but is deprecated in
+        # favour of the explicit, always-absolute `configure` endpoint below.)
+        base_domain = request.build_absolute_uri(reverse("mainhome")).replace(f"/{settings.MY_SCRIPT_NAME}", "")
         return JsonResponse(
             data=base_models.WellKnownFakts(
                 name=settings.DEPLOYMENT_NAME,
@@ -65,7 +90,10 @@ class WellKnownFakts(View):
                 description=settings.DEPLOYMENT_DESCRIPTION,
                 claim=request.build_absolute_uri(reverse("fakts:claim")),
                 base_url=request.build_absolute_uri(reverse("fakts:index")),
-                frontend_url=request.build_absolute_uri(reverse("mainhome")).replace(f"/{settings.MY_SCRIPT_NAME}", ""),
+                frontend_url=base_domain,
+                configure=_absolute_configure_url(settings.DEPLOYMENT_CONFIGURE_URL, base_domain),
+                device_code_start=request.build_absolute_uri(reverse("fakts:start")),
+                challenge_url=request.build_absolute_uri(reverse("fakts:challenge")),
             ).model_dump()
         )
 

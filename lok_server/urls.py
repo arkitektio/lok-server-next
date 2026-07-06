@@ -24,8 +24,10 @@ from health_check.views import HealthCheckView
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from strawberry.django.views import AsyncGraphQLView
+from allauth.headless.constants import Client
 from api.management.schema import schema
 from authapp.views import open_id_configuration
+from lok_server.headless_config import PrivacyConfigView
 
 
 def fakts_challenge(request):
@@ -64,6 +66,10 @@ urlpatterns = [
     dynamicpath("ht", csrf_exempt(HealthCheckView.as_view(checks=["health_check.checks.Database"])), name="health_check"),
     dynamicpath("accounts/", include("allauth.urls")),
     dynamicpath("accounts/", include("karakter.urls")),
+    # Override allauth's headless /config with a privacy-aware one that also reports
+    # `privacy_guards`. Must precede the headless include so it wins by URL ordering.
+    dynamicpath("_allauth/browser/v1/config", PrivacyConfigView.as_api_view(client=Client.BROWSER)),
+    dynamicpath("_allauth/app/v1/config", PrivacyConfigView.as_api_view(client=Client.APP)),
     dynamicpath("_allauth/", include("allauth.headless.urls")),
     dynamicpath(".well-known/fakts-challenge", fakts_challenge, name="fakts-challenge"),
     dynamicpath(".well-known/fakts", WellKnownFakts.as_view()),

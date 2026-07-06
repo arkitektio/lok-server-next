@@ -19,6 +19,16 @@ class WellKnownFakts(BaseModel):
     claim: str
     base_url: str
     frontend_url: str
+    configure: str | None = None
+    """Absolute URL template for the device-code configure page. The literal
+    `{code}` placeholder is substituted by the client with the device code.
+    Supersedes deriving the configure link from the (deprecated) `frontend_url`."""
+    device_code_start: str | None = None
+    """Absolute URL of the device-code *start* endpoint — the client POSTs its
+    manifest here to begin a device-code flow and receive a `code`."""
+    challenge_url: str | None = None
+    """Absolute URL of the device-code *challenge* endpoint — the client polls it
+    with its `code` to learn whether the user has granted the request."""
 
 
 class Requirement(BaseModel):

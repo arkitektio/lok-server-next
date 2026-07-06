@@ -31,6 +31,9 @@ ALLOWED_HOSTS = conf.django.hosts
 FAKTS_PROTOCOL_VERSION = "0.1.0"
 DEPLOYMENT_NAME = conf.deployment.name
 DEPLOYMENT_DESCRIPTION = conf.deployment.description
+# URL template advertised as the fakts well-known `configure` endpoint (see the
+# WellKnownFakts view, which resolves it to an absolute URL for the client).
+DEPLOYMENT_CONFIGURE_URL = conf.deployment.configure_url
 # Application definition
 
 ENSURED_OPENID_APPS = [a.model_dump() for a in conf.openid_apps]
@@ -153,6 +156,11 @@ MIDDLEWARE = [
 # "Send me a sign-in code" option automatically.
 ACCOUNT_LOGIN_BY_CODE_ENABLED = conf.account.login_by_code_enabled and conf.email is not None
 MFA_TRUST_ENABLED = conf.account.mfa_trust_enabled  # Allow trusted devices
+
+# Privacy policy for integrated login widgets (Google One Tap et al.). The custom
+# headless config view reports this to the SPA, which gates the One Tap widget on
+# it (strict = never load Google's script; opt-in = consent prompt; disabled = free).
+PRIVACY_GUARDS = conf.privacy_guards
 
 # S3_PUBLIC_DOMAIN = f"{conf.s3.public.host}:{conf.s3.public.port}"  # TODO: FIx
 AWS_ACCESS_KEY_ID = conf.datalayer.access_key
