@@ -1,12 +1,18 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.16 (2026-07-06)
+
+
 ## v1.0.0-rc.15 (2026-07-06)
 
 ### Bug Fixes
 
 - Better .well-known plus privace guards
   ([`b87d6e0`](https://github.com/arkitektio/lok-server-next/commit/b87d6e0c203e60a2e23c97b2cd135bc3c07aab7a))
+
+- Removed depency on node_id
+  ([`01b346c`](https://github.com/arkitektio/lok-server-next/commit/01b346c83afcc0a5d6ad184924841fc2ae294c9f))
 
 
 ## v1.0.0-rc.14 (2026-07-04)
