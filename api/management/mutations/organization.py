@@ -17,6 +17,7 @@ class UpdateOrganizationInput:
     avatar: strawberry.ID | None = None
     slug: str | None = None
     brand_hue: float | None = None
+    require_device_auth: bool | None = None
     sync_mine: bool = False
 
 
@@ -53,6 +54,9 @@ def update_organization(info: Info, input: UpdateOrganizationInput) -> types.Man
 
     if input.brand_hue is not None:
         organization.brand_hue = input.brand_hue
+
+    if input.require_device_auth is not None:
+        organization.require_device_auth = input.require_device_auth
 
     organization.save()
 

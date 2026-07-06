@@ -415,6 +415,7 @@ class ManagementOrganization:
     name: str | None = strawberry.field(description="The name of this organization")
     description: str | None = strawberry.field(description="A short description of the organization")
     brand_hue: Optional[float] = strawberry.field(description="The organization's default brand hue (0–360), if set. Members can override it per-membership.")
+    require_device_auth: Optional[bool] = strawberry.field(description="Whether clients created in this organization must present a device node_id. None/False means device auth is not required.")
     users: List[ManagementUser] = strawberry.field(description="The users that are part of the organization")
     active_users: List[ManagementUser] = strawberry.field(description="The users that are currently active in the organization")
     profile: Optional["ManagementOrganizationProfile"] = strawberry.field(description="The profile of the organization")
@@ -501,10 +502,9 @@ class ManagementStagingManifest:
     identifier: str
     title: str | None = None
     description: str | None = None
-    url: str | None = None
     logo: str | None = None
     scopes: list[str]
-    node_id: strawberry.ID
+    node_id: strawberry.ID | None = None
     authors: list[str]
     keywords: list[str]
     license: str | None = None
@@ -546,10 +546,10 @@ class ManagementStagingServiceManifest:
     description: str | None = None
     logo: str | None = None
     scopes: list[StagingScope] | None = None
-    node_id: strawberry.ID
+    node_id: strawberry.ID | None = None
     roles: list[StagingRole] | None = None
-    instance_id: str
-    public_sources: list[ManagementStagingPublicSource]
+    instance_id: str | None = None
+    public_sources: list[ManagementStagingPublicSource] | None = None
 
 
 @pydantic.type(base_models.InstanceRequest)
@@ -996,11 +996,11 @@ class ManagementClient:
     scopes: list["ManagementScope"] = strawberry_django.field(description="The scopes that are granted to this client.")
 
     @strawberry_django.field(description="Check if the device code is still valid")
-    def manifest(self, info: Info) -> ManagementStagingManifest:
+    def manifest(self, info: Info) -> Optional[ManagementStagingManifest]:
         if not self.manifest:
             return None
 
-        return base_models.Manifest(**self.manifest)
+        return ManagementStagingManifest.from_pydantic(base_models.Manifest(**self.manifest))
 
     @strawberry_django.field(description="The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information.")
     def token(self, info: Info) -> str:

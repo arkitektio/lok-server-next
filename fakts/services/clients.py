@@ -21,6 +21,11 @@ from karakter import models as karakter_models
 from karakter.hashers import hash_device_id
 
 
+class DeviceAuthRequired(Exception):
+    """Raised when an organization requires device authentication but the client
+    manifest carries no ``node_id``."""
+
+
 class RedeemTokenExpired(Exception):
     """Raised when a redeem token has passed its expiry (and has been deleted)."""
 
@@ -137,6 +142,12 @@ def create_client(
             "requirements": manifest.model_dump()["requirements"],
         },
     )
+
+    if organization.require_device_auth and not manifest.node_id:
+        raise DeviceAuthRequired(
+            "This organization requires device authentication; the client manifest "
+            "must include a node_id."
+        )
 
     if manifest.node_id:
         node = models.Device.objects.get_or_create(

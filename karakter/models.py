@@ -86,6 +86,13 @@ class Organization(models.Model):
         help_text="The organization's default brand hue (0–360). Members can override "
         "it with their own membership brand hue.",
     )
+    require_device_auth = models.BooleanField(
+        null=True,
+        blank=True,
+        default=None,
+        help_text="When set, clients created in this organization must present a device "
+        "node_id (device authentication). None/False means device auth is not required.",
+    )
     # Server-only secret. Combined with SECRET_KEY to hash device ids so the same
     # device hashes differently across organizations and is never stored in the clear.
     device_salt = models.CharField(max_length=64, default=generate_device_salt, editable=False)
