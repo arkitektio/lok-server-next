@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.18 (2026-07-07)
+
+### Bug Fixes
+
+- Add coordinator url
+  ([`5d4d1ce`](https://github.com/arkitektio/lok-server-next/commit/5d4d1ced0d6f41c950afb14dbd3a73ab9980cf58))
+
+
 ## v1.0.0-rc.17 (2026-07-07)
 
 ### Bug Fixes
