@@ -94,6 +94,7 @@ class WellKnownFakts(View):
                 configure=_absolute_configure_url(settings.DEPLOYMENT_CONFIGURE_URL, base_domain),
                 device_code_start=request.build_absolute_uri(reverse("fakts:start")),
                 challenge_url=request.build_absolute_uri(reverse("fakts:challenge")),
+                mesh_coord_url=settings.IONSCALE_COORD_URL,
             ).model_dump()
         )
 

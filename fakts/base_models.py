@@ -29,6 +29,9 @@ class WellKnownFakts(BaseModel):
     challenge_url: str | None = None
     """Absolute URL of the device-code *challenge* endpoint — the client polls it
     with its `code` to learn whether the user has granted the request."""
+    mesh_coord_url: str | None = None
+    """Public coordination URL of the ionscale mesh coordination server that clients
+    should point their tailnet at. `None` when this deployment has no mesh configured."""
 
 
 class Requirement(BaseModel):
