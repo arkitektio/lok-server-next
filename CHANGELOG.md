@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.17 (2026-07-07)
+
+### Bug Fixes
+
+- Add report
+  ([`a4668cc`](https://github.com/arkitektio/lok-server-next/commit/a4668cc0c8403ead9aa188a762e9bbe40f3dbc94))
+
+
 ## v1.0.0-rc.16 (2026-07-06)
 
 
