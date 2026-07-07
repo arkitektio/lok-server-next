@@ -33,6 +33,7 @@ class Query:
     layers: list[types.ManagementLayer] = kante.django_field()
     device_groups: list[types.ManagementDeviceGroup] = kante.django_field()
     used_aliases: list[types.ManagementUsedAlias] = kante.django_field()
+    reports: list[types.ManagementReport] = kante.django_field()
     service_releases: list[types.ManagementServiceRelease] = kante.django_field()
     instance_aliases: list[types.ManagementInstanceAlias] = kante.django_field()
     social_accounts: list[types.ManagementSocialAccount] = kante.django_field()
@@ -224,6 +225,10 @@ class Query:
     @kante.django_field()
     def client(self, info: Info, id: strawberry.ID) -> types.ManagementClient:
         return fakts_models.Client.objects.get(id=id)
+
+    @kante.django_field()
+    def report(self, info: Info, id: strawberry.ID) -> types.ManagementReport:
+        return fakts_models.Report.objects.get(id=id)
 
     @kante.django_field()
     def service_instance_mapping(self, info: Info, id: strawberry.ID) -> types.ManagementServiceInstanceMapping:

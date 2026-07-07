@@ -29,6 +29,8 @@ DEBUG = conf.django.debug
 ALLOWED_HOSTS = conf.django.hosts
 
 FAKTS_PROTOCOL_VERSION = "0.1.0"
+# How many of a client's most recent self-reports to retain (see fakts.services.clients.report_client).
+CLIENT_REPORT_RETENTION = 5
 DEPLOYMENT_NAME = conf.deployment.name
 DEPLOYMENT_DESCRIPTION = conf.deployment.description
 # URL template advertised as the fakts well-known `configure` endpoint (see the

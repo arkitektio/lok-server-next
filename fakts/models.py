@@ -573,6 +573,14 @@ class Client(models.Model):
     statuses = models.JSONField(default=dict, help_text="Per-requirement grant outcomes: {'key': 'granted'|'denied'|'unavailable'}.")
     logo = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
     last_reported_at = models.DateTimeField(auto_now=True)
+    last_healthy_report = models.ForeignKey(
+        "Report",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text="The most recent report where the client was functional; null if it has never reported healthy.",
+    )
     manifest = models.JSONField(default=dict)
     scopes = models.ManyToManyField("karakter.Scope", related_name="clients", blank=True)
 
@@ -620,6 +628,26 @@ class UsedAlias(models.Model):
 
     def __str__(self):
         return f"{self.alias} used in {self.key} at {self.used_at}"
+
+
+class Report(models.Model):
+    """A point-in-time snapshot of a client's self-report (functional flag +
+    the per-requirement alias_reports payload). Only the latest N per client
+    are retained (N configurable via settings.CLIENT_REPORT_RETENTION)."""
+
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="reports")
+    functional = models.BooleanField(default=True)
+    alias_reports = models.JSONField(
+        default=dict,
+        help_text="Raw snapshot of the reported payload: {key: {alias_id, valid, reason}}.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return f"Report for {self.client} at {self.created_at}"
 
 
 class TailscaleInspector(models.Model):

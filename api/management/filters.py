@@ -221,6 +221,23 @@ class ManagementClientFilter:
         return Q(**{f"{prefix}composition__id": value})
 
 
+@strawberry_django.order_type(fakts_models.Report)
+class ManagementReportOrdering:
+    id: strawberry.auto
+    created_at: strawberry.auto
+
+
+@strawberry_django.filter_type(fakts_models.Report)
+class ManagementReportFilter:
+    @strawberry_django.filter_field
+    def ids(self, value: list[strawberry.ID], prefix: str) -> Q:
+        return Q(**{f"{prefix}id__in": value})
+
+    @strawberry_django.filter_field
+    def client(self, value: strawberry.ID, prefix: str) -> Q:
+        return Q(**{f"{prefix}client__id": value})
+
+
 @strawberry_django.order_type(fakts_models.InstanceAlias)
 class ManagementInstanceAliasOrdering:
     id: strawberry.auto

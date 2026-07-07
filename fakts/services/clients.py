@@ -9,6 +9,7 @@ the historical ``logic`` <-> ``builders`` import cycle.
 import hashlib
 import json
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
@@ -263,8 +264,15 @@ def redeem_token(token: str, manifest: Manifest, role: enums.ClientRoleVanilla =
 
 @transaction.atomic
 def report_client(claim: base_models.ReportRequest) -> models.Client:
-    """Record a client's self-report (functional flag + per-requirement alias reports)."""
-    client = models.Client.objects.get(token=claim.token)
+    """Record a client's self-report (functional flag + per-requirement alias reports).
+
+    Also snapshots the report into a ``Report`` row, updates the client's
+    ``last_healthy_report`` pointer when the client reports healthy, and prunes
+    the client's report history to the latest ``settings.CLIENT_REPORT_RETENTION``
+    (the last-healthy report is always kept, even if it falls outside that window).
+    """
+    # Lock the client row so concurrent reports don't race the prune / pointer update.
+    client = models.Client.objects.select_for_update().get(token=claim.token)
     client.functional = claim.functional
     client.save()
 
@@ -280,5 +288,31 @@ def report_client(claim: base_models.ReportRequest) -> models.Client:
                 "reason": alias_report.reason,
             },
         )
+
+    # Snapshot this report (raw payload; valid/reason are the frozen issue signal).
+    report = models.Report.objects.create(
+        client=client,
+        functional=claim.functional,
+        alias_reports={
+            key: {"alias_id": r.alias_id, "valid": r.valid, "reason": r.reason}
+            for key, r in claim.alias_reports.items()
+        },
+    )
+
+    # Track the last healthy report; it persists across pruning.
+    if claim.functional:
+        client.last_healthy_report = report
+        client.save(update_fields=["last_healthy_report"])
+
+    # Keep only the latest N reports, but never delete the last-healthy pointer's target.
+    retention = getattr(settings, "CLIENT_REPORT_RETENTION", 5)
+    keep_ids = list(
+        models.Report.objects.filter(client=client)
+        .order_by("-created_at", "-id")
+        .values_list("id", flat=True)[:retention]
+    )
+    if client.last_healthy_report_id:
+        keep_ids.append(client.last_healthy_report_id)
+    models.Report.objects.filter(client=client).exclude(id__in=keep_ids).delete()
 
     return client

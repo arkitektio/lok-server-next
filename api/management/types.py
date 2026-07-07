@@ -969,6 +969,48 @@ class ManagementUsedAlias:
     reason: Optional[str] = strawberry.field(description="If the alias is not valid, the reason why it is not valid.")
 
 
+@strawberry.type(description="One per-requirement entry in a client report snapshot: which alias was resolved for a requirement key and whether it was reachable.")
+class ManagementReportEntry:
+    key: str = strawberry.field(description="The requirement key this entry reports on.")
+    valid: bool = strawberry.field(description="Was the resolved alias reachable when the client reported?")
+    reason: Optional[str] = strawberry.field(description="If the alias was not reachable, the reason the client gave.")
+    alias: Optional[ManagementInstanceAlias] = strawberry.field(description="The alias the client resolved this requirement to (resolved live; may be null if it no longer exists or none was reported).")
+
+
+@strawberry_django.type(
+    fakts_models.Report,
+    description="A point-in-time snapshot of a client's self-report (functional flag + per-requirement alias reports). Only the latest few per client are retained.",
+    filters=filters.ManagementReportFilter,
+    ordering=filters.ManagementReportOrdering,
+    pagination=True,
+)
+class ManagementReport:
+    id: strawberry.ID
+    client: "ManagementClient" = strawberry_django.field(description="The client this report belongs to.")
+    functional: bool = strawberry_django.field(description="Did the client report itself as functional at report time?")
+    created_at: datetime.datetime = strawberry_django.field(description="When the client submitted this report.")
+
+    @strawberry_django.field(description="The per-requirement alias reports captured in this snapshot.")
+    def entries(self, info: Info) -> list[ManagementReportEntry]:
+        entries: list[ManagementReportEntry] = []
+        for key, report in (self.alias_reports or {}).items():
+            alias_id = report.get("alias_id")
+            alias = fakts_models.InstanceAlias.objects.filter(id=alias_id).first() if alias_id else None
+            entries.append(
+                ManagementReportEntry(
+                    key=key,
+                    valid=report.get("valid", False),
+                    reason=report.get("reason"),
+                    alias=alias,
+                )
+            )
+        return entries
+
+    @classmethod
+    def get_queryset(cls, queryset, info: Info):
+        return queryset.filter(client__organization__memberships__user=info.context.request.user).distinct()
+
+
 @strawberry_django.type(
     fakts_models.Client,
     description="""A client is a way of authenticating users with a release.
@@ -994,6 +1036,8 @@ class ManagementClient:
     used_aliases: list[ManagementUsedAlias] = strawberry_django.field(description="The aliases that are used by this client.")
     last_reported_at: datetime.datetime | None = strawberry_django.field(description="The last time the client reported in. This is used to determine if the client is active or not.")
     scopes: list["ManagementScope"] = strawberry_django.field(description="The scopes that are granted to this client.")
+    reports: list["ManagementReport"] = strawberry_django.field(description="The retained self-reports of this client, most recent first.")
+    last_healthy_report: Optional["ManagementReport"] = strawberry_django.field(description="The most recent report where the client was functional; null if it has never reported healthy.")
 
     @strawberry_django.field(description="Check if the device code is still valid")
     def manifest(self, info: Info) -> Optional[ManagementStagingManifest]:
@@ -1030,6 +1074,10 @@ class ManagementClient:
     @strawberry_django.field(description="Check if the client is active")
     def device(self, info: Info) -> Optional["ManagementDevice"]:
         return self.node
+
+    @strawberry_django.field(description="The client's most recent report; null if it has never reported.")
+    def latest_report(self, info: Info) -> Optional["ManagementReport"]:
+        return self.reports.order_by("-created_at", "-id").first()
 
     @classmethod
     def get_queryset(cls, queryset, info: Info):
