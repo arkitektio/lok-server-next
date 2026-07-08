@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.20 (2026-07-08)
+
+### Bug Fixes
+
+- Added configuration for kontrol rontend
+  ([`84e64c1`](https://github.com/arkitektio/lok-server-next/commit/84e64c1475fdf2a6cbcbbe90cdebb62578674ea4))
+
+
 ## v1.0.0-rc.19 (2026-07-08)
 
 ### Features
