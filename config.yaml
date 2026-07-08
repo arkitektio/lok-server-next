@@ -79,6 +79,12 @@ datalayer:
   media:
     bucket: sleazy-tan-seahorse
 
+# Base URL of the kontrol SPA. All account email links (verify-email, password
+# reset, signup) and invite/organization redirects derive from it. Set to your
+# frontend origin per deployment, e.g. https://go.arkitekt.live. The default '/'
+# keeps links same-origin for local/dev.
+# kontrol_frontend_url: "https://go.arkitekt.live"
+
 account:
   email_verification: none
   # Identifier(s) users log in with. Default is username login.
@@ -89,11 +95,12 @@ account:
   login_methods: [username]
   login_by_code_enabled: true
   mfa_trust_enabled: true
-  # SPA URLs allauth points users at ({key} is filled in by allauth). Change the host per deployment.
-  headless_frontend_urls:
-    account_confirm_email: http://localhost/account/verify-email/{key}
-    account_reset_password_from_key: http://localhost/account/password/reset/key/{key}
-    account_signup: http://localhost/account/signup
+  # SPA URLs allauth points users at ({key} is filled in by allauth) default to
+  # relative paths joined to `kontrol_frontend_url` (see below), so you normally
+  # only set that one base URL. Override an individual flow here only if it must
+  # live on a different host — an absolute value (with scheme) is used verbatim:
+  #   headless_frontend_urls:
+  #     account_confirm_email: https://other-host/account/verify-email/{key}
   social_provider_apps:
   - allauth.socialaccount.providers.orcid
   - allauth.socialaccount.providers.google

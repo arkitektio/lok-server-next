@@ -475,12 +475,8 @@ class ManagementInvite:
 
     @strawberry_django.field(description="Get the full URL for accepting this invite")
     def invite_url(self, info: Info) -> str:
-        """Generate the full URL for accepting this invite"""
-        from django.urls import reverse
-
-        request = info.context.request
-        path = reverse("accept_invite", kwargs={"token": str(self.token)})
-        return path
+        """Generate the full URL for accepting this invite on the kontrol SPA."""
+        return f"{settings.KONTROL_FRONTEND_URL}/invite/{self.token}"
 
 
 @pydantic.type(base_models.Requirement)

@@ -305,13 +305,18 @@ Notes:
 
 #### `account.headless_frontend_urls` — SPA URLs allauth-headless points users at
 
-The `{key}` placeholders are substituted by allauth. Change the host per deployment.
+The `{key}` placeholders are substituted by allauth. These default to **relative
+paths** that are joined to [`kontrol_frontend_url`](#top-level-settings) at load
+time, so you normally only set that one base URL. Override an individual key here
+with a fully-qualified URL (with scheme) to host that flow elsewhere — absolute
+values are used verbatim.
 
 | Key | Env var | Type | Default | Description |
 |---|---|---|---|---|
-| `account_confirm_email` | `ACCOUNT__HEADLESS_FRONTEND_URLS__ACCOUNT_CONFIRM_EMAIL` | str | `http://localhost/account/verify-email/{key}` | Email-verification link. Set per deployment. |
-| `account_reset_password_from_key` | `ACCOUNT__HEADLESS_FRONTEND_URLS__ACCOUNT_RESET_PASSWORD_FROM_KEY` | str | `http://localhost/account/password/reset/key/{key}` | Password-reset link. Set per deployment. |
-| `account_signup` | `ACCOUNT__HEADLESS_FRONTEND_URLS__ACCOUNT_SIGNUP` | str | `http://localhost/account/signup` | Signup page URL. Set per deployment. |
+| `account_confirm_email` | `ACCOUNT__HEADLESS_FRONTEND_URLS__ACCOUNT_CONFIRM_EMAIL` | str | `/account/verify-email/{key}` | Email-verification link. Joined to `kontrol_frontend_url` unless absolute. |
+| `account_reset_password` | `ACCOUNT__HEADLESS_FRONTEND_URLS__ACCOUNT_RESET_PASSWORD` | str | `/account/password/reset` | Password-reset request page. Joined to `kontrol_frontend_url` unless absolute. |
+| `account_reset_password_from_key` | `ACCOUNT__HEADLESS_FRONTEND_URLS__ACCOUNT_RESET_PASSWORD_FROM_KEY` | str | `/account/password/reset/key/{key}` | Password-reset-from-key link. Joined to `kontrol_frontend_url` unless absolute. |
+| `account_signup` | `ACCOUNT__HEADLESS_FRONTEND_URLS__ACCOUNT_SIGNUP` | str | `/account/signup` | Signup page URL. Joined to `kontrol_frontend_url` unless absolute. |
 
 ### `deployment` — human-facing deployment identity
 
@@ -375,7 +380,7 @@ list/object fields below are provisioning data applied on boot — express them 
 |---|---|---|---|---|
 | `private_key` 🔒 | `PRIVATE_KEY` | str (PEM) | **required** | OIDC/OAuth2 RSA private signing key. Lok refuses to start without it. |
 | `oidc_issuer` | `OIDC_ISSUER` | str | `http://lok` | OIDC issuer URL advertised by lok. |
-| `kontrol_frontend_url` | `KONTROL_FRONTEND_URL` | str | `/` | Frontend URL used for redirects. |
+| `kontrol_frontend_url` | `KONTROL_FRONTEND_URL` | str | `/` | Base URL of the kontrol SPA. All account email links (verify-email, password reset, signup) and invite/organization redirects derive from it. Set to the deployment's frontend origin, e.g. `https://go.arkitekt.live`. |
 | `privacy_guards` | `PRIVACY_GUARDS` | str | `opt-in` | Policy for *integrated* login widgets (e.g. Google One Tap) — `strict` / `opt-in` / `disabled`. See [Integrated login widgets](#integrated-login-widgets-google-one-tap). |
 | `socialaccount_providers` | — (use YAML) | map[str, provider] | `{}` | `SOCIALACCOUNT_PROVIDERS`, keyed by provider id. Typed — see [Social login providers](#social-login-providers). |
 | `organizations` | — (use YAML) | list[object] | `[]` | Organizations ensured on boot. |

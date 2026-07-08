@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
+from urllib.parse import urlparse
 from .configuration import Settings
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -114,8 +115,18 @@ INSTALLED_APPS += [
 INSTALLED_APPS += conf.account.social_provider_apps
 
 
-# These are the URLs to be implemented by your single-page application.
-HEADLESS_FRONTEND_URLS = conf.account.headless_frontend_urls.model_dump()
+# Base URL of the kontrol SPA. Every account email link and redirect derives from
+# it, so a deployment configures its frontend host in exactly one place.
+KONTROL_FRONTEND_URL = conf.kontrol_frontend_url.rstrip("/")
+
+# These are the URLs to be implemented by your single-page application. The model
+# holds relative path templates (e.g. "/account/verify-email/{key}") which we join
+# to KONTROL_FRONTEND_URL here; a value that is already absolute (has a scheme) is
+# passed through unchanged so a deployment can still point a single flow elsewhere.
+HEADLESS_FRONTEND_URLS = {
+    key: path if urlparse(path).scheme else f"{KONTROL_FRONTEND_URL}{path}"
+    for key, path in conf.account.headless_frontend_urls.model_dump().items()
+}
 
 ACCOUNT_EMAIL_VERIFICATION = conf.account.email_verification  # default "none": no SMTP server by default
 
@@ -364,8 +375,8 @@ LOGIN_REDIRECT_URL = "mainhome"  # Redirect to main after login
 LOGOUT_REDIRECT_URL = "mainhome"  # Redirect to main after logout
 ACCOUNT_LOGOUT_REDIRECT_URL = "mainhome"
 
-# Frontend URL for redirects (used by karakter views)
-KONTROL_FRONTEND_URL = conf.kontrol_frontend_url
+# KONTROL_FRONTEND_URL is defined above (near HEADLESS_FRONTEND_URLS) — the same
+# base drives both the allauth email links and the karakter view redirects.
 
 
 SYSTEM_MESSAGES = conf.system_messages or [

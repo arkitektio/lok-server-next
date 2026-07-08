@@ -171,19 +171,29 @@ class DatalayerSettings(BaseModel):
 
 
 class HeadlessFrontendUrls(BaseModel):
-    """Single-page-app URLs allauth-headless points users at (the ``{key}`` placeholders are filled in by allauth)."""
+    """Single-page-app URLs allauth-headless points users at (the ``{key}`` placeholders are filled in by allauth).
+
+    These are **relative path templates** by default; they are joined to
+    ``kontrol_frontend_url`` in ``settings.py`` so the SPA host is configured in one
+    place. Set a field to a fully-qualified URL (with scheme) to override a single
+    flow's host independently of the base.
+    """
 
     account_confirm_email: str = Field(
-        default="http://localhost/account/verify-email/{key}",
-        description="Email-verification link; {key} substituted by allauth. Set per deployment.",
+        default="/account/verify-email/{key}",
+        description="Email-verification link; {key} substituted by allauth. Joined to kontrol_frontend_url unless absolute.",
+    )
+    account_reset_password: str = Field(
+        default="/account/password/reset",
+        description="Password-reset request page. Joined to kontrol_frontend_url unless absolute.",
     )
     account_reset_password_from_key: str = Field(
-        default="http://localhost/account/password/reset/key/{key}",
-        description="Password-reset link; {key} substituted by allauth. Set per deployment.",
+        default="/account/password/reset/key/{key}",
+        description="Password-reset-from-key link; {key} substituted by allauth. Joined to kontrol_frontend_url unless absolute.",
     )
     account_signup: str = Field(
-        default="http://localhost/account/signup",
-        description="Signup page URL. Set per deployment.",
+        default="/account/signup",
+        description="Signup page URL. Joined to kontrol_frontend_url unless absolute.",
     )
 
 
@@ -360,7 +370,13 @@ class Settings(BaseSettings):
     ionscale: Optional[IonscaleSettings] = Field(default=None, description="Optional ionscale coordinator connection.")
     private_key: str = Field(description="OIDC/OAuth2 RSA private signing key (PEM). Secret — must be set.")
     oidc_issuer: str = Field(default="http://lok", description="OIDC issuer URL advertised by lok.")
-    kontrol_frontend_url: str = Field(default="/", description="Frontend URL used for redirects.")
+    kontrol_frontend_url: str = Field(
+        default="/",
+        description="Base URL of the kontrol SPA. All account email links (verify-email, "
+        "password reset, signup) and karakter view redirects (invites, organizations) derive "
+        "from it. Set to the deployment's frontend origin, e.g. https://go.arkitekt.live. "
+        "The default '/' keeps links same-origin for local/dev.",
+    )
     privacy_guards: Literal["strict", "opt-in", "disabled"] = Field(
         default="opt-in",
         description="Policy for integrated login widgets (e.g. Google One Tap) that load "
