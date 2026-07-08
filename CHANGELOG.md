@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.19 (2026-07-08)
+
+### Features
+
+- Composition is now hub
+  ([`356e76a`](https://github.com/arkitektio/lok-server-next/commit/356e76a9c3377e0531e428d872be0f9cdf77266b))
+
+
 ## v1.0.0-rc.18 (2026-07-07)
 
 ### Bug Fixes
