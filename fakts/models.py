@@ -25,7 +25,7 @@ class KommunityPartner(models.Model):
     identifier = fields.IdentifierField(unique=True)
     auth_url = models.CharField(max_length=1000, null=True, blank=True)
     license_agreement = models.TextField(null=True, blank=True, help_text="Optional license agreement text shown before connecting this partner.")
-    pre_authorize_hook = models.CharField(max_length=1000, null=True, blank=True, help_text="Optional hook called after creating a partner composition. The response must explicitly approve the composition.")
+    pre_authorize_hook = models.CharField(max_length=1000, null=True, blank=True, help_text="Optional hook called after creating a partner hub. The response must explicitly approve the hub.")
     pre_authorize_token = models.CharField(max_length=1000, null=True, blank=True, help_text="Optional bearer token sent to the pre-authorize hook.")
     oauth_client = models.ForeignKey(OAuth2Client, on_delete=models.CASCADE, null=True)
     partner_kind = models.CharField(
@@ -39,7 +39,7 @@ class KommunityPartner(models.Model):
         help_text="The kind of kommunity",
     )
     auto_configure = models.BooleanField(default=False)
-    preconfigured_composition = models.JSONField(help_text="A preconfigured composition that gets created when a user redeems a token from this partner.", null=True, blank=True)
+    preconfigured_hub = models.JSONField(help_text="A preconfigured hub that gets created when a user redeems a token from this partner.", null=True, blank=True)
     filter_config = models.JSONField(
         help_text="Filter conditions to determine which users/organizations this partner applies to. Example: {'email_domain_equals': ['example.com', 'test.org'], 'email_domain_ends_with': ['edu']}",
         null=True,
@@ -51,10 +51,10 @@ class KommunityPartner(models.Model):
         return f"{self.identifier}"
 
     @property
-    def preconfigured_composition_as_model(self) -> Optional[base_models.CompositionManifest]:
-        if not self.preconfigured_composition:
+    def preconfigured_hub_as_model(self) -> Optional[base_models.HubManifest]:
+        if not self.preconfigured_hub:
             return None
-        return base_models.CompositionManifest(**self.preconfigured_composition)
+        return base_models.HubManifest(**self.preconfigured_hub)
 
     def applies_to_user(self, user) -> bool:
         """
@@ -130,13 +130,19 @@ class Layer(models.Model):
 
 class IonscaleLayer(Layer):
     tailnet_name = models.CharField(max_length=1000, unique=True)
+    # Desired per-mesh DNS state. lok is the source of truth: these are pushed to
+    # ionscale via `set-dns` (see ionscale.manager.apply_dns_config). HTTPS certs
+    # require MagicDNS (the cert domain *is* the MagicDNS name), enforced at the
+    # mutation layer. Default on for new meshes.
+    magic_dns_enabled = models.BooleanField(default=True)
+    https_enabled = models.BooleanField(default=True)
 
     def __str__(self):
         return f"Ionscale Layer: {self.identifier} ({self.tailnet_name})"
 
 
 class IonscaleAuthKey(models.Model):
-    composition = models.ForeignKey("Composition", on_delete=models.CASCADE, related_name="ionscale_auth_keys", null=True, blank=True)
+    hub = models.ForeignKey("Hub", on_delete=models.CASCADE, related_name="ionscale_auth_keys", null=True, blank=True)
     layer = models.ForeignKey(IonscaleLayer, on_delete=models.CASCADE, related_name="auth_keys")
     key = models.CharField(max_length=1000)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -184,7 +190,7 @@ class ServiceRelease(models.Model):
 
 
 class ServiceInstance(models.Model):
-    composition = models.ForeignKey("Composition", on_delete=models.CASCADE, related_name="instances")
+    hub = models.ForeignKey("Hub", on_delete=models.CASCADE, related_name="instances")
     release = models.ForeignKey(ServiceRelease, on_delete=models.CASCADE, related_name="instances")
     logo = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
     instance_id = models.CharField(max_length=1000, default="default")
@@ -217,12 +223,12 @@ class ServiceInstance(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["release", "instance_id", "organization", "device", "composition"],
+                fields=["release", "instance_id", "organization", "device", "hub"],
                 name="Only one instance_id per release, organization and device and instance",
             ),
             models.UniqueConstraint(
-                fields=["token", "composition"],
-                name="Only one token per composition",
+                fields=["token", "hub"],
+                name="Only one token per hub",
             ),
         ]
 
@@ -361,32 +367,32 @@ class RedeemToken(models.Model):
         help_text="If set, this token may be re-redeemed even when the manifest hash differs from the originally redeemed one.",
     )
     user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="issued_tokens")
-    composition = models.ForeignKey(
-        "Composition",
+    hub = models.ForeignKey(
+        "Hub",
         on_delete=models.CASCADE,
         related_name="issued_tokens",
     )
 
 
-class Composition(models.Model):
+class Hub(models.Model):
     name = models.CharField(max_length=1000)
     organization = models.ForeignKey(
         Organization,
         on_delete=models.CASCADE,
-        related_name="compositions",
+        related_name="hubs",
     )
     identifier = fields.IdentifierField()
     description = models.TextField(default="No description available", null=True, blank=True)
     creator = models.ForeignKey(
         get_user_model(),
         on_delete=models.CASCADE,
-        related_name="created_compositions",
+        related_name="created_hubs",
     )
     token = models.CharField(max_length=1000, default=uuid.uuid4)
     auth_key = models.ForeignKey(
         IonscaleAuthKey,
         on_delete=models.SET_NULL,
-        related_name="compositions",
+        related_name="hubs",
         null=True,
         blank=True,
     )
@@ -395,7 +401,7 @@ class Composition(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["organization", "identifier"],
-                name="Only one composition identifier per organization",
+                name="Only one hub identifier per organization",
             )
         ]
 
@@ -451,19 +457,51 @@ class ServiceDeviceCode(models.Model):
         return [base_models.StagingAlias(**alias) for alias in self.staging_aliases]
 
 
-class CompositionDeviceCode(models.Model):
+class HubDeviceCode(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     code = models.CharField(max_length=100, unique=True)
     challenge_code = models.CharField(max_length=100, unique=True)
     user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, null=True)
-    composition = models.ForeignKey(Composition, on_delete=models.CASCADE, null=True)
+    hub = models.ForeignKey(Hub, on_delete=models.CASCADE, null=True)
     manifest = models.JSONField(default=dict)
     expires_at = models.DateTimeField()
     denied = models.BooleanField(default=False)
 
     @property
-    def manifest_as_model(self) -> base_models.CompositionManifest:
-        return base_models.CompositionManifest(**self.manifest)
+    def manifest_as_model(self) -> base_models.HubManifest:
+        return base_models.HubManifest(**self.manifest)
+
+
+class MeshDeviceCode(models.Model):
+    """A device-code flow for a machine that wants to join an organization's mesh.
+
+    Mirrors ``ServiceDeviceCode``: ``code`` is the human-visible value that goes in the
+    configure URL, ``challenge_code`` is the secret the machine polls with. On accept a
+    per-machine pre-authorized ``IonscaleAuthKey`` is minted and linked as ``auth_key``,
+    and ``machine_name`` is returned to the machine as a hint for ``tailscale up --hostname``.
+    """
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    code = models.CharField(max_length=100, unique=True)
+    challenge_code = models.CharField(max_length=100, unique=True)
+    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, null=True)
+    auth_key = models.ForeignKey(
+        "IonscaleAuthKey",
+        on_delete=models.SET_NULL,
+        related_name="mesh_device_code",
+        null=True,
+        blank=True,
+    )
+    requested_machine_name = models.CharField(max_length=1000, null=True, blank=True)
+    machine_name = models.CharField(max_length=1000, null=True, blank=True)
+    description = models.TextField(null=True, blank=True)
+    staging_ephemeral = models.BooleanField(default=False)
+    staging_tags = models.JSONField(default=list)
+    expires_at = models.DateTimeField()
+    denied = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"MeshDeviceCode {self.code} ({self.requested_machine_name})"
 
 
 class App(models.Model):
@@ -535,7 +573,7 @@ class Device(models.Model):
 
 
 class Client(models.Model):
-    composition = models.ForeignKey(Composition, on_delete=models.CASCADE, related_name="clients", null=True)
+    hub = models.ForeignKey(Hub, on_delete=models.CASCADE, related_name="clients", null=True)
     functional = models.BooleanField(default=True)
     name = models.CharField(max_length=1000, default="No name")
     release = models.ForeignKey(Release, on_delete=models.CASCADE, related_name="clients", null=True)
@@ -607,7 +645,7 @@ class ServiceInstanceMapping(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["key", "client"],
-                name="Only one instance per key and composition",
+                name="Only one instance per key and hub",
             )
         ]
 

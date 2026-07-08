@@ -29,17 +29,17 @@ class ManagementKommunityPartnerFilter:
         return Q(**{f"{prefix}auto_configure": value})
 
     @strawberry_django.filter_field
-    def has_preconfigured_composition(self, value: bool, queryset, prefix: str):
+    def has_preconfigured_hub(self, value: bool, queryset, prefix: str):
         if value:
             return (
-                queryset.exclude(preconfigured_composition__isnull=True).exclude(
-                    preconfigured_composition={}
+                queryset.exclude(preconfigured_hub__isnull=True).exclude(
+                    preconfigured_hub={}
                 ),
                 Q(),
             )
         return (
-            queryset.filter(preconfigured_composition__isnull=True)
-            | queryset.filter(preconfigured_composition={}),
+            queryset.filter(preconfigured_hub__isnull=True)
+            | queryset.filter(preconfigured_hub={}),
             Q(),
         )
 
@@ -99,14 +99,14 @@ class ManagementDeviceGroupFilter:
         return Q(**{f"{prefix}organization__id": value})
 
 
-@strawberry_django.order_type(fakts_models.Composition)
-class ManagementCompositionOrdering:
+@strawberry_django.order_type(fakts_models.Hub)
+class ManagementHubOrdering:
     id: strawberry.auto
     name: strawberry.auto
 
 
-@strawberry_django.filter_type(fakts_models.Composition)
-class ManagementCompositionFilter:
+@strawberry_django.filter_type(fakts_models.Hub)
+class ManagementHubFilter:
     @strawberry_django.filter_field
     def ids(self, value: list[strawberry.ID], prefix: str) -> Q:
         return Q(**{f"{prefix}id__in": value})
@@ -217,8 +217,8 @@ class ManagementClientFilter:
         return Q(**{f"{prefix}organization__id": value})
 
     @strawberry_django.filter_field
-    def composition(self, value: strawberry.ID, prefix: str) -> Q:
-        return Q(**{f"{prefix}composition__id": value})
+    def hub(self, value: strawberry.ID, prefix: str) -> Q:
+        return Q(**{f"{prefix}hub__id": value})
 
 
 @strawberry_django.order_type(fakts_models.Report)
@@ -295,8 +295,8 @@ class ManagementServiceInstanceFilter:
         return Q(**{f"{prefix}organization__id": value})
 
     @strawberry_django.filter_field
-    def composition(self, value: strawberry.ID, prefix: str) -> Q:
-        return Q(**{f"{prefix}composition__id": value})
+    def hub(self, value: strawberry.ID, prefix: str) -> Q:
+        return Q(**{f"{prefix}hub__id": value})
 
 
 @strawberry_django.order_type(fakts_models.RedeemToken)
@@ -317,11 +317,11 @@ class ManagementRedeemTokenFilter:
 
     @strawberry_django.filter_field
     def organization(self, value: strawberry.ID, prefix: str) -> Q:
-        return Q(**{f"{prefix}composition__organization__id": value})
+        return Q(**{f"{prefix}hub__organization__id": value})
 
     @strawberry_django.filter_field
-    def composition(self, value: strawberry.ID, prefix: str) -> Q:
-        return Q(**{f"{prefix}composition__id": value})
+    def hub(self, value: strawberry.ID, prefix: str) -> Q:
+        return Q(**{f"{prefix}hub__id": value})
 
 
 @strawberry_django.order_type(smodels.SocialAccount)

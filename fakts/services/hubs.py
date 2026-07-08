@@ -1,4 +1,4 @@
-"""Composition lifecycle: building compositions from manifests/partners.
+"""Hub lifecycle: building hubs from manifests/partners.
 
 Includes the partner pre-authorization webhook and the auto-configuration of
 kommunity partners for an organization.
@@ -11,7 +11,7 @@ import requests
 from django.db import transaction
 
 from fakts import models
-from fakts.base_models import CompositionManifest
+from fakts.base_models import HubManifest
 from fakts.services import aliases
 from fakts.services.tokens import create_api_token  # noqa: F401  (kept for shim parity)
 from ionscale.repo import get_ionscale_repo
@@ -22,14 +22,14 @@ logger = logging.getLogger(__name__)
 
 
 class PartnerPreAuthorizationError(Exception):
-    """Raised when a partner pre-authorization hook rejects a composition."""
+    """Raised when a partner pre-authorization hook rejects a hub."""
 
 
 def run_partner_pre_authorize_hook(
     partner: models.KommunityPartner,
     organization: karakter_models.Organization,
-    composition: models.Composition,
-    composition_config: dict | None,
+    hub: models.Hub,
+    hub_config: dict | None,
     license_signature: str | None = None,
 ) -> None:
     """Call an optional partner pre-authorization hook and require an explicit OK response."""
@@ -53,13 +53,13 @@ def run_partner_pre_authorize_hook(
             "slug": organization.slug,
             "name": organization.name,
         },
-        "composition": {
-            "id": str(composition.pk),
-            "identifier": composition.identifier,
-            "name": composition.name,
-            "token": composition.token,
+        "hub": {
+            "id": str(hub.pk),
+            "identifier": hub.identifier,
+            "name": hub.name,
+            "token": hub.token,
         },
-        "composition_config": composition_config,
+        "hub_config": hub_config,
     }
     if license_signature:
         payload["license_signature"] = license_signature
@@ -107,26 +107,26 @@ def run_partner_pre_authorize_hook(
 
 
 @transaction.atomic
-def create_composition_from_manifest(
-    manifest: CompositionManifest,
+def create_hub_from_manifest(
+    manifest: HubManifest,
     organization: karakter_models.Organization,
-) -> models.Composition:
-    """Create or update a composition (and its instances/roles/scopes/aliases) from a manifest."""
+) -> models.Hub:
+    """Create or update a hub (and its instances/roles/scopes/aliases) from a manifest."""
     token = str(uuid5(NAMESPACE_DNS, f"{manifest.identifier}:{organization.slug}"))
 
-    composition, created = models.Composition.objects.update_or_create(
+    hub, created = models.Hub.objects.update_or_create(
         identifier=manifest.identifier,
         organization=organization,
         defaults={
             "token": token,
-            "name": manifest.identifier or "Unnamed Composition",
-            "description": manifest.description or "Auto-configured composition",
+            "name": manifest.identifier or "Unnamed Hub",
+            "description": manifest.description or "Auto-configured hub",
             "organization": organization,
             "creator": organization.owner,
         },
     )
 
-    logger.info(f"{'Created' if created else 'Updated'} composition '{composition.name}' for org '{organization.slug}'")
+    logger.info(f"{'Created' if created else 'Updated'} hub '{hub.name}' for org '{organization.slug}'")
 
     for instance_request in manifest.instances:
         service_manifest = instance_request.manifest
@@ -137,7 +137,7 @@ def create_composition_from_manifest(
 
         instance, inst_created = models.ServiceInstance.objects.update_or_create(
             token=instance_request.identifier,
-            composition=composition,
+            hub=hub,
             defaults={
                 "steward": organization.owner,
                 "release": release,
@@ -165,22 +165,22 @@ def create_composition_from_manifest(
             alias_obj, alias_created = aliases.upsert_instance_alias(instance, alias)
             logger.info(f"    {'Created' if alias_created else 'Updated'} alias: {alias_obj.name}")
 
-    return composition
+    return hub
 
 
-def create_composition_from_partner(
+def create_hub_from_partner(
     partner: models.KommunityPartner,
     organization: karakter_models.Organization,
     license_signature: str | None = None,
-) -> models.Composition | None:
-    """Create a composition from a partner's preconfigured composition, honouring its pre-auth hook."""
-    manifest = partner.preconfigured_composition_as_model
+) -> models.Hub | None:
+    """Create a hub from a partner's preconfigured hub, honouring its pre-auth hook."""
+    manifest = partner.preconfigured_hub_as_model
     if not manifest:
-        raise ValueError(f"Partner '{partner.identifier}' has no preconfigured composition")
+        raise ValueError(f"Partner '{partner.identifier}' has no preconfigured hub")
 
-    logger.info(f"Creating composition from partner '{partner.identifier}' for org '{organization.slug}' ")
+    logger.info(f"Creating hub from partner '{partner.identifier}' for org '{organization.slug}' ")
 
-    composition = create_composition_from_manifest(
+    hub = create_hub_from_manifest(
         manifest=manifest,
         organization=organization,
     )
@@ -189,20 +189,20 @@ def create_composition_from_partner(
         run_partner_pre_authorize_hook(
             partner=partner,
             organization=organization,
-            composition=composition,
-            composition_config=partner.preconfigured_composition,
+            hub=hub,
+            hub_config=partner.preconfigured_hub,
             license_signature=license_signature,
         )
     except PartnerPreAuthorizationError:
         logger.exception(
-            "Partner pre-authorization rejected composition '%s' for organization '%s'; deleting composition.",
-            composition.identifier,
+            "Partner pre-authorization rejected hub '%s' for organization '%s'; deleting hub.",
+            hub.identifier,
             organization.slug,
         )
-        composition.delete()
+        hub.delete()
         raise
 
-    return composition
+    return hub
 
 
 def auto_configure_kommunity_partners(
@@ -219,14 +219,14 @@ def auto_configure_kommunity_partners(
             logger.info(f"Partner '{partner.identifier}' does not apply to user '{user}'")
             continue
 
-        if not partner.preconfigured_composition:
-            logger.warning(f"Partner '{partner.identifier}' has no preconfigured composition")
+        if not partner.preconfigured_hub:
+            logger.warning(f"Partner '{partner.identifier}' has no preconfigured hub")
             continue
 
         logger.info(f"Applying partner '{partner.identifier}' to organization '{organization.slug}'")
 
         try:
-            create_composition_from_partner(
+            create_hub_from_partner(
                 partner=partner,
                 organization=organization,
             )
@@ -243,11 +243,11 @@ def auto_configure_kommunity_partners(
     return applied_partners
 
 
-def create_composition_auth_key(user: karakter_models.User, composition: models.Composition, ephemeral: bool = False, tags: list[str] = None) -> models.IonscaleAuthKey:
+def create_hub_auth_key(user: karakter_models.User, hub: models.Hub, ephemeral: bool = False, tags: list[str] = None) -> models.IonscaleAuthKey:
     # The mesh is a per-organization singleton, provisioned on explicit opt-in.
-    # Read-only here: a composition uses the org's mesh if it has one, but does not
+    # Read-only here: a hub uses the org's mesh if it has one, but does not
     # silently create a tailnet.
-    layer = get_org_mesh(composition.organization)
+    layer = get_org_mesh(hub.organization)
 
     if not layer:
         raise Exception(
@@ -255,7 +255,30 @@ def create_composition_auth_key(user: karakter_models.User, composition: models.
             "organization (or bring your own), or configure ionscale on this deployment."
         )
 
-    tags = ["tag:composition-" + str(composition.pk)] if tags is None else tags
+    tags = ["tag:hub-" + str(hub.pk)] if tags is None else tags
+
+    key = get_ionscale_repo().create_auth_key(tailnet=layer.tailnet_name, ephemeral=ephemeral, pre_authorized=True, tags=tags)
+    key = models.IonscaleAuthKey.objects.create(layer=layer, key=key, creator=user, ephemeral=ephemeral, tags=tags)
+    return key
+
+
+def create_mesh_auth_key(user: karakter_models.User, organization: karakter_models.Organization, ephemeral: bool = False, tags: list[str] = None) -> models.IonscaleAuthKey:
+    """Mint a single-use pre-authorized key for an organization's mesh.
+
+    Organization-scoped counterpart to ``create_hub_auth_key``: used by the mesh
+    device-code flow to let a standalone machine join the org's tailnet. Read-only on the
+    mesh — a machine uses the org's mesh if it has one, but does not silently create a
+    tailnet.
+    """
+    layer = get_org_mesh(organization)
+
+    if not layer:
+        raise Exception(
+            "This organization has no mesh. Enable the ionscale mesh for the "
+            "organization (or bring your own), or configure ionscale on this deployment."
+        )
+
+    tags = ["tag:mesh-" + str(organization.pk)] if tags is None else tags
 
     key = get_ionscale_repo().create_auth_key(tailnet=layer.tailnet_name, ephemeral=ephemeral, pre_authorized=True, tags=tags)
     key = models.IonscaleAuthKey.objects.create(layer=layer, key=key, creator=user, ephemeral=ephemeral, tags=tags)

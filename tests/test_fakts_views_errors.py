@@ -101,14 +101,14 @@ def test_service_challenge_unknown_code_errors(client):
 
 
 @pytest.mark.django_db
-def test_composition_challenge_unknown_code_errors(client):
-    body = _post(client, "fakts:compositionchallenge", {"code": "does-not-exist"}).json()
+def test_hub_challenge_unknown_code_errors(client):
+    body = _post(client, "fakts:hubchallenge", {"code": "does-not-exist"}).json()
     assert body["status"] == "error"
     assert body["error"] == "Challenge does not exist"
 
 
 # --------------------------------------------------------------------------- #
-# Service / Composition start (currently untested) + their challenge routes
+# Service / Hub start (currently untested) + their challenge routes
 # --------------------------------------------------------------------------- #
 
 
@@ -126,16 +126,16 @@ def test_service_start_returns_code_and_challenge(client):
 
 
 @pytest.mark.django_db
-def test_composition_start_returns_code_and_challenge(client):
+def test_hub_start_returns_code_and_challenge(client):
     body = _post(
         client,
-        "fakts:compositionstart",
-        {"composition": {"identifier": "com.example.comp"}},
+        "fakts:hubstart",
+        {"hub": {"identifier": "com.example.comp"}},
     ).json()
     assert body["status"] == "granted"
     assert body["code"]
     assert body["challenge"]
-    assert models.CompositionDeviceCode.objects.filter(challenge_code=body["challenge"]).exists()
+    assert models.HubDeviceCode.objects.filter(challenge_code=body["challenge"]).exists()
 
 
 # --------------------------------------------------------------------------- #
@@ -222,7 +222,7 @@ def test_claim_rendering_failure_returns_error(client, monkeypatch):
     def _boom(*args, **kwargs):
         raise RuntimeError("render exploded")
 
-    monkeypatch.setattr(rendering, "render_composition", _boom)
+    monkeypatch.setattr(rendering, "render_hub", _boom)
 
     body = _post(client, "fakts:claim", {"token": fakts_client.token, "secure": False}).json()
 
@@ -231,13 +231,13 @@ def test_claim_rendering_failure_returns_error(client, monkeypatch):
 
 
 @pytest.mark.django_db
-def test_claim_composition_unknown_token_errors(client):
-    # The view looks up a ``Composition`` and catches ``Composition.DoesNotExist``,
+def test_claim_hub_unknown_token_errors(client):
+    # The view looks up a ``Hub`` and catches ``Hub.DoesNotExist``,
     # returning the dedicated not-found envelope rather than the generic
     # "Error creating configuration" fallthrough.
-    body = _post(client, "fakts:compositionclaim", {"token": "missing"}).json()
+    body = _post(client, "fakts:hubclaim", {"token": "missing"}).json()
     assert body["status"] == "error"
-    assert body["message"] == "No Composition found for this token"
+    assert body["message"] == "No Hub found for this token"
 
 
 # --------------------------------------------------------------------------- #

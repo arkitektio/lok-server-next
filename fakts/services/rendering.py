@@ -1,6 +1,6 @@
-"""Rendering of fakts claims + requirement/instance resolution and composition.
+"""Rendering of fakts claims + requirement/instance resolution and hub.
 
-These functions turn clients/compositions into the claim payloads handed back to
+These functions turn clients/hubs into the claim payloads handed back to
 apps, resolve which service instance satisfies a requirement, and (re)compose a
 client's service-instance mappings from its manifest.
 """
@@ -16,43 +16,43 @@ from fakts.base_models import (
     Alias,
     AuthClaim,
     ClaimAnswer,
-    CompositionAuthClaim,
-    CompositionClaimAnswer,
-    CompositionClientClaim,
-    CompositionInstanceClaim,
+    HubAuthClaim,
+    HubClaimAnswer,
+    HubClientClaim,
+    HubInstanceClaim,
     InstanceClaim,
     SelfClaim,
 )
 from fakts.services.tokens import hash_requirements
 
 
-def render_server_fakts(composition: models.Composition, context: base_models.LinkingContext) -> CompositionClaimAnswer:
+def render_server_fakts(hub: models.Hub, context: base_models.LinkingContext) -> HubClaimAnswer:
     self_claim = SelfClaim(
         deployment_name=context.deployment_name,
         alias=Alias(id="self", host=context.request.host, port=context.request.port, is_secure=context.request.is_secure, path="lok", challenge="ht"),
     )
 
-    auth_claim = CompositionAuthClaim(
+    auth_claim = HubAuthClaim(
         jwks_url=f"{context.request.base_url}/.well-known/jwks.json",
-        ionscale_auth_key=composition.auth_key.key if composition.auth_key else None,
+        ionscale_auth_key=hub.auth_key.key if hub.auth_key else None,
         ionscale_coord_url=settings.IONSCALE_COORD_URL,
     )
 
-    instance_claims: Dict[str, CompositionInstanceClaim] = {}
-    client_claims: Dict[str, CompositionClientClaim] = {}
+    instance_claims: Dict[str, HubInstanceClaim] = {}
+    client_claims: Dict[str, HubClientClaim] = {}
 
-    for instance in composition.instances.all():
-        instance_claims[instance.token] = CompositionInstanceClaim(
+    for instance in hub.instances.all():
+        instance_claims[instance.token] = HubInstanceClaim(
             identifier=instance.token,
             private_key=instance.private_key,
         )
 
-    for client in composition.clients.all():
-        client_claims[client.token] = CompositionClientClaim(
+    for client in hub.clients.all():
+        client_claims[client.token] = HubClientClaim(
             token=client.token,
         )
 
-    claim = CompositionClaimAnswer(
+    claim = HubClaimAnswer(
         auth=auth_claim,
         self=self_claim,
         instances=instance_claims,
@@ -63,7 +63,7 @@ def render_server_fakts(composition: models.Composition, context: base_models.Li
 
 
 # TODO: Rename to render_fakts
-def render_composition(client: models.Client, context: base_models.LinkingContext) -> dict:
+def render_hub(client: models.Client, context: base_models.LinkingContext) -> dict:
     self_claim = SelfClaim(
         deployment_name=context.deployment_name,
         alias=Alias(id="self", host=context.request.host, port=context.request.port, is_secure=context.request.is_secure, path="lok", challenge="ht"),
@@ -96,11 +96,11 @@ def render_composition(client: models.Client, context: base_models.LinkingContex
     return claim.model_dump()
 
 
-def find_instance_for_requirement_and_composition(requirement: base_models.Requirement, user: models.AbstractUser, composition: models.Composition) -> models.ServiceInstance | None:
+def find_instance_for_requirement_and_hub(requirement: base_models.Requirement, user: models.AbstractUser, hub: models.Hub) -> models.ServiceInstance | None:
     instance = (
         models.ServiceInstance.objects.filter(
             release__service__identifier=requirement.service,
-            composition=composition,
+            hub=hub,
         )
         .filter(
             models.Q(allowed_users__isnull=True)
@@ -131,10 +131,10 @@ def auto_compose(client: models.Client, manifest: base_models.Manifest, user: mo
             continue
 
         try:
-            instance = find_instance_for_requirement_and_composition(req, user, composition=client.composition)
+            instance = find_instance_for_requirement_and_hub(req, user, hub=client.hub)
 
             if instance is None:
-                raise errors.InstanceNotFound(f"No instance for {req.service} in this composition.")
+                raise errors.InstanceNotFound(f"No instance for {req.service} in this hub.")
 
             models.ServiceInstanceMapping.objects.get_or_create(
                 client=client,
@@ -191,7 +191,7 @@ def create_linking_context(request: HttpRequest, client: models.Client, claim: b
     )
 
 
-def create_serverlinking_context(request: HttpRequest, composition: models.Composition, claim: base_models.ServerClaimRequest) -> base_models.LinkingContext:
+def create_serverlinking_context(request: HttpRequest, hub: models.Hub, claim: base_models.ServerClaimRequest) -> base_models.LinkingContext:
     host_string = request.get_host().split(":")
     if len(host_string) == 2:
         host = host_string[0]

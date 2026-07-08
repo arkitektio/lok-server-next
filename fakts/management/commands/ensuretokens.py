@@ -21,14 +21,14 @@ class Command(BaseCommand):
 
         for token in tokens.tokens:
             user = get_user_model().objects.get(username=token.user)
-            composition = models.Composition.objects.get(organization__slug=token.organization, identifier=token.composition)
+            hub = models.Hub.objects.get(organization__slug=token.organization, identifier=token.hub)
 
             token, _ = models.RedeemToken.objects.update_or_create(
                 token=token.token,
                 defaults={
                     "user": user,
-                    "composition": composition,
+                    "hub": hub,
                 },
             )
 
-            print(f"Token {token.token} created for user {user} and composition {composition}")
+            print(f"Token {token.token} created for user {user} and hub {hub}")

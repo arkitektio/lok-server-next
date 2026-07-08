@@ -72,11 +72,11 @@ def test_upsert_is_idempotent_on_natural_key():
 
 @pytest.mark.django_db
 def test_both_persistence_paths_produce_equivalent_rows():
-    """compositions path and the helper agree on the stored row for one staging alias."""
+    """hubs path and the helper agree on the stored row for one staging alias."""
     staging = _staging(name="n", scope="network", public=True, challenge="ht", kind="absolute", port=9, path="/x")
 
     org_a = factories.make_organization()
-    manifest = base_models.CompositionManifest(
+    manifest = base_models.HubManifest(
         identifier="com.example.parity",
         instances=[
             base_models.InstanceRequest(
@@ -86,9 +86,9 @@ def test_both_persistence_paths_produce_equivalent_rows():
             )
         ],
     )
-    from fakts.services import compositions
+    from fakts.services import hubs
 
-    compositions.create_composition_from_manifest(manifest, org_a)
+    hubs.create_hub_from_manifest(manifest, org_a)
     via_path = models.InstanceAlias.objects.get(name="n")
 
     instance_b = factories.make_service_instance()

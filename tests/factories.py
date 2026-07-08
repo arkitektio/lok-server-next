@@ -90,14 +90,14 @@ def make_client(membership: Membership | None = None, release: fmodels.Release |
     return fmodels.Client.objects.create(release=release, membership=membership, **kw)
 
 
-def make_composition(organization: Organization | None = None, **kw) -> fmodels.Composition:
+def make_hub(organization: Organization | None = None, **kw) -> fmodels.Hub:
     if organization is None:
         organization = make_organization()
     n = _n()
-    kw.setdefault("name", f"composition-{n}")
+    kw.setdefault("name", f"hub-{n}")
     kw.setdefault("identifier", f"comp{n}")
     kw.setdefault("creator", organization.owner)
-    return fmodels.Composition.objects.create(organization=organization, **kw)
+    return fmodels.Hub.objects.create(organization=organization, **kw)
 
 
 def make_service(**kw) -> fmodels.Service:
@@ -114,16 +114,16 @@ def make_service_release(service: fmodels.Service | None = None, **kw) -> fmodel
     return fmodels.ServiceRelease.objects.create(service=service, **kw)
 
 
-def make_service_instance(composition: fmodels.Composition | None = None, release: fmodels.ServiceRelease | None = None, **kw) -> fmodels.ServiceInstance:
-    if composition is None:
-        composition = make_composition()
+def make_service_instance(hub: fmodels.Hub | None = None, release: fmodels.ServiceRelease | None = None, **kw) -> fmodels.ServiceInstance:
+    if hub is None:
+        hub = make_hub()
     if release is None:
         release = make_service_release()
-    kw.setdefault("organization", composition.organization)
-    kw.setdefault("steward", composition.creator)
+    kw.setdefault("organization", hub.organization)
+    kw.setdefault("steward", hub.creator)
     kw.setdefault("template", "{}")
     kw.setdefault("token", f"instance-token-{_n()}")
-    return fmodels.ServiceInstance.objects.create(composition=composition, release=release, **kw)
+    return fmodels.ServiceInstance.objects.create(hub=hub, release=release, **kw)
 
 
 def make_device_code(**kw) -> fmodels.DeviceCode:
@@ -138,9 +138,9 @@ def make_device_code(**kw) -> fmodels.DeviceCode:
     return fmodels.DeviceCode.objects.create(**kw)
 
 
-def make_redeem_token(composition: fmodels.Composition | None = None, **kw) -> fmodels.RedeemToken:
-    if composition is None:
-        composition = make_composition()
-    kw.setdefault("user", composition.creator)
+def make_redeem_token(hub: fmodels.Hub | None = None, **kw) -> fmodels.RedeemToken:
+    if hub is None:
+        hub = make_hub()
+    kw.setdefault("user", hub.creator)
     kw.setdefault("token", str(uuid4()))
-    return fmodels.RedeemToken.objects.create(composition=composition, **kw)
+    return fmodels.RedeemToken.objects.create(hub=hub, **kw)

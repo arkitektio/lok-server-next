@@ -50,17 +50,20 @@ def ensure_org_mesh(organization) -> IonscaleLayer | None:
         )
         return None
 
-    tailnet_name = f"{organization.slug or organization.pk}-default"
+    # There is exactly one network per organization, so the tailnet is named after
+    # the organization itself (its slug) rather than a "<slug>-default" variant.
+    tailnet_name = str(organization.slug or organization.pk)
     try:
         get_ionscale_repo().create_tailnet(base_models.TailnetCreate(name=tailnet_name))
         layer = IonscaleLayer.objects.create(
             organization=organization,
-            name="Default",
+            name=organization.name or tailnet_name,
             kind=_IONSCALE_KIND,
             identifier=tailnet_name,
             tailnet_name=tailnet_name,
         )
         sync(layer)
+        apply_dns_config(layer)
         return layer
     except Exception:
         logger.exception(
@@ -79,6 +82,39 @@ def sync(layer: IonscaleLayer) -> IonscaleLayer:
     }
 
     get_ionscale_repo().update_policy(layer.tailnet_name, policy)
+
+    return layer
+
+
+def apply_dns_config(layer: IonscaleLayer, raise_on_error: bool = False) -> IonscaleLayer:
+    """Push the mesh's desired DNS state (MagicDNS + HTTPS certs) to ionscale.
+
+    Kept separate from `sync` (which runs on every membership change) so a DNS/ACME
+    failure can't break member management and DNS isn't needlessly re-pushed. lok is
+    the source of truth: `set-dns` replaces the whole config, so we always send the
+    full desired state built from the model.
+
+    ``raise_on_error`` controls failure handling: provisioning (`ensure_org_mesh`)
+    leaves it False so a DNS hiccup doesn't fail org creation, but an *explicit* user
+    toggle passes True so the failure surfaces to the caller (and the UI) instead of
+    silently reporting success while ionscale never got the change.
+    """
+    if not ionscale_configured():
+        logger.warning(
+            "Ionscale is not configured; skipping DNS config for mesh %s", layer
+        )
+        return layer
+
+    config = base_models.DNSConfig(
+        magic_dns=layer.magic_dns_enabled,
+        https_certs=layer.https_enabled,
+    )
+    try:
+        get_ionscale_repo().set_dns_config(layer.tailnet_name, config)
+    except Exception:
+        logger.exception("Failed to apply DNS config for mesh %s", layer)
+        if raise_on_error:
+            raise
 
     return layer
 

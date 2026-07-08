@@ -8,6 +8,8 @@ class OpenIDAppConfig(BaseModel):
     client_id: str
     client_secret: str
     redirect_uris: list[str]
+    membership_is_subject: bool = False
+    email_template: str | None = None
 
 
 class Command(BaseCommand):
@@ -33,6 +35,8 @@ class Command(BaseCommand):
                 client.client_secret = config.client_secret
                 client.redirect_uris = " ".join(config.redirect_uris)
                 client.scope = "openid profile email"
+                client.membership_is_subject = config.membership_is_subject
+                client.email_template = config.email_template
                 client.save()
 
                 self.stdout.write(f"Updated OpenID client {client.client_id}")
@@ -43,6 +47,8 @@ class Command(BaseCommand):
                     client_secret=config.client_secret,
                     redirect_uris=" ".join(config.redirect_uris),
                     scope="openid profile email",
+                    membership_is_subject=config.membership_is_subject,
+                    email_template=config.email_template,
                 )
 
                 self.stdout.write(f"Created OpenID client {client.client_id}")

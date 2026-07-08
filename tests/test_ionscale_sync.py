@@ -1,11 +1,49 @@
 from types import SimpleNamespace
 from typing import cast
+from unittest import mock
 
 import pytest
 
 from api.management.mutations.ionscale import CreateIonscaleLayerInput, create_ionscale_layer
 from fakts import models as fakts_models
+from ionscale.base_models import DNSConfig
+from ionscale.repo import IonscaleRepository
 from karakter.models import Membership, Organization, User
+
+
+def _repo() -> IonscaleRepository:
+    # Bypass the binary lookup in __init__ so the arg-building logic can be tested
+    # without an ionscale binary present.
+    with mock.patch("ionscale.repo.shutil.which", return_value="/usr/bin/ionscale"):
+        return IonscaleRepository(server_url="http://ionscale", admin_key="k")
+
+
+def test_set_dns_config_enable_both():
+    """MagicDNS + HTTPS on → both flags present."""
+    repo = _repo()
+    with mock.patch.object(repo, "_run_command", return_value="ok") as run:
+        repo.set_dns_config("tn", DNSConfig(magic_dns=True, https_certs=True))
+    assert run.call_args.args[0] == [
+        "tailnets", "set-dns", "--tailnet", "tn", "--magic-dns", "--https-certs",
+    ]
+
+
+def test_set_dns_config_disable_by_omission():
+    """Disabling = omitting the flag. Relies on set-dns replacing the whole config."""
+    repo = _repo()
+    with mock.patch.object(repo, "_run_command", return_value="ok") as run:
+        repo.set_dns_config("tn", DNSConfig(magic_dns=False, https_certs=False))
+    assert run.call_args.args[0] == ["tailnets", "set-dns", "--tailnet", "tn"]
+
+
+def test_set_dns_config_magic_on_https_off():
+    """MagicDNS on, HTTPS off → only --magic-dns."""
+    repo = _repo()
+    with mock.patch.object(repo, "_run_command", return_value="ok") as run:
+        repo.set_dns_config("tn", DNSConfig(magic_dns=True, https_certs=False))
+    assert run.call_args.args[0] == [
+        "tailnets", "set-dns", "--tailnet", "tn", "--magic-dns",
+    ]
 
 
 @pytest.mark.django_db
@@ -58,8 +96,8 @@ def test_create_ionscale_layer_syncs_existing_members(ionscale_repo):
     )
 
     assert len(ionscale_repo.created_tailnets) == 1
-    assert ionscale_repo.created_tailnets[0].name == "ionscale-create-org-default"
-    assert layer.tailnet_name == "ionscale-create-org-default"
+    assert ionscale_repo.created_tailnets[0].name == "ionscale-create-org"
+    assert layer.tailnet_name == "ionscale-create-org"
     assert ionscale_repo.updated_policies == [
-        ("ionscale-create-org-default", {"subs": [str(first_user.pk), str(second_user.pk)]}),
+        ("ionscale-create-org", {"subs": [str(first_user.pk), str(second_user.pk)]}),
     ]

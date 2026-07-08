@@ -120,7 +120,7 @@ class Query:
 
     @kante.django_field()
     def my_redeem_tokens(self, info: Info) -> list[fakts_types.RedeemToken]:
-        return fakts_models.RedeemToken.objects.filter(user=info.context.request.user, composition__organization=info.context.request.organization)
+        return fakts_models.RedeemToken.objects.filter(user=info.context.request.user, hub__organization=info.context.request.organization)
 
     @kante.django_field()
     def layer(self, info: Info, id: strawberry.ID) -> fakts_types.Layer:
@@ -168,7 +168,7 @@ class Mutation:
         resolver=fakts_mutations.create_developmental_client,
     )
     render = strawberry_django.mutation(
-        resolver=fakts_mutations.render_composition,
+        resolver=fakts_mutations.render_hub,
     )
     acknowledge_message = strawberry_django.mutation(resolver=karakter_mutations.acknowledge_message)
 

@@ -211,7 +211,9 @@ django-allauth flows. All optional with sensible defaults.
 
 | Key | Env var | Type | Default | Description |
 |---|---|---|---|---|
-| `email_verification` | `ACCOUNT__EMAIL_VERIFICATION` | str | `none` | `ACCOUNT_EMAIL_VERIFICATION` (`none` / `optional` / `mandatory`). |
+| `email_verification` | `ACCOUNT__EMAIL_VERIFICATION` | str | `none` | `ACCOUNT_EMAIL_VERIFICATION` (`none` / `optional` / `mandatory`). Governs **local** email/password accounts. |
+| `social_email_verification` | `ACCOUNT__SOCIAL_EMAIL_VERIFICATION` | str \| null | `null` | `SOCIALACCOUNT_EMAIL_VERIFICATION` — verification policy for **social/OIDC** logins, independent of `email_verification`. `null` inherits `email_verification`; set `none` to admit IdP-authenticated users without our own confirmation (see below). |
+| `social_email_required` | `ACCOUNT__SOCIAL_EMAIL_REQUIRED` | bool \| null | `null` | `SOCIALACCOUNT_EMAIL_REQUIRED` — whether an email must be present to sign up via a social provider. `null` inherits allauth's derivation; set `false` to admit providers that release no email (e.g. ORCID). |
 | `login_methods` | `ACCOUNT__LOGIN_METHODS` | list[str] | `["username"]` | `ACCOUNT_LOGIN_METHODS` — identifier(s) users log in with (`username` / `email` / `phone`). Set to `["email"]` to enable login via email. |
 | `signup_fields` | `ACCOUNT__SIGNUP_FIELDS` | list[str] | derived | `ACCOUNT_SIGNUP_FIELDS`, e.g. `["email*", "password1*", "password2*"]` (`*` = required). When omitted, derived from `login_methods`. |
 | `login_by_code_enabled` | `ACCOUNT__LOGIN_BY_CODE_ENABLED` | bool | `true` | Enable login by emailed code (`ACCOUNT_LOGIN_BY_CODE_ENABLED`). |
@@ -272,6 +274,35 @@ Notes:
 - `signup_fields` must collect an email (`email*`) whenever `login_methods`
   includes `email`; this is validated on load.
 
+#### Verifying local signups but trusting social logins
+
+`email_verification` governs **local** (email/password) accounts; social/OIDC
+logins are governed separately by `social_email_verification`, which allauth
+applies to both new social signups *and* subsequent logins of existing social
+accounts. This lets you require verification for password users while trusting an
+IdP to vouch for its own:
+
+```yaml
+account:
+  login_methods: [email]
+  email_verification: mandatory        # local signups must confirm their email
+  social_email_verification: none      # Google/ORCID/CILogon logins skip our confirmation
+  social_email_required: false         # ...and may carry no email at all (e.g. ORCID)
+```
+
+Notes:
+- `social_email_verification: none` opens the gate for **all** social providers
+  globally (allauth has no per-provider verification level). To keep that an
+  explicit, per-provider decision, config load **requires every provider under
+  `socialaccount_providers` to be marked `VERIFIED_EMAIL: true`** when it is set —
+  otherwise a provider (including one added later) would be silently exempted with
+  its email stored unverified and no path to verify it.
+- `social_email_verification: mandatory` carries the same SMTP dependency as the
+  local setting: an `email:` block is required (enforced on load).
+- `social_email_verification: mandatory` with `social_email_required: false` is
+  rejected — verification needs an address to confirm, so a social login with no
+  email could never complete.
+
 #### `account.headless_frontend_urls` — SPA URLs allauth-headless points users at
 
 The `{key}` placeholders are substituted by allauth. Change the host per deployment.
@@ -289,6 +320,8 @@ The `{key}` placeholders are substituted by allauth. Change the host per deploym
 | `name` | `DEPLOYMENT__NAME` | str | `default` | Deployment name. |
 | `description` | `DEPLOYMENT__DESCRIPTION` | str | `A Basic Arkitekt Deployment` | Deployment description. |
 | `configure_url` | `DEPLOYMENT__CONFIGURE_URL` | str | `/configure/{code}` | URL template the fakts well-known (`/.well-known/fakts`) advertises as its `configure` endpoint. `{code}` is substituted by the client with the device code. |
+| `mesh_configure_url` | `DEPLOYMENT__MESH_CONFIGURE_URL` | str | `/meshconfigure/{code}` | URL template the fakts well-known advertises as its `mesh_configure` endpoint (the [mesh device-code](docs/fakts_flows/mesh_device_code.md) page). Resolved to an absolute URL exactly like `configure_url`; `{code}` is substituted by the machine. |
+| `hub_configure_url` | `DEPLOYMENT__HUB_CONFIGURE_URL` | str | `/hubconfigure/{code}` | URL template the fakts well-known advertises as its `hub_configure` endpoint (the [hub device-code](docs/fakts_flows/hub_device_code.md) page). Resolved to an absolute URL exactly like `configure_url`; `{code}` is substituted by the client. |
 
 The `configure_url` is what the fakts well-known hands clients to point a user at the
 device-code configure page. It is always advertised as an **absolute** URL, resolved
@@ -370,6 +403,8 @@ the full setup, the values that must match across services, and troubleshooting.
 | `client_id` | str | **required** | OAuth2 `client_id`. Must match the relying party's `client_id`. |
 | `client_secret` 🔒 | str | **required** | OAuth2 client secret. Must match the relying party's secret. Override per deployment. |
 | `redirect_uris` | list[str] | `[]` | Allowed OAuth2 redirect URIs (the relying party's callback URL). |
+| `membership_is_subject` | bool | `false` | Use the membership id as the token `sub` (subject) instead of the user id. When `false` the same human is one subject across all their organizations; when `true` each (user, organization) membership is a distinct subject. ⚠️ Flipping this on an existing client changes every user's `sub`, so the relying party sees them as brand-new identities. |
+| `email_template` | str | `null` | Template for the `email` claim, rendered per user from membership variables (e.g. `"{username}@corp.example"`). Available variables: `username`, `user_id`, `email`, `membership_id`, `org_slug`, `org_name`. Validated at boot — an unknown variable or attribute access (e.g. `{user.email}`) fails config load. When unset, the user's own email is used (falling back to a synthetic `<pk>@users.noreply` address). |
 
 ---
 

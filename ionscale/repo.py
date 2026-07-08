@@ -5,7 +5,7 @@ import re
 import json
 from typing import List, Dict, Any, Union, Optional, Protocol, runtime_checkable
 from pathlib import Path
-from .base_models import Tailnet, TailnetCreate, Machine, MachineDetail
+from .base_models import Tailnet, TailnetCreate, Machine, MachineDetail, DNSConfig
 from django.conf import settings
 from django.utils.module_loading import import_string
 
@@ -24,6 +24,7 @@ class IonscaleRepo(Protocol):
     def get_machine(self, machine_id: str) -> MachineDetail: ...
     def create_tailnet(self, tailnet_input: TailnetCreate) -> Tailnet: ...
     def update_policy(self, tailnet: str, policy: Union[Dict[str, Any], str, Path]) -> str: ...
+    def set_dns_config(self, tailnet: str, config: DNSConfig) -> str: ...
     def create_auth_key(self, tailnet: str, ephemeral: bool = ..., pre_authorized: bool = ..., tags: List[str] = ...) -> str: ...
     def run(self, *preargs) -> str: ...
     def help(self, *preargs) -> str: ...
@@ -118,6 +119,29 @@ class IonscaleRepository:
             dns_name=f"{tailnet_input.name}.{self.server_url.split('://')[1]}",
         )
 
+    def set_dns_config(self, tailnet: str, config: DNSConfig) -> str:
+        """
+        Runs `ionscale tailnets set-dns` to (re)set the tailnet's DNS config.
+
+        set-dns replaces the entire config on each call (presence-based flags), so
+        the passed `config` must describe the full desired state — any options not
+        represented here are cleared on the server.
+        """
+        args = ["tailnets", "set-dns", "--tailnet", tailnet]
+
+        if config.magic_dns:
+            args.append("--magic-dns")
+        if config.https_certs:
+            args.append("--https-certs")
+        if config.override_local_dns:
+            args.append("--override-local-dns")
+        for ns in config.nameservers:
+            args.extend(["--nameserver", ns])
+        for domain in config.search_domains:
+            args.extend(["--search-domain", domain])
+
+        return self._run_command(args)
+
     def update_policy(self, tailnet: str, policy: Union[Dict[str, Any], str, Path]) -> str:
         """
         Updates the policy for a tailnet.
@@ -210,36 +234,64 @@ class IonscaleRepository:
 
     def _parse_machine_list_output(self, cli_output: str) -> List[Machine]:
         """
-        Parses the ASCII table output from Ionscale into Pydantic models.
-        """
-        lines = cli_output.splitlines()
-        machines = []
+        Parses the aligned ASCII table from `ionscale machines list` into Machine models.
 
-        # Skip header line
+        The real column layout is (verified against ionscale 1.9x)::
+
+            ID  TAILNET  NAME  IPv4  IPv6  AUTHORIZED  EPHEMERAL  VERSION  LAST_SEEN  TAGS
+
+        i.e. NAME is the *third* column, not the second — a naive positional parse mis-assigns
+        the tailnet to `name` and the name to `ipv4`. We therefore map columns by their header
+        label and split on runs of 2+ spaces (LAST_SEEN is a human phrase like "a minute ago"
+        and TAGS may be empty, so single-space splitting is unreliable).
+        """
+        lines = [ln for ln in cli_output.splitlines() if ln.strip()]
         if not lines:
             return []
 
+        # Build header-label -> column-index from the first row.
+        header_cols = re.split(r"\s{2,}", lines[0].strip())
+        idx = {col.strip().lower(): i for i, col in enumerate(header_cols)}
+
+        def _col(parts: List[str], label: str) -> Optional[str]:
+            i = idx.get(label)
+            if i is None or i >= len(parts):
+                return None
+            value = parts[i].strip()
+            return value or None
+
+        machines: List[Machine] = []
         for line in lines[1:]:
-            parts = line.split()
-            if len(parts) >= 2:
-                m_id = parts[0]
-                name = parts[1]
-                
-                # Heuristic mapping
-                ipv4 = parts[2] if len(parts) > 2 else None
-                ipv6 = parts[3] if len(parts) > 3 else None
-                
-                connected = False
-                if "true" in line.lower():
-                    connected = True
-                    
-                machines.append(Machine(
-                    id=m_id, 
-                    name=name,
-                    ipv4=ipv4,
-                    ipv6=ipv6,
-                    connected=connected
-                ))
+            # NOTE: this assumes only *trailing* columns (TAGS) can be empty. If a middle
+            # column is ever blank (e.g. a machine with no IPv6 yet), the 2+-space split
+            # shifts later fields left. If that surfaces, switch to header char-offset slicing.
+            parts = re.split(r"\s{2,}", line.strip())
+            m_id = _col(parts, "id")
+            if not m_id:
+                continue
+
+            # `machines list` has no explicit online column; approximate "connected" from
+            # LAST_SEEN recency (ionscale prints "a minute ago" / "now" for live nodes).
+            last_seen = (_col(parts, "last_seen") or "").lower()
+            connected = any(token in last_seen for token in ("now", "second", "minute"))
+
+            tags_raw = _col(parts, "tags") or ""
+            tags = [t for t in re.split(r"[,\s]+", tags_raw) if t]
+
+            authorized_raw = _col(parts, "authorized")
+            authorized = authorized_raw.lower() == "true" if authorized_raw is not None else None
+
+            machines.append(Machine(
+                id=m_id,
+                name=_col(parts, "name") or "",
+                tailnet=_col(parts, "tailnet"),
+                ipv4=_col(parts, "ipv4"),
+                ipv6=_col(parts, "ipv6"),
+                ephemeral=(_col(parts, "ephemeral") or "false").lower() == "true",
+                connected=connected,
+                tags=tags,
+                authorized=authorized,
+            ))
 
         return machines
 
@@ -279,9 +331,12 @@ class IonscaleRepository:
             ephemeral=data.get("ephemeral", "false").lower() == "true",
             last_seen=None, # "a few seconds ago" is not easily parsable to datetime without logic
             os=data.get("os"),
-            key_expiry=None, # "in 6 months"
-            authorized=False, # Not explicitly in sample
-            is_external=False, # Not explicitly in sample
+            key_expiry=None, # "in 6 months" — not yet parsed to a datetime
+            authorized=None, # Not sourced from the CLI yet -> unknown, not a hard False
+            is_external=None, # Not sourced from the CLI yet -> unknown, not a hard False
+            # The MagicDNS name, if the CLI exposes it. Preferred over deriving it from
+            # name+suffix on the GraphQL layer. Key name varies, so probe a few likely labels.
+            fqdn=data.get("fqdn", data.get("dns_name", data.get("magic_dns_name"))),
         )
     
     def create_auth_key(self, tailnet: str, ephemeral: bool = False, pre_authorized: bool = True, tags: List[str] = None) -> str:

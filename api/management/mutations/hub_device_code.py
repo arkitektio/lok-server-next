@@ -10,7 +10,7 @@ import kante
 
 
 @kante.input
-class AcceptCompositionDeviceCodeInput:
+class AcceptHubDeviceCodeInput:
     """Input for creating a single-use magic device code for an organization"""
 
     device_code: strawberry.ID
@@ -18,7 +18,7 @@ class AcceptCompositionDeviceCodeInput:
     allow_ionscale: bool = True
 
 
-def accept_composition_device_code(info: Info, input: AcceptCompositionDeviceCodeInput) -> types.ManagementComposition:
+def accept_hub_device_code(info: Info, input: AcceptHubDeviceCodeInput) -> types.ManagementHub:
     """
     Create a single-use magic invite link for an organization.
 
@@ -27,12 +27,12 @@ def accept_composition_device_code(info: Info, input: AcceptCompositionDeviceCod
     If no roles are specified, the 'guest' role will be assigned.
     """
     user = info.context.request.user
-    device_code = fakts_models.CompositionDeviceCode.objects.get(id=input.device_code)
+    device_code = fakts_models.HubDeviceCode.objects.get(id=input.device_code)
     organization = models.Organization.objects.get(id=input.organization)
 
     manifest = device_code.manifest_as_model
 
-    composition = fakts_models.Composition.objects.create(
+    hub = fakts_models.Hub.objects.create(
         name=manifest.identifier,
         description=manifest.description or "",
         organization=organization,
@@ -51,7 +51,7 @@ def accept_composition_device_code(info: Info, input: AcceptCompositionDeviceCod
             release__version=service_manifest.version,
             device=device,
             steward=user,
-            composition=composition,
+            hub=hub,
             organization=organization,
             instance_id=service_manifest.instance_id,
         ).first()
@@ -68,7 +68,7 @@ def accept_composition_device_code(info: Info, input: AcceptCompositionDeviceCod
                 device=device,
                 steward=user,
                 token=token,
-                composition=composition,
+                hub=hub,
                 instance_id=service_manifest.instance_id,
                 organization=organization,
             )
@@ -117,37 +117,37 @@ def accept_composition_device_code(info: Info, input: AcceptCompositionDeviceCod
             user=user,
             config=config,
             manifest=client_manifest,
-            composition=composition,
+            hub=hub,
         )
         
         
     if input.allow_ionscale and manifest.request_auth_key:
-        composition.auth_key = logic.create_composition_auth_key(user=info.context.request.user, composition=composition)
-        composition.save()
+        hub.auth_key = logic.create_hub_auth_key(user=info.context.request.user, hub=hub)
+        hub.save()
         
         
-    device_code.composition = composition
+    device_code.hub = hub
     device_code.save()
 
-    return composition
+    return hub
 
 
 @kante.input
-class DeclineCompositionDeviceCodeInput:
+class DeclineHubDeviceCodeInput:
     """Input for declining an organization invite"""
 
     device_code: strawberry.ID
 
 
-def decline_composition_device_code(info: Info, input: DeclineCompositionDeviceCodeInput) -> types.ManagementCompositionDeviceCode:
+def decline_hub_device_code(info: Info, input: DeclineHubDeviceCodeInput) -> types.ManagementHubDeviceCode:
     """
     Decline an invite to join an organization.
 
     Marks the invite as declined.
     """
     try:
-        invite = fakts_models.CompositionDeviceCode.objects.get(token=input.device_code)
-    except fakts_models.CompositionDeviceCode.DoesNotExist:
+        invite = fakts_models.HubDeviceCode.objects.get(token=input.device_code)
+    except fakts_models.HubDeviceCode.DoesNotExist:
         raise Exception("Invalid invite token")
 
     invite.declined = True

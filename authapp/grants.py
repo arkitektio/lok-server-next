@@ -1,5 +1,6 @@
 from authlib.oauth2.rfc6749 import grants
 from .models import OAuth2Token, AuthorizationCode
+from .oidc_claims import resolve_email, resolve_sub
 from authlib.oidc.core import grants as oidcgrants, UserInfo
 from karakter.models import Membership
 from django.conf import settings
@@ -27,16 +28,27 @@ class OpenIDCode(oidcgrants.OpenIDCode):
             "kid": settings.KEY_ID,
         }
 
+    def encode_id_token(self, token, request):
+        # generate_user_info() only receives (user, scope), but the per-client
+        # `sub`/`email` policy lives on the client. Stash the client on the
+        # per-request membership instance (request.user is a freshly loaded
+        # Membership, so this is request-scoped and thread-safe).
+        request.user._oauth_client = request.client
+        return super().encode_id_token(token, request)
+
     def generate_user_info(self, user: Membership, scope):
         # The user is actually a membership object (see token_generators.py)
         membership = user
+        client = getattr(membership, "_oauth_client", None)
+        membership_is_subject = bool(getattr(client, "membership_is_subject", False))
+        email_template = getattr(client, "email_template", None)
 
         return UserInfo(
-            sub=str(membership.user.id),
+            sub=resolve_sub(membership, membership_is_subject),
             name=membership.user.username,
             preferred_username=membership.user.username,
             active_org=membership.organization.slug,
-            email= membership.user.email or f"{str(membership.pk)}@users.noreply",
+            email=resolve_email(membership, email_template),
         )
 
 

@@ -10,7 +10,7 @@ with a ``ValidationError`` if they are not supplied via config or environment.
 import os
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -103,6 +103,20 @@ class DeploymentSettings(BaseModel):
         "(`https://…`) is used verbatim; a bare host (`go.arkitekt.live/configure/{code}`) "
         "is treated as https. The well-known always advertises the resolved *absolute* URL.",
     )
+    mesh_configure_url: str = Field(
+        default="/meshconfigure/{code}",
+        description="URL template the fakts well-known advertises as the *mesh* device-code "
+        "`mesh_configure` endpoint. Resolved to an absolute URL the same way as "
+        "`configure_url`; the literal `{code}` placeholder is substituted by the machine "
+        "with the mesh device code.",
+    )
+    hub_configure_url: str = Field(
+        default="/hubconfigure/{code}",
+        description="URL template the fakts well-known advertises as the *hub* "
+        "device-code `hub_configure` endpoint. Resolved to an absolute URL the "
+        "same way as `configure_url`; the literal `{code}` placeholder is substituted by "
+        "the client with the hub device code.",
+    )
 
 
 class IonscaleSettings(BaseModel):
@@ -113,6 +127,11 @@ class IonscaleSettings(BaseModel):
     server_url: str = Field(description="Ionscale server URL.")
     admin_key: str = Field(description="Ionscale admin API key. Secret — must be set.")
     coord_url: str = Field(description="Public coordination URL advertised to clients.")
+    magic_dns_suffix: Optional[str] = Field(
+        default=None,
+        description="MagicDNS suffix served by ionscale (mirrors its dns.magic_dns_suffix). "
+        "Used to derive a machine's MagicDNS name as `<name>.<suffix>`.",
+    )
     repository: Optional[str] = Field(default=None, description="Dotted path to an IonscaleRepo factory (tests).")
     eager_init: bool = Field(default=False, description="Eagerly initialize the ionscale repo on boot (tests).")
     auto_create_mesh: bool = Field(
@@ -172,6 +191,22 @@ class AccountSettings(BaseModel):
     """django-allauth account/MFA behavior."""
 
     email_verification: str = Field(default="none", description="ACCOUNT_EMAIL_VERIFICATION (none/optional/mandatory).")
+    social_email_verification: Optional[Literal["none", "optional", "mandatory"]] = Field(
+        default=None,
+        description="SOCIALACCOUNT_EMAIL_VERIFICATION — email-verification policy for logins via a "
+        "social/OIDC provider, evaluated independently of `email_verification` (which governs "
+        "local email/password accounts). None (default) inherits `email_verification`. Set to "
+        "'none' to admit provider-authenticated users (Google, ORCID, CILogon, …) without our own "
+        "email confirmation — appropriate when the IdP is trusted to vouch for identity, and "
+        "required for providers such as ORCID that may release no email at all. This is the "
+        "supported way to say 'local signups must verify, IdP logins need not'.",
+    )
+    social_email_required: Optional[bool] = Field(
+        default=None,
+        description="SOCIALACCOUNT_EMAIL_REQUIRED — whether an email address must be present to "
+        "sign up via a social provider. None (default) inherits allauth's derivation from "
+        "signup_fields. Set False to admit providers that don't release an email (e.g. ORCID).",
+    )
     login_methods: List[Literal["username", "email", "phone"]] = Field(
         default_factory=lambda: ["username"],
         description="ACCOUNT_LOGIN_METHODS — the identifier(s) users may log in with. "
@@ -217,6 +252,24 @@ class AccountSettings(BaseModel):
             )
         return self
 
+    @model_validator(mode="after")
+    def _coherent_social_email(self) -> "AccountSettings":
+        """Reject a self-contradictory social email policy.
+
+        Mandatory verification for social logins means allauth tries to send a
+        confirmation to the provider's email and blocks until confirmed. If email
+        is simultaneously declared *not required* (``social_email_required: false``)
+        there may be no address to send to — the login would dead-end. Requiring an
+        email is a precondition for being able to verify it."""
+        if self.social_email_verification == "mandatory" and self.social_email_required is False:
+            raise ValueError(
+                "account.social_email_verification is 'mandatory' but "
+                "account.social_email_required is false — verification needs an email "
+                "to confirm, so a social login with no email could never complete. Set "
+                "social_email_required to true, or relax social_email_verification."
+            )
+        return self
+
 
 class OpenIDAppSettings(BaseModel):
     """An OIDC/OAuth2 client provisioned on boot (see the ``ensureopenid`` command)."""
@@ -225,6 +278,31 @@ class OpenIDAppSettings(BaseModel):
     client_id: str = Field(description="OAuth2 client_id.")
     client_secret: str = Field(description="OAuth2 client secret. Override per deployment.")
     redirect_uris: List[str] = Field(default_factory=list, description="Allowed OAuth2 redirect URIs.")
+    membership_is_subject: bool = Field(
+        default=False,
+        description="Use the membership id as the token `sub` (subject) instead of the user id. "
+        "When false (default) the same human is one subject across all their organizations; "
+        "when true each (user, organization) membership is a distinct subject. NOTE: flipping "
+        "this on an existing client changes every user's `sub`, so the relying party sees them "
+        "as brand-new identities.",
+    )
+    email_template: Optional[str] = Field(
+        default=None,
+        description="Template for the `email` claim, rendered per user from membership variables "
+        "(e.g. '{username}@corp.example'). Available variables: username, user_id, email, "
+        "membership_id, org_slug, org_name. When unset, the user's own email is used (falling "
+        "back to a synthetic <pk>@users.noreply address).",
+    )
+
+    @field_validator("email_template")
+    @classmethod
+    def _validate_email_template(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None:
+            # Pure (stdlib-only) validator shared with the runtime renderer.
+            from authapp.oidc_claims import validate_email_template
+
+            validate_email_template(value)
+        return value
 
 
 class SocialAppConfig(BaseModel):
@@ -313,13 +391,53 @@ class Settings(BaseSettings):
         Note: ``account.login_by_code_enabled`` has the same email dependency but
         is not hard-failed here — password login still works without it. Instead it
         is soft-disabled (effective value ``False``) when no ``email:`` block is
-        present; see ``ACCOUNT_LOGIN_BY_CODE_ENABLED`` in settings.py and CONFIG.md."""
-        if self.account.email_verification == "mandatory" and self.email is None:
-            raise ValueError(
-                "account.email_verification is 'mandatory' but no `email:` SMTP block "
-                "is configured — verification mails can't be sent and users would be "
-                "permanently locked out. Add an `email:` block or relax verification."
+        present; see ``ACCOUNT_LOGIN_BY_CODE_ENABLED`` in settings.py and CONFIG.md.
+
+        The same SMTP dependency applies to ``account.social_email_verification``
+        when it is set to ``mandatory``."""
+        mandatory = [
+            name
+            for name, value in (
+                ("email_verification", self.account.email_verification),
+                ("social_email_verification", self.account.social_email_verification),
             )
+            if value == "mandatory"
+        ]
+        if mandatory and self.email is None:
+            raise ValueError(
+                f"account.{' and account.'.join(mandatory)} is 'mandatory' but no "
+                "`email:` SMTP block is configured — verification mails can't be sent "
+                "and affected users would be permanently locked out. Add an `email:` "
+                "block or relax verification."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _relaxed_social_verification_needs_trusted_providers(self) -> "Settings":
+        """If social logins are exempted from email verification, every configured
+        social provider must be explicitly trusted.
+
+        ``social_email_verification: none`` opens the login gate for *all* social
+        providers globally (allauth has no per-provider verification level). Leaving
+        a provider without ``VERIFIED_EMAIL: true`` then means its users are admitted
+        *and* their email is stored unverified with no path to ever verify it — a
+        silent, unintended exemption, especially for a provider added later. Requiring
+        ``VERIFIED_EMAIL`` on each provider makes the trust decision explicit and
+        per-provider, matching the intent behind the global switch."""
+        if self.account.social_email_verification == "none":
+            untrusted = [
+                name
+                for name, cfg in self.socialaccount_providers.items()
+                if not getattr(cfg, "VERIFIED_EMAIL", None)
+            ]
+            if untrusted:
+                raise ValueError(
+                    "account.social_email_verification is 'none' (social logins skip "
+                    "email verification), but these providers are not marked trusted: "
+                    f"{', '.join(sorted(untrusted))}. Add `VERIFIED_EMAIL: true` to each "
+                    "so the exemption is an explicit, per-provider trust decision, or "
+                    "raise social_email_verification to 'optional'/'mandatory'."
+                )
         return self
 
     @classmethod

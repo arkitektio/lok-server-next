@@ -50,11 +50,15 @@ from .upload import request_media_upload
 from .profile import create_profile, update_profile, delete_profile
 from .organization_profile import create_organization_profile, update_organization_profile, delete_organization_profile
 from .device import create_device, update_device, delete_device
-from .composition_device_code import (
-    accept_composition_device_code,
-    decline_composition_device_code,
+from .hub_device_code import (
+    accept_hub_device_code,
+    decline_hub_device_code,
 )
-from .composition import update_composition, delete_composition
+from .mesh_device_code import (
+    accept_mesh_device_code,
+    decline_mesh_device_code,
+)
+from .hub import update_hub, delete_hub
 from .redeem_token import create_redeem_token
 from .ionscale import (
     create_ionscale_layer,

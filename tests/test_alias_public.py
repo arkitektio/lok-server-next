@@ -14,7 +14,7 @@ from asgiref.sync import sync_to_async
 
 from api.management.schema import schema as management_schema
 from fakts import base_models, models
-from fakts.services import compositions
+from fakts.services import hubs
 from tests import factories
 from tests.conftest import build_auth_context
 
@@ -95,11 +95,11 @@ def test_to_url_defaults_public_false():
 
 
 # --------------------------------------------------------------------------- #
-# Composition service persists ``public`` from the staging alias.
+# Hub service persists ``public`` from the staging alias.
 # --------------------------------------------------------------------------- #
 
-def _composition_manifest(*, public: bool) -> base_models.CompositionManifest:
-    return base_models.CompositionManifest(
+def _hub_manifest(*, public: bool) -> base_models.HubManifest:
+    return base_models.HubManifest(
         identifier="com.example.comp",
         instances=[
             base_models.InstanceRequest(
@@ -114,18 +114,18 @@ def _composition_manifest(*, public: bool) -> base_models.CompositionManifest:
 
 
 @pytest.mark.django_db
-def test_create_composition_persists_public_true():
+def test_create_hub_persists_public_true():
     organization = factories.make_organization()
-    compositions.create_composition_from_manifest(_composition_manifest(public=True), organization)
+    hubs.create_hub_from_manifest(_hub_manifest(public=True), organization)
 
     alias = models.InstanceAlias.objects.get(name="alias-1")
     assert alias.public is True
 
 
 @pytest.mark.django_db
-def test_create_composition_defaults_public_false():
+def test_create_hub_defaults_public_false():
     organization = factories.make_organization()
-    compositions.create_composition_from_manifest(_composition_manifest(public=False), organization)
+    hubs.create_hub_from_manifest(_hub_manifest(public=False), organization)
 
     alias = models.InstanceAlias.objects.get(name="alias-1")
     assert alias.public is False

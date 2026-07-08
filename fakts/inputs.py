@@ -54,7 +54,7 @@ class ManifestInput:
 
 class DevelopmentClientInputModel(BaseModel):
     manifest: Manifest
-    composition: str | None = None
+    hub: str | None = None
     requirements: list[RequirementModel] = Field(default_factory=list)
     layers: list[str] = Field(default_factory=lambda: ["web"])
     role: enums.ClientRoleVanilla | None = None
@@ -63,7 +63,7 @@ class DevelopmentClientInputModel(BaseModel):
 @pydantic.input(DevelopmentClientInputModel)
 class DevelopmentClientInput:
     manifest: ManifestInput
-    composition: strawberry.ID | None = None
+    hub: strawberry.ID | None = None
     layers: list[str] | None = None
     role: enums.ClientRole | None = None
 
@@ -92,7 +92,7 @@ class LinkingContextInput:
 
 class RenderInputModel(BaseModel):
     client: str
-    composition: str | None = None
+    hub: str | None = None
     request: LinkingRequest | None = None
     manifest: Manifest | None = None
 
@@ -100,7 +100,7 @@ class RenderInputModel(BaseModel):
 @pydantic.input(RenderInputModel)
 class RenderInput:
     client: strawberry.ID
-    composition: strawberry.ID | None = None
+    hub: strawberry.ID | None = None
     request: LinkingRequestInput | None = None
     manifest: ManifestInput | None = None
 

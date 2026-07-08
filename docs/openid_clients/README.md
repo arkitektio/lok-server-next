@@ -10,7 +10,8 @@ exist"**.
 - [2. Registering a relying party](#2-registering-a-relying-party)
 - [3. The values that must match across services](#3-the-values-that-must-match-across-services)
 - [4. Worked example: ionscale](#4-worked-example-ionscale)
-- [5. Troubleshooting "client does not exist"](#5-troubleshooting-client-does-not-exist)
+- [5. Per-client claim shaping (`sub` and `email`)](#5-per-client-claim-shaping-sub-and-email)
+- [6. Troubleshooting "client does not exist"](#6-troubleshooting-client-does-not-exist)
 
 ---
 
@@ -92,7 +93,58 @@ sends the user to the authorize endpoint (`https://go.arkitekt.live/authorize`,
 the kontrol SPA consent page) → the user approves → lok redirects back with a
 code → ionscale exchanges it at `/lok/o/token/`.
 
-## 5. Troubleshooting "client does not exist"
+## 5. Per-client claim shaping (`sub` and `email`)
+
+Two claims lok issues to a relying party can be configured **per client**, on the
+`openid_apps` entry. Both are optional and default to today's behavior.
+
+```yaml
+openid_apps:
+  - client_name: My Service
+    client_id: my-service
+    client_secret: "<shared secret>"
+    redirect_uris:
+      - https://my-service.example/oidc/callback
+    membership_is_subject: true                 # optional
+    email_template: "{username}@corp.example"   # optional
+```
+
+**`membership_is_subject`** (default `false`) — controls the `sub` (subject)
+claim in the id_token and the userinfo response:
+
+- `false` — `sub` is the **user** id, so the same human is the same subject
+  across every organization they belong to.
+- `true` — `sub` is the **membership** id, so each (user, organization) pair is a
+  distinct subject the RP treats as a separate identity.
+
+> ⚠️ Flipping this on an existing client changes every user's `sub`, so the
+> relying party sees them all as brand-new identities (new accounts, lost links).
+> Decide it up front per client.
+
+**`email_template`** (default unset) — a format string for the `email` claim,
+rendered per user from a fixed set of membership variables:
+
+| Variable | Value |
+|---|---|
+| `{username}` | user's username |
+| `{user_id}` | user's id |
+| `{email}` | user's own email (empty if none) |
+| `{membership_id}` | membership id |
+| `{org_slug}` | organization slug |
+| `{org_name}` | organization name |
+
+Example: `"{username}@corp.example"`. The template is **validated at boot** — an
+unknown variable, attribute/index access (e.g. `{user.email}`), or a template
+with no variables fails config load with an actionable message. When unset, the
+`email` claim is the user's own email, falling back to a synthetic
+`<pk>@users.noreply` address.
+
+Both settings are provisioned by `ensureopenid` and stored on the `OAuth2Client`;
+the claims are produced in `authapp/oidc_claims.py` (shared by the id_token path
+in `authapp/grants.py` and the userinfo endpoint in `authapp/views.py`, so the
+two always agree on `sub` as OIDC requires).
+
+## 6. Troubleshooting "client does not exist"
 
 This means lok has no `OAuth2Client` for the `client_id` the relying party sent.
 Almost always one of:

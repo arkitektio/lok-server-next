@@ -1,4 +1,5 @@
-from fakts.logic import find_instance_for_requirement_and_composition
+from typing import Optional
+from fakts.logic import find_instance_for_requirement_and_hub
 import strawberry
 import strawberry_django
 from kante.types import Info
@@ -41,7 +42,8 @@ class Query:
     role_requests: list[types.ManagementRoleRequest] = kante.django_field()
     scopes: list[types.ManagementScope] = kante.django_field()
     roles: list[types.ManagementRole] = kante.django_field()
-    compositions: list[types.ManagementComposition] = kante.django_field()
+    hubs: list[types.ManagementHub] = kante.django_field()
+    compositions: list[types.ManagementHub] = kante.django_field(deprecation_reason="Renamed to `hubs`. Use `hubs` instead.")
     management_layers: list[types.ManagementLayer] = kante.django_field()
     ionscale_auth_keys: list[types.ManagementIonscaleAuthKey] = kante.django_field()
 
@@ -95,8 +97,12 @@ class Query:
         return fakts_models.ServiceInstance.objects.get(id=id)
 
     @kante.django_field()
-    def composition(self, info: Info, id: strawberry.ID) -> types.ManagementComposition:
-        return fakts_models.Composition.objects.get(id=id)
+    def hub(self, info: Info, id: strawberry.ID) -> types.ManagementHub:
+        return fakts_models.Hub.objects.get(id=id)
+
+    @kante.django_field(name="composition", deprecation_reason="Renamed to `hub`. Use `hub` instead.")
+    def composition(self, info: Info, id: strawberry.ID) -> types.ManagementHub:
+        return fakts_models.Hub.objects.get(id=id)
 
     @kante.django_field()
     def oauth2_client_by_client_id(self, info: Info, client_id: str) -> types.ManagementOAuth2Client:
@@ -109,9 +115,9 @@ class Query:
             )
 
     @kante.django_field()
-    def validate_device_code(self, info: Info, device_code: strawberry.ID, composition: strawberry.ID) -> types.ValidationResult:
+    def validate_device_code(self, info: Info, device_code: strawberry.ID, hub: strawberry.ID) -> types.ValidationResult:
         device_code_obj = fakts_models.DeviceCode.objects.get(id=device_code)
-        composition_obj = fakts_models.Composition.objects.get(id= composition)
+        hub_obj = fakts_models.Hub.objects.get(id= hub)
         user = info.context.request.user
         manifest = device_code_obj.manifest_as_model
         errors: list[str] = []
@@ -123,8 +129,8 @@ class Query:
         existing_device = None
         if manifest.node_id:
             existing_device = fakts_models.Device.objects.filter(
-                organization=composition_obj.organization,
-                node_id=hash_device_id(manifest.node_id, composition_obj.organization),
+                organization=hub_obj.organization,
+                node_id=hash_device_id(manifest.node_id, hub_obj.organization),
             ).first()
 
         if not manifest.requirements:
@@ -137,7 +143,7 @@ class Query:
 
         for req in manifest.requirements:
             try:
-                instance = find_instance_for_requirement_and_composition(req, user, composition=composition_obj)
+                instance = find_instance_for_requirement_and_hub(req, user, hub=hub_obj)
                 if instance:
                     mappings.append(
                         types.PotentialMapping(
@@ -205,22 +211,66 @@ class Query:
 
 
     @kante.django_field()
-    def machine(self, info: Info, id: strawberry.ID) -> types.ManagementMachine:
+    def machine(self, info: Info, id: strawberry.ID) -> Optional[types.ManagementMachine]:
         from ionscale.repo import get_ionscale_repo
-        machine = get_ionscale_repo().get_machine(str(id))
+        from ionscale.base_models import MachineDetail
 
-        if machine.tailnet:
+        repo = get_ionscale_repo()
+        machine_id = str(id)
+
+        # Find the machine by scanning only the layers the caller can see. This reuses the
+        # reliable `list_machines` parser (the one the working mesh list page uses) instead of
+        # the fragile single-machine `get_machine` parse, and gives us the owning layer for free.
+        # Restricting to the caller's layers is also the authorization check — no machine from
+        # another org is ever reachable.
+        layers = fakts_models.IonscaleLayer.objects.filter(
+            organization__memberships__user=info.context.request.user,
+            tailnet_name__isnull=False,
+        ).distinct()
+
+        for layer in layers:
+            # One subprocess per layer; short-circuit on the first match. Fine for the handful
+            # of meshes a user typically belongs to.
+            match = next((m for m in repo.list_machines(layer.tailnet_name) if str(m.id) == machine_id), None)
+            if match is None:
+                continue
+
+            # Best-effort enrichment with the detail view for os/key_expiry/authorized/is_external/
+            # fqdn. The detail parser is fragile (and hardcodes connected=False), so the list
+            # `Machine` always wins for connected/ipv4/ipv6/name/tags; we only overlay the
+            # detail-only attributes when the call succeeds.
+            instance = match
             try:
-                layer = fakts_models.IonscaleLayer.objects.get(tailnet_name=machine.tailnet)
-                if not layer.organization.memberships.filter(user=info.context.request.user).exists():
-                     raise PermissionError("You are not a member of the organization that owns this layer.")
-                return types.ManagementMachine(instance=machine, tailnet=machine.tailnet, layer_id=layer.id)
-            except fakts_models.IonscaleLayer.DoesNotExist:
-                 # What if the machine belongs to a tailnet that is not managed by lok?
-                 # For now we fail
-                 pass
-        
-        raise PermissionError("Could not find the layer associated with this machine.")
+                detail = repo.get_machine(machine_id)
+                instance = MachineDetail(
+                    id=match.id,
+                    name=match.name,
+                    tailnet=layer.tailnet_name,
+                    ipv4=match.ipv4,
+                    ipv6=match.ipv6,
+                    ephemeral=match.ephemeral,
+                    connected=match.connected,
+                    last_seen=match.last_seen,
+                    tags=match.tags,
+                    # `authorized` is reliable from the list; keep it (fall back to detail).
+                    authorized=match.authorized if match.authorized is not None else detail.authorized,
+                    os=detail.os,
+                    key_expiry=detail.key_expiry,
+                    is_external=detail.is_external,
+                    fqdn=detail.fqdn,
+                )
+            except Exception:
+                pass
+
+            return types.ManagementMachine(
+                instance=instance,
+                tailnet=layer.tailnet_name,
+                layer_id=layer.id,
+                magic_dns_enabled=layer.magic_dns_enabled,
+            )
+
+        # Not found in any of the caller's layers -> null (the frontend renders "not found").
+        return None
 
     @kante.django_field()
     def client(self, info: Info, id: strawberry.ID) -> types.ManagementClient:
@@ -259,12 +309,28 @@ class Query:
         return fakts_models.ServiceDeviceCode.objects.get(code=code)
 
     @kante.django_field()
-    def composition_device_code(self, info: Info, id: strawberry.ID) -> types.ManagementCompositionDeviceCode:
-        return fakts_models.CompositionDeviceCode.objects.get(id=id)
+    def hub_device_code(self, info: Info, id: strawberry.ID) -> types.ManagementHubDeviceCode:
+        return fakts_models.HubDeviceCode.objects.get(id=id)
 
     @kante.django_field()
-    def composition_device_code_by_code(self, info: Info, code: str) -> types.ManagementCompositionDeviceCode:
-        return fakts_models.CompositionDeviceCode.objects.get(code=code)
+    def hub_device_code_by_code(self, info: Info, code: str) -> types.ManagementHubDeviceCode:
+        return fakts_models.HubDeviceCode.objects.get(code=code)
+
+    @kante.django_field(name="compositionDeviceCode", deprecation_reason="Renamed to `hubDeviceCode`. Use `hubDeviceCode` instead.")
+    def composition_device_code(self, info: Info, id: strawberry.ID) -> types.ManagementHubDeviceCode:
+        return fakts_models.HubDeviceCode.objects.get(id=id)
+
+    @kante.django_field(name="compositionDeviceCodeByCode", deprecation_reason="Renamed to `hubDeviceCodeByCode`. Use `hubDeviceCodeByCode` instead.")
+    def composition_device_code_by_code(self, info: Info, code: str) -> types.ManagementHubDeviceCode:
+        return fakts_models.HubDeviceCode.objects.get(code=code)
+
+    @kante.django_field()
+    def mesh_device_code(self, info: Info, id: strawberry.ID) -> types.ManagementMeshDeviceCode:
+        return fakts_models.MeshDeviceCode.objects.get(id=id)
+
+    @kante.django_field()
+    def mesh_device_code_by_code(self, info: Info, code: str) -> types.ManagementMeshDeviceCode:
+        return fakts_models.MeshDeviceCode.objects.get(code=code)
 
 
 @strawberry.type
@@ -334,20 +400,46 @@ class Mutation:
         resolver=mutations.cancel_role_request,
     )
 
-    # Compsition Device Code Mutations
+    # Hub Device Code Mutations
+    accept_hub_device_code = strawberry_django.mutation(
+        resolver=mutations.accept_hub_device_code,
+    )
+    decline_hub_device_code = strawberry_django.mutation(
+        resolver=mutations.decline_hub_device_code,
+    )
+    # Deprecated composition aliases (same resolvers; renamed to hub).
     accept_composition_device_code = strawberry_django.mutation(
-        resolver=mutations.accept_composition_device_code,
+        resolver=mutations.accept_hub_device_code,
+        deprecation_reason="Renamed to `acceptHubDeviceCode`. Use `acceptHubDeviceCode` instead.",
     )
     decline_composition_device_code = strawberry_django.mutation(
-        resolver=mutations.decline_composition_device_code,
+        resolver=mutations.decline_hub_device_code,
+        deprecation_reason="Renamed to `declineHubDeviceCode`. Use `declineHubDeviceCode` instead.",
     )
 
-    # Composition
+    # Mesh Device Code Mutations
+    accept_mesh_device_code = strawberry_django.mutation(
+        resolver=mutations.accept_mesh_device_code,
+    )
+    decline_mesh_device_code = strawberry_django.mutation(
+        resolver=mutations.decline_mesh_device_code,
+    )
+
+    # Hub
+    update_hub = strawberry_django.mutation(
+        resolver=mutations.update_hub,
+    )
+    delete_hub = strawberry_django.mutation(
+        resolver=mutations.delete_hub,
+    )
+    # Deprecated composition aliases (same resolvers; renamed to hub).
     update_composition = strawberry_django.mutation(
-        resolver=mutations.update_composition,
+        resolver=mutations.update_hub,
+        deprecation_reason="Renamed to `updateHub`. Use `updateHub` instead.",
     )
     delete_composition = strawberry_django.mutation(
-        resolver=mutations.delete_composition,
+        resolver=mutations.delete_hub,
+        deprecation_reason="Renamed to `deleteHub`. Use `deleteHub` instead.",
     )
 
     # Device Code Mutations

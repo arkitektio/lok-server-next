@@ -12,7 +12,7 @@ class AcceptDeviceCodeInput:
     """Input for creating a single-use magic device code for an organization"""
 
     device_code: strawberry.ID
-    composition: strawberry.ID
+    hub: strawberry.ID
     device_name: str | None = strawberry.field(default=None, description="Name to give a newly created device (ignored if the device already exists).")
     declined_requirements: list[str] = strawberry.field(default_factory=list)
     """Requirement keys the user has explicitly declined (optional requirements only)."""
@@ -28,14 +28,14 @@ def accept_device_code(info: Info, input: AcceptDeviceCodeInput) -> types.Manage
     """
     user = info.context.request.user
     device_code = fakts_models.DeviceCode.objects.get(id=input.device_code)
-    composition = fakts_models.Composition.objects.get(id=input.composition)
-    organization = composition.organization
+    hub = fakts_models.Hub.objects.get(id=input.hub)
+    organization = hub.organization
 
     validate_device_code = logic.validate_device_code(
         device_code=device_code,
         user=user,
         organization=organization,
-        composition=composition,
+        hub=hub,
         device_name=input.device_name,
         declined_requirements=input.declined_requirements,
     )

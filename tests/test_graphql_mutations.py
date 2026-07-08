@@ -16,7 +16,7 @@ def _context(user, organization, client):
 def _setup():
     """Sync DB setup (must not run inside the async event loop)."""
     membership = factories.make_membership()
-    # the mutation reads request.client.composition; a fakts Client provides it
+    # the mutation reads request.client.hub; a fakts Client provides it
     request_client = factories.make_client(membership=membership)
     return membership.user, membership.organization, request_client
 

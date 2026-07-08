@@ -59,3 +59,16 @@ def test_device_code_endpoints_are_advertised(client):
     data = client.get(WELL_KNOWN).json()
     assert data["device_code_start"] == "http://testserver/lok/f/start/"
     assert data["challenge_url"] == "http://testserver/lok/f/challenge/"
+
+
+@pytest.mark.django_db
+@override_settings(DEPLOYMENT_HUB_CONFIGURE_URL="/hubconfigure/{code}")
+def test_hub_endpoints_are_advertised(client):
+    """The hub device-code start, challenge, claim, and configure endpoints
+    are advertised as absolute URLs (start/challenge/claim point at lok's fakts API;
+    configure resolves the template against the base domain with `{code}` preserved)."""
+    data = client.get(WELL_KNOWN).json()
+    assert data["hub_device_code_start"] == "http://testserver/lok/f/hubstart/"
+    assert data["hub_challenge_url"] == "http://testserver/lok/f/hubchallenge/"
+    assert data["hub_claim"] == "http://testserver/lok/f/claimhub/"
+    assert data["hub_configure"] == "http://testserver/hubconfigure/{code}"

@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional, Literal
 from fakts import enums
-from fakts.base_models import CompositionManifest, StagingAlias, Role, Scope
+from fakts.base_models import HubManifest, StagingAlias, Role, Scope
 
 
 class LayerModel(BaseModel):
@@ -46,7 +46,7 @@ class ClientInstanceModel(BaseModel):
     identifier: str
 
 
-class CompositionsConfigModel(BaseModel):
+class HubsConfigModel(BaseModel):
     instances: List[ServiceInstanceModel] = []
     clients: List[ClientInstanceModel] = []
     name: str
@@ -58,7 +58,7 @@ class CompositionsConfigModel(BaseModel):
 class YamlConfigModel(BaseModel):
     """Model representing the YAML configuration."""
 
-    compositions: List[CompositionsConfigModel] = []
+    hubs: List[HubsConfigModel] = []
 
     @model_validator(mode="after")
     def validate_args(self):
@@ -105,7 +105,7 @@ class KommunityPartnerModel(BaseModel):
     partner_kind: enums.PartnerKind = enums.PartnerKind.PREAUTHORIZED
     kommunity_kind: enums.KommunityKind = enums.KommunityKind.OPEN
     auto_configure: bool = False
-    preconfigured_composition: Optional[CompositionManifest] = None
+    preconfigured_hub: Optional[HubManifest] = None
     filter_config: Optional[FilterConfigModel] = None
 
 
@@ -115,7 +115,7 @@ class RedeemTokenModel(BaseModel):
     token: str
     user: str
     organization: str
-    composition: str
+    hub: str
 
 
 class RedeemTokenConfigs(BaseModel):

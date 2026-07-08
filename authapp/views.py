@@ -46,22 +46,34 @@ def jwks(request: HttpRequest) -> JsonResponse:
 @csrf_exempt
 @resource_protector("profile")
 def user_info(request: HttpRequest) -> JsonResponse:
+    from authapp.models import OAuth2Client
+    from authapp.oidc_claims import resolve_email, resolve_sub
+
     membership = request.oauth_token.user  # type: ignore
-    x =  JsonResponse(
+
+    # Recover the per-client `sub`/`email` policy from the token's client. The
+    # `sub` here MUST match the id_token's `sub` for the same client (OIDC Core
+    # §5.3.2), so it is resolved identically to grants.OpenIDCode.
+    try:
+        client = OAuth2Client.objects.get(client_id=request.oauth_token.client_id)  # type: ignore
+        membership_is_subject = client.membership_is_subject
+        email_template = client.email_template
+    except OAuth2Client.DoesNotExist:
+        membership_is_subject = False
+        email_template = None
+
+    return JsonResponse(
         {
-            "sub": str(membership.user.id),
+            "sub": resolve_sub(membership, membership_is_subject),
             "name": membership.user.username,
             "nickname": membership.user.username,
             "preferred_username": membership.user.username,
-            "email": membership.user.email or f"{str(membership.user.id)}@users.noreply",
+            "email": resolve_email(membership, email_template),
             "roles": [role.identifier for role in membership.roles.all()],
             "scope": "scope",
             "active_org": membership.organization.slug,
         }
     )
-    print(x.content)
-    
-    return x
 
 
 # use ``server.create_token_response`` to handle token endpoint

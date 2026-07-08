@@ -13,7 +13,7 @@ test settings already point here) or per-test with
 from pathlib import Path
 from typing import Any, Dict, List, Union
 
-from .base_models import Machine, MachineDetail, Tailnet, TailnetCreate
+from .base_models import DNSConfig, Machine, MachineDetail, Tailnet, TailnetCreate
 
 
 class FakeIonscaleRepository:
@@ -24,6 +24,7 @@ class FakeIonscaleRepository:
         self.created_tailnets: List[TailnetCreate] = []
         self.updated_policies: List[tuple[str, Union[Dict[str, Any], str, Path]]] = []
         self.created_auth_keys: List[Dict[str, Any]] = []
+        self.dns_configs: List[tuple[str, DNSConfig]] = []
         # Canned read data — seed these in tests as needed.
         self.machines_by_tailnet: Dict[str, List[Machine]] = {}
         self.machines: Dict[str, MachineDetail] = {}
@@ -47,6 +48,10 @@ class FakeIonscaleRepository:
 
     def update_policy(self, tailnet: str, policy: Union[Dict[str, Any], str, Path]) -> str:
         self.updated_policies.append((tailnet, policy))
+        return "ok"
+
+    def set_dns_config(self, tailnet: str, config: DNSConfig) -> str:
+        self.dns_configs.append((tailnet, config))
         return "ok"
 
     def create_auth_key(self, tailnet: str, ephemeral: bool = False, pre_authorized: bool = True, tags: List[str] = None) -> str:

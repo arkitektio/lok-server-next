@@ -58,18 +58,18 @@ class Layer:
     
 
 @strawberry_django.type(
-    models.Composition,
-    ordering=filters.CompositionOrdering,
-    description="A Composition is a specific configuration of a Service. It contains the configuration for a particular version of the service.",
+    models.Hub,
+    ordering=filters.HubOrdering,
+    description="A Hub is a specific configuration of a Service. It contains the configuration for a particular version of the service.",
     pagination=True,
-    filters=filters.CompositionFilter,
+    filters=filters.HubFilter,
 )
-class Composition:
+class Hub:
     id: strawberry.ID
-    organization: types.Organization = strawberry.field(description="The organization that this composition belongs to.")
-    identifier: scalars.ServiceIdentifier = strawberry.field(description="The identifier of the composition. This should be a globally unique string that identifies the composition. We encourage you to use the reverse domain name notation. E.g. `com.example.mycomposition`")
+    organization: types.Organization = strawberry.field(description="The organization that this hub belongs to.")
+    identifier: scalars.ServiceIdentifier = strawberry.field(description="The identifier of the hub. This should be a globally unique string that identifies the hub. We encourage you to use the reverse domain name notation. E.g. `com.example.myhub`")
     description: str | None = strawberry.field(description="The description of the service. This should be a human readable description of the service.")
-    name: str = strawberry.field(description="The name of the composition. This should be a human readable name of the composition.")
+    name: str = strawberry.field(description="The name of the hub. This should be a human readable name of the hub.")
     
 
 
@@ -125,7 +125,7 @@ class ServiceInstance:
     denied_users: list[types.User] = strawberry_django.field(description="The users that are denied to use this instance.")
     allowed_groups: list[types.Group] = strawberry_django.field(description="The groups that are allowed to use this instance.")
     denied_groups: list[types.Group] = strawberry_django.field(description="The groups that are denied to use this instance.")
-    mappings: list["ServiceInstanceMapping"] = strawberry_django.field(description="The mappings of the composition. A mapping is a mapping of a service to a service instance. This is used to configure the composition.")
+    mappings: list["ServiceInstanceMapping"] = strawberry_django.field(description="The mappings of the hub. A mapping is a mapping of a service to a service instance. This is used to configure the hub.")
     logo: types.MediaStore | None = strawberry.field(description="The logo of the app. This should be a url to a logo that can be used to represent the app.")
     aliases: list["InstanceAlias"] = strawberry_django.field(
         description="The aliases of the instance. An alias is a way to reach the instance. Clients can use these aliases to check if they can reach the instance. An alias can be an absolute alias (e.g. 'example.com') or a relative alias (e.g. 'example.com/path'). If the alias is relative, it will be relative to the layer's domain, port and path."
@@ -245,7 +245,7 @@ class Client:
         if self.node and self.node.name:
             label += f" on {self.node.name}"
         return label
-    mappings: list["ServiceInstanceMapping"] = strawberry_django.field(description="The mappings of the client. A mapping is a mapping of a service to a service instance. This is used to configure the composition.")
+    mappings: list["ServiceInstanceMapping"] = strawberry_django.field(description="The mappings of the client. A mapping is a mapping of a service to a service instance. This is used to configure the hub.")
 
 
 
@@ -330,4 +330,4 @@ class RedeemToken:
     user: types.User = strawberry.field(description="The user that this redeem token belongs to.")
 
     def get_queryset(cls, info) -> models.RedeemToken:
-        return models.RedeemToken.objects.filter(user=info.context.request.user, composition__organization=info.context.request.organization)
+        return models.RedeemToken.objects.filter(user=info.context.request.user, hub__organization=info.context.request.organization)

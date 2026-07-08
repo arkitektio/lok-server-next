@@ -63,9 +63,9 @@ def start_service_device_code(start_grant: base_models.ServiceDeviceCodeStartReq
     )
 
 
-def start_composition_device_code(start_grant: base_models.CompositionStartRequest) -> models.CompositionDeviceCode:
-    """Stage a composition device code from a start request, downloading the logo."""
-    manifest = start_grant.composition
+def start_hub_device_code(start_grant: base_models.HubStartRequest) -> models.HubDeviceCode:
+    """Stage a hub device code from a start request, downloading the logo."""
+    manifest = start_grant.hub
 
     try:
         logo = download_logo(manifest.logo) if manifest.logo else None  # noqa: F841 (validates logo is reachable)
@@ -74,10 +74,30 @@ def start_composition_device_code(start_grant: base_models.CompositionStartReque
 
     logger.info(f"Received start challenge for {manifest.identifier}")
 
-    return models.CompositionDeviceCode.objects.create(
+    return models.HubDeviceCode.objects.create(
         code=create_device_code(),
         challenge_code=create_device_code(),
         manifest=manifest.model_dump(),
+        expires_at=timezone.now() + datetime.timedelta(seconds=start_grant.expiration_time_seconds),
+    )
+
+
+def start_mesh_device_code(start_grant: base_models.MeshDeviceCodeStartRequest) -> models.MeshDeviceCode:
+    """Stage a mesh device code from a start request.
+
+    A machine requests to join an organization's mesh; a human authorizer later accepts
+    (minting the pre-auth key) via the management GraphQL. ``code`` is the human-visible
+    value for the configure URL, ``challenge_code`` is the secret the machine polls with.
+    """
+    logger.info(f"Received mesh start challenge for machine {start_grant.requested_machine_name!r}")
+
+    return models.MeshDeviceCode.objects.create(
+        code=create_device_code(),
+        challenge_code=create_device_code(),
+        requested_machine_name=start_grant.requested_machine_name,
+        description=start_grant.description,
+        staging_ephemeral=start_grant.ephemeral,
+        staging_tags=start_grant.tags,
         expires_at=timezone.now() + datetime.timedelta(seconds=start_grant.expiration_time_seconds),
     )
 
@@ -87,7 +107,7 @@ def validate_device_code(
     device_code: models.DeviceCode,
     user: models.AbstractUser,
     organization: models.Organization,
-    composition: models.Composition,
+    hub: models.Hub,
     device_name: str | None = None,
     declined_requirements: list[str] | None = None,
 ) -> models.DeviceCode:
@@ -108,7 +128,7 @@ def validate_device_code(
         node=node,
         tenant=user,
         organization=organization,
-        composition=composition,
+        hub=hub,
         redirect_uris=redirect_uris,
     ).first()
 
@@ -135,7 +155,7 @@ def validate_device_code(
             config=config,
             user=user,
             organization=organization,
-            composition=composition,
+            hub=hub,
             declined_requirements=declined_requirements,
             device_name=device_name,
         )

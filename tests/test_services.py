@@ -92,8 +92,8 @@ def test_create_client_allows_node_id_when_org_requires_device_auth():
 
 @pytest.mark.django_db
 def test_validate_redeem_token_creates_and_attaches_client():
-    composition = factories.make_composition()
-    redeem = factories.make_redeem_token(composition=composition)
+    hub = factories.make_hub()
+    redeem = factories.make_redeem_token(hub=hub)
 
     result = clients.validate_redeem_token(redeem, _manifest(identifier="com.example.redeem"))
 
@@ -105,14 +105,14 @@ def test_validate_redeem_token_creates_and_attaches_client():
 
 @pytest.mark.django_db
 def test_validate_device_code_creates_client():
-    composition = factories.make_composition()
-    user = composition.creator
-    organization = composition.organization
+    hub = factories.make_hub()
+    user = hub.creator
+    organization = hub.organization
     device_code = factories.make_device_code(
         staging_manifest={"identifier": "com.example.dc", "version": "1.0.0", "scopes": [], "requirements": []},
     )
 
-    result = device_codes.validate_device_code(device_code, user, organization, composition)
+    result = device_codes.validate_device_code(device_code, user, organization, hub)
 
     assert result.client is not None
     assert result.client.release.app.identifier == "com.example.dc"
@@ -120,9 +120,9 @@ def test_validate_device_code_creates_client():
 
 @pytest.mark.django_db
 def test_validate_device_code_uses_provided_name_for_node_device():
-    composition = factories.make_composition()
-    user = composition.creator
-    organization = composition.organization
+    hub = factories.make_hub()
+    user = hub.creator
+    organization = hub.organization
     device_code = factories.make_device_code(
         staging_manifest={
             "identifier": "com.example.node",
@@ -133,7 +133,7 @@ def test_validate_device_code_uses_provided_name_for_node_device():
         },
     )
 
-    result = device_codes.validate_device_code(device_code, user, organization, composition, device_name="Workbench")
+    result = device_codes.validate_device_code(device_code, user, organization, hub, device_name="Workbench")
 
     assert result.client is not None
     assert result.client.node is not None

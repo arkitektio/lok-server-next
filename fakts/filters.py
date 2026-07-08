@@ -139,8 +139,8 @@ class ServiceReleaseFilter:
         return Q(**{f"{prefix}backend__contains": value})
 
 
-@strawberry_django.filter_type(fakts_models.Composition)
-class CompositionFilter:
+@strawberry_django.filter_type(fakts_models.Hub)
+class HubFilter:
     @strawberry_django.filter_field
     def ids(self, value: list[strawberry.ID], prefix: str) -> Q:
         return Q(**{f"{prefix}id__in": value})
@@ -215,8 +215,8 @@ class ServiceInstanceMappingOrdering:
     id: strawberry.auto
 
 
-@strawberry_django.order_type(fakts_models.Composition)
-class CompositionOrdering:
+@strawberry_django.order_type(fakts_models.Hub)
+class HubOrdering:
     id: strawberry.auto
     name: strawberry.auto
 

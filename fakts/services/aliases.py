@@ -1,8 +1,8 @@
 """Alias persistence helpers.
 
 A single place to turn a wire-level ``StagingAlias`` into a persisted
-``InstanceAlias`` row, so the composition-manifest path and the device-code
-composition path stay in agreement (they used to diverge on which fields they
+``InstanceAlias`` row, so the hub-manifest path and the device-code
+hub path stay in agreement (they used to diverge on which fields they
 wrote and on the upsert key).
 """
 

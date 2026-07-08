@@ -1,5 +1,6 @@
 import datetime
 from typing import List, Optional, cast
+from django.conf import settings
 from django.db.models import Q
 from karakter.datalayer import get_current_datalayer
 import strawberry
@@ -567,8 +568,8 @@ class ManagementStagingClientRequest:
     description: Optional[str] = None
 
 
-@pydantic.type(base_models.CompositionManifest)
-class ManagementCompositionManifest:
+@pydantic.type(base_models.HubManifest)
+class ManagementHubManifest:
     identifier: str
     instances: list[ManagementStagingInstanceRequest]
     clients: list[ManagementStagingClientRequest]
@@ -594,7 +595,7 @@ class ManagementService:
 
 @strawberry_django.type(
     fakts_models.KommunityPartner,
-    description="A KommunityPartner represents a pre-configured partner that can provide compositions and services to organizations. Partners can be auto-configured to automatically create compositions for new organizations.",
+    description="A KommunityPartner represents a pre-configured partner that can provide hubs and services to organizations. Partners can be auto-configured to automatically create hubs for new organizations.",
     pagination=True,
     filters=filters.ManagementKommunityPartnerFilter,
     ordering=filters.ManagementKommunityPartnerOrdering,
@@ -612,12 +613,12 @@ class ManagementKommunityPartner:
     website_url: str | None = strawberry.field(description="The website URL of the partner.")
     partner_kind: str = strawberry.field(description="The kind of partner (e.g., 'preauthorized', 'oauth2').")
     kommunity_kind: str = strawberry.field(description="The kind of kommunity (e.g., 'open', 'restricted', 'private').")
-    auto_configure: bool = strawberry.field(description="Whether this partner should automatically create compositions for new organizations.")
+    auto_configure: bool = strawberry.field(description="Whether this partner should automatically create hubs for new organizations.")
     oauth_client: Optional["ManagementOAuth2Client"] = strawberry.field(description="The OAuth2 client associated with this partner, if any.")
     
-    @strawberry.field(description="The preconfigured composition manifest for this partner, if any.")
-    def preconfigured_composition(self) -> strawberry.scalars.JSON | None:
-        return self.preconfigured_composition
+    @strawberry.field(description="The preconfigured hub manifest for this partner, if any.")
+    def preconfigured_hub(self) -> strawberry.scalars.JSON | None:
+        return self.preconfigured_hub
 
     @strawberry.field(description="Filter conditions that determine which users/organizations this partner applies to. "
                                    "Conditions include: email_domain_equals, email_domain_ends_with, username_equals, username_contains.")
@@ -649,7 +650,7 @@ class ValidationResult:
     existing_device: Optional["ManagementDevice"] = strawberry.field(
         default=None,
         description=(
-            "The device that already exists for this node in the selected composition's "
+            "The device that already exists for this node in the selected hub's "
             "organization. If null, accepting will create a new device."
         ),
     )
@@ -688,7 +689,7 @@ class ManagementServiceInstance:
     denied_users: list[ManagementUser] = strawberry_django.field(description="The users that are denied to use this instance.")
     allowed_groups: list[ManagementGroup] = strawberry_django.field(description="The groups that are allowed to use this instance.")
     denied_groups: list[ManagementGroup] = strawberry_django.field(description="The groups that are denied to use this instance.")
-    mappings: list["ManagementServiceInstanceMapping"] = strawberry_django.field(description="The mappings of the composition. A mapping is a mapping of a service to a service instance. This is used to configure the composition.")
+    mappings: list["ManagementServiceInstanceMapping"] = strawberry_django.field(description="The mappings of the hub. A mapping is a mapping of a service to a service instance. This is used to configure the hub.")
     logo: ManagementMediaStore | None = strawberry.field(description="The logo of the app. This should be a url to a logo that can be used to represent the app.")
     aliases: list["ManagementInstanceAlias"] = strawberry_django.field(
         description="The aliases of the instance. An alias is a way to reach the instance. Clients can use these aliases to check if they can reach the instance. An alias can be an absolute alias (e.g. 'example.com') or a relative alias (e.g. 'example.com/path'). If the alias is relative, it will be relative to the layer's domain, port and path."
@@ -702,23 +703,23 @@ class ManagementServiceInstance:
 
 
 @strawberry_django.type(
-    fakts_models.Composition,
-    description="A Composition is a collection of service instances and clients that work together. It represents a deployable configuration for an organization.",
+    fakts_models.Hub,
+    description="A Hub is a collection of service instances and clients that work together. It represents a deployable configuration for an organization.",
     pagination=True,
-    filters=filters.ManagementCompositionFilter,
-    ordering=filters.ManagementCompositionOrdering,
+    filters=filters.ManagementHubFilter,
+    ordering=filters.ManagementHubOrdering,
 )
-class ManagementComposition:
+class ManagementHub:
     id: strawberry.ID
-    name: str = strawberry.field(description="The name of the composition")
-    description: str | None = strawberry.field(description="The description of the composition. This should be a human readable description of the composition.")
-    token: str = strawberry.field(description="The token used to claim this composition")
-    creator: ManagementUser = strawberry_django.field(description="The user who created this composition")
-    organization: "ManagementOrganization" = strawberry_django.field(description="The organization that owns this composition.")
+    name: str = strawberry.field(description="The name of the hub")
+    description: str | None = strawberry.field(description="The description of the hub. This should be a human readable description of the hub.")
+    token: str = strawberry.field(description="The token used to claim this hub")
+    creator: ManagementUser = strawberry_django.field(description="The user who created this hub")
+    organization: "ManagementOrganization" = strawberry_django.field(description="The organization that owns this hub.")
     instances: list["ManagementServiceInstance"] = strawberry_django.field(
-        description="The instances of the composition. A service instance is a configured instance of a service."
+        description="The instances of the hub. A service instance is a configured instance of a service."
     )
-    clients: list["ManagementClient"] = strawberry_django.field(description="The clients that are part of this composition. A client is an application that uses the services in the composition.")
+    clients: list["ManagementClient"] = strawberry_django.field(description="The clients that are part of this hub. A client is an application that uses the services in the hub.")
 
     @classmethod
     def get_queryset(cls, queryset, info: Info):
@@ -788,11 +789,15 @@ class ManagementMachine:
     instance: strawberry.Private[Machine]
     tailnet: strawberry.Private[str]
     layer_id: strawberry.Private[strawberry.ID]
+    magic_dns_enabled: strawberry.Private[bool]
 
-    def __init__(self, instance: Machine, tailnet: str, layer_id: strawberry.ID):
+    def __init__(self, instance: Machine, tailnet: str, layer_id: strawberry.ID, magic_dns_enabled: bool = False):
          self.instance = instance
          self.tailnet = tailnet
          self.layer_id = layer_id
+         # Whether the owning layer has MagicDNS on. Threaded in at construction so the
+         # `magic_dns_name` field doesn't hit the DB per machine (avoids N+1 on the list page).
+         self.magic_dns_enabled = magic_dns_enabled
 
     @strawberry.field
     def id(self) -> strawberry.ID:
@@ -825,10 +830,49 @@ class ManagementMachine:
     @strawberry.field
     def last_seen(self) -> Optional[datetime.datetime]:
         return self.instance.last_seen
-    
+
     @strawberry.field
     def tags(self) -> List[str]:
         return self.instance.tags
+
+    @strawberry.field(description="The operating system reported by the machine, if known.")
+    def os(self) -> Optional[str]:
+        return getattr(self.instance, "os", None)
+
+    @strawberry.field(description="When the machine's node key expires, if key expiry is enabled.")
+    def key_expiry(self) -> Optional[datetime.datetime]:
+        return getattr(self.instance, "key_expiry", None)
+
+    @strawberry.field(description="Whether the machine is authorized on the tailnet, or null when unknown.")
+    def authorized(self) -> Optional[bool]:
+        return getattr(self.instance, "authorized", None)
+
+    @strawberry.field(description="Whether the machine is an external node (belongs to another tailnet), or null when unknown.")
+    def is_external(self) -> Optional[bool]:
+        return getattr(self.instance, "is_external", None)
+
+    @strawberry.field(
+        description="The machine's MagicDNS name (e.g. `myhost.mytailnet.mesh.example.com`), or null "
+        "when MagicDNS is disabled for the mesh or no suffix is configured."
+    )
+    def magic_dns_name(self) -> Optional[str]:
+        # MagicDNS off for this mesh -> the name would not resolve, so surface nothing.
+        if not self.magic_dns_enabled:
+            return None
+        # Prefer the real FQDN reported by ionscale over deriving it (avoids guessing the format).
+        fqdn = getattr(self.instance, "fqdn", None)
+        if fqdn:
+            return fqdn
+        # Derive the MagicDNS name. ionscale namespaces machines under their tailnet, so the
+        # form is `<name>.<tailnet>.<suffix>` (e.g. gpu-01.myorg.mesh.arkitekt.live).
+        suffix = getattr(settings, "IONSCALE_MAGIC_DNS_SUFFIX", None)
+        if suffix and self.instance.name:
+            parts = [self.instance.name]
+            if self.tailnet:
+                parts.append(self.tailnet)
+            parts.append(suffix)
+            return ".".join(parts)
+        return None
 
 
 
@@ -851,6 +895,8 @@ class ManagementLayer:
         description="The instances of the service. A service instance is a configured instance of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."
     )
     tailnet_name: str = strawberry.field(description="The tailnet name of the layer. This is only set for Ionscale layers.")
+    magic_dns_enabled: bool = strawberry.field(description="Whether MagicDNS is enabled for this mesh.")
+    https_enabled: bool = strawberry.field(description="Whether HTTPS certificates are enabled for this mesh. Requires MagicDNS.")
     auth_keys: list["ManagementIonscaleAuthKey"] = strawberry_django.field(description="The auth keys that are associated with this layer.")
     
     
@@ -859,7 +905,7 @@ class ManagementLayer:
     def machines(self, info: Info) -> List[ManagementMachine]:
         if hasattr(self, "tailnet_name"):
              machines = get_ionscale_repo().list_machines(self.tailnet_name)
-             return [ManagementMachine(instance=m, tailnet=self.tailnet_name, layer_id=self.id) for m in machines]
+             return [ManagementMachine(instance=m, tailnet=self.tailnet_name, layer_id=self.id, magic_dns_enabled=self.magic_dns_enabled) for m in machines]
         return []
 
     @strawberry.field(description="A specific machine associated with this layer (only works for IonscaleLayers)")
@@ -867,7 +913,7 @@ class ManagementLayer:
         if hasattr(self, "tailnet_name"):
              try:
                 machine = get_ionscale_repo().get_machine(str(id))
-                return ManagementMachine(instance=machine, tailnet=self.tailnet_name, layer_id=self.id)
+                return ManagementMachine(instance=machine, tailnet=self.tailnet_name, layer_id=self.id, magic_dns_enabled=self.magic_dns_enabled)
              except Exception:
                  return None
         return None
@@ -1032,7 +1078,7 @@ class ManagementClient:
     organization: ManagementOrganization = strawberry_django.field(description="The client")
     logo: ManagementMediaStore | None = strawberry_django.field(description="The logo of the release. This should be a url to a logo that can be used to represent the release.")
     name: str = strawberry_django.field(description="The name of the client. This is a human readable name of the client.")
-    mappings: list["ManagementServiceInstanceMapping"] = strawberry_django.field(description="The mappings of the client. A mapping is a mapping of a service to a service instance. This is used to configure the composition.")
+    mappings: list["ManagementServiceInstanceMapping"] = strawberry_django.field(description="The mappings of the client. A mapping is a mapping of a service to a service instance. This is used to configure the hub.")
     used_aliases: list[ManagementUsedAlias] = strawberry_django.field(description="The aliases that are used by this client.")
     last_reported_at: datetime.datetime | None = strawberry_django.field(description="The last time the client reported in. This is used to determine if the client is active or not.")
     scopes: list["ManagementScope"] = strawberry_django.field(description="The scopes that are granted to this client.")
@@ -1141,22 +1187,43 @@ class ManagementServiceDeviceCode:
         ]
 
 
-@strawberry_django.type(fakts_models.CompositionDeviceCode, filters=karakter_filters.OrganizationFilter, pagination=True, description="""A CompositionDeviceCode is used for the device code flow for compositions.""")
-class ManagementCompositionDeviceCode:
+@strawberry_django.type(fakts_models.HubDeviceCode, filters=karakter_filters.OrganizationFilter, pagination=True, description="""A HubDeviceCode is used for the device code flow for hubs.""")
+class ManagementHubDeviceCode:
     id: strawberry.ID
     user: Optional[ManagementUser]
     created_at: datetime.datetime
     expires_at: datetime.datetime
     code: str
-    composition: Optional[ManagementComposition]
+    hub: Optional[ManagementHub]
+    composition: Optional[ManagementHub] = strawberry_django.field(
+        field_name="hub",
+        deprecation_reason="Renamed to `hub`. Use `hub` instead.",
+    )
     denied: bool
 
-    @strawberry_django.field(description="The composition manifest for this device code")
-    def manifest(self, info: Info) -> Optional[ManagementCompositionManifest]:
+    @strawberry_django.field(description="The hub manifest for this device code")
+    def manifest(self, info: Info) -> Optional[ManagementHubManifest]:
         if not self.manifest:
             return None
 
-        return base_models.CompositionManifest(**self.manifest)
+        return base_models.HubManifest(**self.manifest)
+
+
+@strawberry_django.type(fakts_models.MeshDeviceCode, filters=karakter_filters.OrganizationFilter, pagination=True, description="""A MeshDeviceCode is used for the device-code flow that lets a machine join an organization's mesh.""")
+class ManagementMeshDeviceCode:
+    id: strawberry.ID
+    user: Optional[ManagementUser]
+    created_at: datetime.datetime
+    expires_at: datetime.datetime
+    code: str
+    requested_machine_name: Optional[str]
+    machine_name: Optional[str]
+    description: Optional[str]
+    denied: bool
+    # NB: the minted pre-auth key is deliberately NOT exposed here. The by-code lookup is
+    # unauthenticated-preview-friendly, so surfacing the secret would leak a live mesh-join
+    # credential to anyone who learns the code. The machine receives the key only via the
+    # REST /f/meshchallenge/ poll (gated on the secret challenge_code).
 
 
 @strawberry_django.type(fakts_models.RedeemToken, filters=filters.ManagementRedeemTokenFilter, pagination=True, ordering=filters.ManagementRedeemTokenOrdering)
@@ -1165,10 +1232,15 @@ class ManagementRedeemToken:
     created_at: datetime.datetime
     expires_at: datetime.datetime | None
     token: str = strawberry.field(description="The token of the redeem token")
-    composition: ManagementComposition = strawberry_django.field(description="The composition that this redeem token grants access to.")
+    hub: ManagementHub = strawberry_django.field(description="The hub that this redeem token grants access to.")
+    composition: ManagementHub = strawberry_django.field(
+        field_name="hub",
+        deprecation_reason="Renamed to `hub`. Use `hub` instead.",
+        description="Deprecated alias for `hub`.",
+    )
     client: ManagementClient | None = strawberry.field(description="The client that this redeem token belongs to.")
     user: ManagementUser = strawberry_django.field(description="The user that this redeem token belongs to.")
 
     @classmethod
     def get_queryset(cls, queryset, info: Info):
-        return queryset.filter(composition__organization__memberships__user=info.context.request.user).distinct()
+        return queryset.filter(hub__organization__memberships__user=info.context.request.user).distinct()

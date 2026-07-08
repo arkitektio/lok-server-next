@@ -32,6 +32,27 @@ class WellKnownFakts(BaseModel):
     mesh_coord_url: str | None = None
     """Public coordination URL of the ionscale mesh coordination server that clients
     should point their tailnet at. `None` when this deployment has no mesh configured."""
+    mesh_device_code_start: str | None = None
+    """Absolute URL of the *mesh* device-code start endpoint — a machine POSTs here to
+    request joining an organization's mesh and receives a `code` + `challenge`."""
+    mesh_challenge_url: str | None = None
+    """Absolute URL of the *mesh* device-code challenge endpoint — the machine polls it
+    with its `challenge` code to receive the minted mesh pre-auth key once granted."""
+    mesh_configure: str | None = None
+    """Absolute URL template for the mesh configure page. The literal `{code}`
+    placeholder is substituted by the machine with the mesh device code."""
+    hub_device_code_start: str | None = None
+    """Absolute URL of the *hub* device-code start endpoint — a client POSTs a
+    hub manifest here to begin provisioning a whole hub."""
+    hub_challenge_url: str | None = None
+    """Absolute URL of the *hub* device-code challenge endpoint — the client
+    polls it with its `challenge` code to receive the hub token once granted."""
+    hub_claim: str | None = None
+    """Absolute URL of the *hub* claim endpoint — the holder of a hub
+    token POSTs it here to receive the rendered server configuration."""
+    hub_configure: str | None = None
+    """Absolute URL template for the hub configure page. The literal `{code}`
+    placeholder is substituted by the client with the hub device code."""
 
 
 class Requirement(BaseModel):
@@ -125,8 +146,8 @@ class ServiceManifest(BaseModel):
     and includes it in claims so clients can verify signed alias challenges. """
 
 
-class CompositionInputModel(BaseModel):
-    """A composition is a Jinja2 YAML template that will be rendered
+class HubInputModel(BaseModel):
+    """A hub is a Jinja2 YAML template that will be rendered
     with the LinkingContext as context. The result of the rendering
     will be used to send to the client as a configuration."""
 
@@ -172,6 +193,25 @@ class ServiceDeviceCodeStartRequest(BaseModel):
     expiration_time_seconds: int = 300
 
 
+class MeshDeviceCodeStartRequest(BaseModel):
+    """A MeshDeviceCodeStartRequest is used to start the mesh device-code flow. A machine
+    that wants to join an organization's mesh POSTs this to request a pre-authorized key.
+    """
+
+    requested_machine_name: str | None = None
+    """The machine's suggested node name. A human authorizer sees it pre-filled on the
+    configure page and may edit it; the final value is returned to the machine as a hint
+    for `tailscale up --hostname=<machine_name>`."""
+    description: str | None = None
+    """A human readable description of the machine / why it wants to join, shown to the
+    authorizing user on the configure page."""
+    ephemeral: bool = False
+    """Whether the minted node should be ephemeral (auto-removed when offline)."""
+    tags: List[str] = Field(default_factory=list)
+    """Optional ionscale ACL tags to request for the minted key."""
+    expiration_time_seconds: int = 600
+
+
 class InstanceRequest(BaseModel):
     """A ServiceRequest is used to request a service instance from the server.
     It contains the manifest of the service that is being requested.
@@ -195,22 +235,22 @@ class ClientRequest(BaseModel):
     manifest: Manifest
 
 
-class CompositionManifest(BaseModel):
-    """A Composition Request allows to request seting up a composition of clients and services."""
+class HubManifest(BaseModel):
+    """A Hub Request allows to request seting up a hub of clients and services."""
 
-    identifier: str = Field(..., description="A unique identifier for the composition WITHIN the organization.")
+    identifier: str = Field(..., description="A unique identifier for the hub WITHIN the organization.")
     description: Optional[str] = None
-    """A human readable description of the composition."""
+    """A human readable description of the hub."""
     logo: Optional[str] = None
     instances: List[InstanceRequest] = Field(default_factory=list)
     clients: List[ClientRequest] = Field(default_factory=list)
     request_auth_key: bool = False
 
 
-class CompositionStartRequest(BaseModel):
-    """A Composition Start Request allows to start the setup of a composition."""
+class HubStartRequest(BaseModel):
+    """A Hub Start Request allows to start the setup of a hub."""
 
-    composition: CompositionManifest
+    hub: HubManifest
     expiration_time_seconds: int = 600
 
 
@@ -410,13 +450,13 @@ class ClaimAnswer(BaseModel):
     that predate this feature (clients should treat missing keys as 'unknown')."""
 
 
-class CompositionAuthClaim(BaseModel):
+class HubAuthClaim(BaseModel):
     jwks_url: str
     ionscale_auth_key: str | None = None
     ionscale_coord_url: str | None = None
 
 
-class CompositionInstanceClaim(BaseModel):
+class HubInstanceClaim(BaseModel):
     """InstancesClaim is a claim that contains the instances that are available
     for the client. It is used to link the client to the server and to provide
     the client with the necessary information to connect to the server.
@@ -426,7 +466,7 @@ class CompositionInstanceClaim(BaseModel):
     private_key: str | None = None
 
 
-class CompositionClientClaim(BaseModel):
+class HubClientClaim(BaseModel):
     """InstancesClaim is a claim that contains the instances that are available
     for the client. It is used to link the client to the server and to provide
     the client with the necessary information to connect to the server.
@@ -435,12 +475,12 @@ class CompositionClientClaim(BaseModel):
     token: str | None = None
 
 
-class CompositionClaimAnswer(BaseModel):
+class HubClaimAnswer(BaseModel):
     """A ClaimAnswer is the answer to a claim request. It contains the
     linking context that should be used to link the client to the server.
     """
 
     self: SelfClaim
-    auth: CompositionAuthClaim
-    instances: Dict[str, CompositionInstanceClaim] = Field(default_factory=dict)
-    clients: Dict[str, CompositionClientClaim] = Field(default_factory=dict)
+    auth: HubAuthClaim
+    instances: Dict[str, HubInstanceClaim] = Field(default_factory=dict)
+    clients: Dict[str, HubClientClaim] = Field(default_factory=dict)

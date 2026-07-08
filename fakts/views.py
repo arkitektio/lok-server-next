@@ -95,6 +95,13 @@ class WellKnownFakts(View):
                 device_code_start=request.build_absolute_uri(reverse("fakts:start")),
                 challenge_url=request.build_absolute_uri(reverse("fakts:challenge")),
                 mesh_coord_url=settings.IONSCALE_COORD_URL,
+                mesh_device_code_start=request.build_absolute_uri(reverse("fakts:meshstart")),
+                mesh_challenge_url=request.build_absolute_uri(reverse("fakts:meshchallenge")),
+                mesh_configure=_absolute_configure_url(settings.DEPLOYMENT_MESH_CONFIGURE_URL, base_domain),
+                hub_device_code_start=request.build_absolute_uri(reverse("fakts:hubstart")),
+                hub_challenge_url=request.build_absolute_uri(reverse("fakts:hubchallenge")),
+                hub_claim=request.build_absolute_uri(reverse("fakts:hubclaim")),
+                hub_configure=_absolute_configure_url(settings.DEPLOYMENT_HUB_CONFIGURE_URL, base_domain),
             ).model_dump()
         )
 
@@ -134,16 +141,16 @@ class ServiceStartChallengeView(View):
 
 
 @method_decorator(csrf_exempt, name="dispatch")
-class CompositionStartChallengeView(View):
+class HubStartChallengeView(View):
     """An endpoint that is challenged in the course of a device code flow."""
 
     def post(self, request, *args, **kwargs):
-        start_grant, err = _parse(request, base_models.CompositionStartRequest)
+        start_grant, err = _parse(request, base_models.HubStartRequest)
         if err:
             return err
 
         try:
-            device_code = device_codes.start_composition_device_code(start_grant)
+            device_code = device_codes.start_hub_device_code(start_grant)
         except device_codes.LogoDownloadError:
             return JsonResponse({"status": "error", "error": "Error downloading logo"})
 
@@ -151,7 +158,7 @@ class CompositionStartChallengeView(View):
 
 
 @method_decorator(csrf_exempt, name="dispatch")
-class CompositionChallengeView(View):
+class HubChallengeView(View):
     """An endpoint that is challenged in the course of a device code flow."""
 
     def post(self, request, *args, **kwargs):
@@ -160,11 +167,11 @@ class CompositionChallengeView(View):
             return err
 
         try:
-            device_code = models.CompositionDeviceCode.objects.get(challenge_code=challenge.code)
-        except models.CompositionDeviceCode.DoesNotExist:
+            device_code = models.HubDeviceCode.objects.get(challenge_code=challenge.code)
+        except models.HubDeviceCode.DoesNotExist:
             return JsonResponse({"status": "error", "error": "Challenge does not exist"})
 
-        return _poll_device_code(device_code, "composition")
+        return _poll_device_code(device_code, "hub")
 
 
 @method_decorator(csrf_exempt, name="dispatch")
@@ -199,6 +206,62 @@ class ChallengeView(View):
             return JsonResponse({"status": "error", "error": "Challenge does not exist"})
 
         return _poll_device_code(device_code, "client")
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class MeshStartChallengeView(View):
+    """Start endpoint for the mesh device-code flow (a machine joining an org mesh)."""
+
+    def post(self, request, *args, **kwargs):
+        start_grant, err = _parse(request, base_models.MeshDeviceCodeStartRequest)
+        if err:
+            return err
+
+        device_code = device_codes.start_mesh_device_code(start_grant)
+
+        return JsonResponse({"status": "granted", "code": device_code.code, "challenge": device_code.challenge_code})
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class MeshChallengeView(View):
+    """Poll endpoint for the mesh device-code flow.
+
+    Unlike the client/service/hub challenge views this does not reuse
+    ``_poll_device_code``: the minted result is an ``IonscaleAuthKey`` (which exposes
+    ``.key``, not ``.token``) and the machine needs the coordination URL and the
+    authorized machine name in addition to the key.
+    """
+
+    def post(self, request, *args, **kwargs):
+        challenge, err = _parse(request, base_models.DeviceCodeChallengeRequest)
+        if err:
+            return err
+
+        try:
+            device_code = models.MeshDeviceCode.objects.get(challenge_code=challenge.code)
+        except models.MeshDeviceCode.DoesNotExist:
+            return JsonResponse({"status": "error", "error": "Challenge does not exist"})
+
+        if timezone.now() > device_code.expires_at:
+            device_code.delete()
+            return _status("expired", "The user has not given an answer in enough time")
+
+        if device_code.denied:
+            device_code.delete()
+            return _status("denied", "The user has denied the request")
+
+        auth_key = device_code.auth_key
+        if auth_key:
+            return JsonResponse(
+                {
+                    "status": "granted",
+                    "ionscale_auth_key": auth_key.key,
+                    "ionscale_coord_url": settings.IONSCALE_COORD_URL,
+                    "machine_name": device_code.machine_name,
+                }
+            )
+
+        return _status("pending", "User has not verified the challenge")
 
 
 @method_decorator(csrf_exempt, name="dispatch")
@@ -272,7 +335,7 @@ class ClaimView(View):
         try:
             client = models.Client.objects.get(token=claim.token)
             context = rendering.create_linking_context(request, client, claim)
-            config = rendering.render_composition(client, context)
+            config = rendering.render_hub(client, context)
             return JsonResponse({"status": "granted", "config": config})
         except models.Client.DoesNotExist:
             return _status("error", "No Client found for this token")
@@ -282,8 +345,8 @@ class ClaimView(View):
 
 
 @method_decorator(csrf_exempt, name="dispatch")
-class ClaimCompositionView(View):
-    """Retrieve a composition faktsclaim given a composition token."""
+class ClaimHubView(View):
+    """Retrieve a hub faktsclaim given a hub token."""
 
     def post(self, request, *args, **kwargs):
         claim, err = _parse(request, base_models.ServerClaimRequest, error_key="message")
@@ -291,12 +354,12 @@ class ClaimCompositionView(View):
             return err
 
         try:
-            composition = models.Composition.objects.get(token=claim.token)
-            context = rendering.create_serverlinking_context(request, composition, claim)
-            config = rendering.render_server_fakts(composition, context)
+            hub = models.Hub.objects.get(token=claim.token)
+            context = rendering.create_serverlinking_context(request, hub, claim)
+            config = rendering.render_server_fakts(hub, context)
             return JsonResponse({"status": "granted", "config": config.model_dump()})
-        except models.Composition.DoesNotExist:
-            return _status("error", "No Composition found for this token")
+        except models.Hub.DoesNotExist:
+            return _status("error", "No Hub found for this token")
         except Exception as e:
             logger.error(e, exc_info=True)
             return _status("error", "Error creating configuration")

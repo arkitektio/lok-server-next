@@ -36,6 +36,10 @@ DEPLOYMENT_DESCRIPTION = conf.deployment.description
 # URL template advertised as the fakts well-known `configure` endpoint (see the
 # WellKnownFakts view, which resolves it to an absolute URL for the client).
 DEPLOYMENT_CONFIGURE_URL = conf.deployment.configure_url
+# URL template advertised as the fakts well-known `mesh_configure` endpoint.
+DEPLOYMENT_MESH_CONFIGURE_URL = conf.deployment.mesh_configure_url
+# URL template advertised as the fakts well-known `hub_configure` endpoint.
+DEPLOYMENT_HUB_CONFIGURE_URL = conf.deployment.hub_configure_url
 # Application definition
 
 ENSURED_OPENID_APPS = [a.model_dump() for a in conf.openid_apps]
@@ -59,6 +63,8 @@ if conf.ionscale is not None:
     IONSCALE_EAGER_INIT = conf.ionscale.eager_init
     # Auto-provision each new organization's mesh on creation.
     IONSCALE_AUTO_CREATE_MESH = conf.ionscale.auto_create_mesh
+    # MagicDNS suffix, used to derive a machine's MagicDNS name (<name>.<suffix>).
+    IONSCALE_MAGIC_DNS_SUFFIX = conf.ionscale.magic_dns_suffix
 else:
     IONSCALE_SERVER_URL = None
     IONSCALE_ADMIN_KEY = None
@@ -66,6 +72,7 @@ else:
     IONSCALE_REPOSITORY = None
     IONSCALE_EAGER_INIT = False
     IONSCALE_AUTO_CREATE_MESH = False
+    IONSCALE_MAGIC_DNS_SUFFIX = None
 
 # IONSCALE_REPOSITORY: dotted path to a zero-arg factory returning an
 # ionscale.repo.IonscaleRepo. When None, the real CLI-backed IonscaleRepository is
@@ -111,6 +118,18 @@ INSTALLED_APPS += conf.account.social_provider_apps
 HEADLESS_FRONTEND_URLS = conf.account.headless_frontend_urls.model_dump()
 
 ACCOUNT_EMAIL_VERIFICATION = conf.account.email_verification  # default "none": no SMTP server by default
+
+# Email-verification policy for social/OIDC logins, independent of the local one
+# above. allauth passes SOCIALACCOUNT_EMAIL_VERIFICATION for both social signups and
+# existing-account social logins (socialaccount/internal/flows/login.py), so setting
+# it to "none" exempts IdP-authenticated users from mandatory verification — the
+# supported way to keep local signups verifying while trusting the IdP. Left unset,
+# allauth falls back to ACCOUNT_EMAIL_VERIFICATION. Validated in configuration.py so
+# a relaxed value can't silently exempt an untrusted provider.
+if conf.account.social_email_verification is not None:
+    SOCIALACCOUNT_EMAIL_VERIFICATION = conf.account.social_email_verification
+if conf.account.social_email_required is not None:
+    SOCIALACCOUNT_EMAIL_REQUIRED = conf.account.social_email_required
 
 # Which identifier(s) users log in with, and which fields signup collects.
 # Set account.login_methods to ["email"] in config.yaml to enable login via email.
@@ -352,7 +371,7 @@ KONTROL_FRONTEND_URL = conf.kontrol_frontend_url
 SYSTEM_MESSAGES = conf.system_messages or [
     {
         "title": "Welcome to Lok",
-        "message": "Now that you are here, you can start creating your own compositions",
+        "message": "Now that you are here, you can start creating your own hubs",
     }
 ]
 

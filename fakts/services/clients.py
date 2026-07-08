@@ -49,7 +49,7 @@ def create_development_client(
     config: base_models.DevelopmentClientConfig,
     manifest: base_models.Manifest,
     node: models.Device | None = None,
-    composition: models.Composition | None = None,
+    hub: models.Hub | None = None,
 ) -> models.Client:
     tenant = config.get_tenant()
     user = config.get_user()
@@ -63,7 +63,7 @@ def create_development_client(
         client.node = node
         client.manifest = manifest.model_dump()
         client.membership = karakter_models.Membership.objects.get(user=user, organization=organization)
-        client.composition = composition
+        client.hub = hub
         client.role = config.role.value if hasattr(config.role, "value") else config.role
         client.public_sources = [t.model_dump() for t in manifest.public_sources] if manifest.public_sources else []
         client.save()
@@ -91,7 +91,7 @@ def create_development_client(
             oauth2_client=oauth2_client,
             redirect_uris="",
             public=False,
-            composition=composition,
+            hub=hub,
             manifest=manifest.model_dump(),
             logo=release.logo,
             organization=organization,
@@ -105,7 +105,7 @@ def create_client(
     config: base_models.ClientConfig,
     user: models.AbstractUser,
     organization: models.Organization,
-    composition: models.Composition | None = None,
+    hub: models.Hub | None = None,
     declined_requirements: list[str] | None = None,
     device_name: str | None = None,
 ) -> models.Client:
@@ -160,7 +160,7 @@ def create_client(
         node = None
 
     if config.kind == enums.ClientKindVanilla.DEVELOPMENT.value:
-        client = create_development_client(release, config, manifest, node=node, composition=composition)
+        client = create_development_client(release, config, manifest, node=node, hub=hub)
     else:
         raise ValueError(f"Client kind {config.kind} not supported yet")
 
@@ -175,8 +175,8 @@ def create_client(
 @transaction.atomic
 def validate_redeem_token(redeem_token: models.RedeemToken, manifest: Manifest, role: enums.ClientRoleVanilla = enums.ClientRoleVanilla.INTERFACE) -> models.RedeemToken:
     node_id = manifest.node_id
-    composition = redeem_token.composition
-    organization = redeem_token.composition.organization
+    hub = redeem_token.hub
+    organization = redeem_token.hub.organization
     user = redeem_token.user
 
     if node_id:
@@ -191,7 +191,7 @@ def validate_redeem_token(redeem_token: models.RedeemToken, manifest: Manifest, 
         node=node,
         tenant=user,
         organization=organization,
-        composition=composition,
+        hub=hub,
         redirect_uris="",
     ).first()
 
@@ -212,7 +212,7 @@ def validate_redeem_token(redeem_token: models.RedeemToken, manifest: Manifest, 
             config=config,
             user=user,
             organization=organization,
-            composition=composition,
+            hub=hub,
         )
 
     redeem_token.client = client

@@ -54,6 +54,19 @@ class OAuth2Client(models.Model, ClientMixin):
     grant_types = models.TextField(default="authorization_code refresh_token client_credentials")
     response_types = models.TextField(blank=True)
     id_token_signed_response_alg = models.CharField(max_length=48, default="RS256")
+    membership_is_subject = models.BooleanField(
+        default=False,
+        help_text="Use the membership id as the OIDC `sub` claim instead of the user id. "
+        "See authapp.oidc_claims.resolve_sub.",
+    )
+    email_template = models.CharField(
+        max_length=500,
+        null=True,
+        blank=True,
+        help_text="Template for the OIDC `email` claim rendered from membership variables "
+        "(e.g. '{username}@corp.example'). When blank, the user's own email is used. "
+        "See authapp.oidc_claims.resolve_email.",
+    )
 
     def resolve_membership(self) -> Membership:
         if self.membership_id:

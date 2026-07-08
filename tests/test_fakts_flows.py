@@ -84,8 +84,8 @@ def test_retrieve_without_public_client_errors(client):
 
 @pytest.mark.django_db
 def test_redeem_creates_client(client):
-    composition = factories.make_composition()
-    redeem = factories.make_redeem_token(composition=composition)
+    hub = factories.make_hub()
+    redeem = factories.make_redeem_token(hub=hub)
 
     body = _post(
         client,
