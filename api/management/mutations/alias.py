@@ -2,7 +2,9 @@ from kante import Info
 import strawberry
 from api.management import types
 import kante
+from api.management.authz import DENIED, assert_member
 from fakts import models as fakts_models
+from graphql import GraphQLError
 
 
 @kante.input
@@ -20,7 +22,14 @@ class CreateAliasInput:
 def create_alias(info: Info, input: CreateAliasInput) -> types.ManagementInstanceAlias:
     """Create an alias for a service instance."""
 
-    instance = fakts_models.ServiceInstance.objects.get(id=input.instance)
+    try:
+        instance = fakts_models.ServiceInstance.objects.get(id=input.instance)
+    except fakts_models.ServiceInstance.DoesNotExist:
+        raise GraphQLError(DENIED)
+
+    # Aliases are routing entries: whoever can create one for an instance can
+    # direct that instance's traffic. Restrict to members of the owning org.
+    assert_member(info, instance.organization)
 
     alias = fakts_models.InstanceAlias.objects.create(
         instance=instance,
@@ -49,7 +58,13 @@ class UpdateAliasInput:
 def update_alias(info: Info, input: UpdateAliasInput) -> types.ManagementInstanceAlias:
     """Update an existing alias for a service instance."""
 
-    alias = fakts_models.InstanceAlias.objects.get(id=input.id)
+    try:
+        alias = fakts_models.InstanceAlias.objects.get(id=input.id)
+    except fakts_models.InstanceAlias.DoesNotExist:
+        raise GraphQLError(DENIED)
+
+    assert_member(info, alias.instance.organization)
+
     alias.port = input.port
     alias.host = input.host
     alias.kind = input.kind
@@ -73,7 +88,9 @@ def delete_alias(info: Info, input: DeleteAliasInput) -> strawberry.ID:
     try:
         alias = fakts_models.InstanceAlias.objects.get(id=input.id)
     except fakts_models.InstanceAlias.DoesNotExist:
-        raise Exception("Invalid alias ID")
+        raise GraphQLError(DENIED)
+
+    assert_member(info, alias.instance.organization)
 
     alias.delete()
 

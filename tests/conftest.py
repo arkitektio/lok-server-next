@@ -46,8 +46,16 @@ def build_auth_context(user, organization, oauth2_client, roles=("admin",)) -> H
         client_id=oauth2_client.client_id,
         roles=list(roles),
     )
+    request = UniversalRequest(_extensions={})
+    # Populate the request principal directly. On the main schema the
+    # ``AuthAppExtension`` resolves these from the bearer token, but the
+    # management schema has no token extension (the SPA authenticates by session),
+    # so an "authenticated" context must set them itself to exercise resolvers
+    # that read ``request.user`` / ``.organization`` / ``.membership``.
+    request.set_user(user)
+    request.set_organization(organization)
     return HttpContext(
-        request=UniversalRequest(_extensions={}),
+        request=request,
         response=TemporalResponse(),
         headers={"Authorization": f"Bearer {token_str}"},
         type="http",

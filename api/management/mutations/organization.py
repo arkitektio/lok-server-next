@@ -140,7 +140,12 @@ def change_organization_owner(info: Info, organization_id: strawberry.ID, new_ow
         types.ManagementOrganization: The updated organization with the new owner.
     """
     organization = models.Organization.objects.get(id=organization_id)
+    assert organization.owner == info.context.request.user, "Only the current owner can transfer ownership of the organization."
+
     new_owner = models.AbstractUser.objects.get(id=new_owner_id)
+    # The new owner must already belong to the organization — ownership cannot be
+    # handed to an unrelated user.
+    assert organization.memberships.filter(user=new_owner).exists(), "The new owner must be a member of the organization."
 
     organization.owner = new_owner
     organization.save()

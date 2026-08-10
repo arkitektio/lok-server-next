@@ -3,6 +3,8 @@ import strawberry
 from api.management import types
 from karakter import models
 from fakts import models as fakts_models
+from api.management.authz import DENIED, assert_member
+from graphql import GraphQLError
 from fakts import logic
 import kante
 
@@ -27,9 +29,17 @@ def accept_device_code(info: Info, input: AcceptDeviceCodeInput) -> types.Manage
     If no roles are specified, the 'guest' role will be assigned.
     """
     user = info.context.request.user
-    device_code = fakts_models.DeviceCode.objects.get(id=input.device_code)
-    hub = fakts_models.Hub.objects.get(id=input.hub)
+    try:
+        device_code = fakts_models.DeviceCode.objects.get(id=input.device_code)
+        hub = fakts_models.Hub.objects.get(id=input.hub)
+    except (fakts_models.DeviceCode.DoesNotExist, fakts_models.Hub.DoesNotExist):
+        raise GraphQLError(DENIED)
+
     organization = hub.organization
+    # Accepting mints a client and an API token inside `organization`, so the
+    # caller must belong to it -- otherwise any authenticated user could name
+    # another tenant's hub and provision credentials there.
+    assert_member(info, organization)
 
     validate_device_code = logic.validate_device_code(
         device_code=device_code,
@@ -57,15 +67,11 @@ def decline_device_code(info: Info, input: DeclineDeviceCodeInput) -> types.Mana
     Marks the invite as declined.
     """
     try:
-        invite = models.Invite.objects.get(token=input.token)
-    except models.Invite.DoesNotExist:
-        raise Exception("Invalid invite token")
+        device_code = fakts_models.DeviceCode.objects.get(id=input.device_code)
+    except fakts_models.DeviceCode.DoesNotExist:
+        raise GraphQLError(DENIED)
 
-    # Check if invite is still pending
-    if invite.status != models.Invite.Status.PENDING:
-        raise Exception(f"This invite has already been {invite.status}")
+    device_code.denied = True
+    device_code.save()
 
-    user = info.context.request.user
-    invite.decline(user)
-
-    return invite
+    return device_code

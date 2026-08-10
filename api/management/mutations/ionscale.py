@@ -7,6 +7,8 @@ from fakts import models as fakts_models
 from ionscale.repo import get_ionscale_repo
 from ionscale.manager import sync, ensure_org_mesh, apply_dns_config
 from karakter import models as karakter_models
+from api.management.authz import DENIED, assert_member, assert_owner_or_admin
+from graphql import GraphQLError
 
 
 @kante.input
@@ -23,7 +25,12 @@ def create_ionscale_layer(info: Info, input: CreateIonscaleLayerInput) -> types.
     The mesh is a per-organization singleton: if one already exists it is
     returned unchanged; otherwise it is provisioned. See `ensure_org_mesh`.
     """
-    organization = fakts_models.Organization.objects.get(id=input.organization_id)
+    try:
+        organization = fakts_models.Organization.objects.get(id=input.organization_id)
+    except fakts_models.Organization.DoesNotExist:
+        raise GraphQLError(DENIED)
+
+    assert_owner_or_admin(info, organization)
 
     layer = ensure_org_mesh(organization)
     if layer is None:
@@ -47,14 +54,19 @@ class UpdateIonscaleLayerInput:
 def update_ionscale_layer(info: Info, input: UpdateIonscaleLayerInput) -> types.ManagementLayer:
     """Update an organization's mesh: member blocking and/or DNS (MagicDNS/HTTPS)."""
 
-    layer = fakts_models.IonscaleLayer.objects.get(
-        id=input.id
-    )
-    if not layer.organization.memberships.filter(user=info.context.request.user).exists():
-        raise PermissionError("You are not a member of the organization that owns this layer.")
+    try:
+        layer = fakts_models.IonscaleLayer.objects.get(id=input.id)
+    except fakts_models.IonscaleLayer.DoesNotExist:
+        raise GraphQLError(DENIED)
+
+    assert_member(info, layer.organization)
 
     if input.blocked_for is not None:
-        memberships = karakter_models.Membership.objects.filter(id__in=input.blocked_for)
+        # Scope to this layer's organization: unscoped ids would let a member of
+        # one tenant attach another tenant's memberships to their mesh.
+        memberships = karakter_models.Membership.objects.filter(
+            id__in=input.blocked_for, organization=layer.organization
+        )
         layer.blocked_for.set(memberships)
         layer.save()
         sync(layer)
@@ -87,17 +99,23 @@ class DeleteIonscaleLayerInput:
 
 
 def delete_ionscale_layer(info: Info, input: DeleteIonscaleLayerInput) -> strawberry.ID:
-    """
-    Accept an invite to join an organization.
+    """Disable (delete) an organization's mesh layer.
 
-    Validates the invite token and adds the user to the organization.
+    This previously looked up an ``InstanceAlias`` by the given id and deleted
+    that instead of the layer, so "disable mesh" destroyed an unrelated routing
+    entry -- and did so for any id, in any organization.
+
+    Note: this removes the layer record only. There is no ionscale-side teardown
+    helper, so the tailnet itself is left in place.
     """
     try:
-        alias = fakts_models.InstanceAlias.objects.get(id=input.id)
-    except fakts_models.InstanceAlias.DoesNotExist:
-        raise Exception("Invalid alias ID")
+        layer = fakts_models.IonscaleLayer.objects.get(id=input.id)
+    except fakts_models.IonscaleLayer.DoesNotExist:
+        raise GraphQLError(DENIED)
 
-    alias.delete()
+    assert_owner_or_admin(info, layer.organization)
+
+    layer.delete()
 
     return input.id
 
@@ -112,9 +130,12 @@ class CreateIonscaleAuthKeyInput:
 
 def create_ionscale_auth_key(info: Info, input: CreateIonscaleAuthKeyInput) -> types.ManagementIonscaleAuthKey:
     """ """
-    layer = fakts_models.IonscaleLayer.objects.get(id=input.layer_id)
-    if not layer.organization.memberships.filter(user=info.context.request.user).exists():
-        raise PermissionError("You are not a member of the organization that owns this layer.")
+    try:
+        layer = fakts_models.IonscaleLayer.objects.get(id=input.layer_id)
+    except fakts_models.IonscaleLayer.DoesNotExist:
+        raise GraphQLError(DENIED)
+
+    assert_member(info, layer.organization)
 
     key = get_ionscale_repo().create_auth_key(
         tailnet=layer.tailnet_name,

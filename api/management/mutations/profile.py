@@ -5,6 +5,8 @@ from kante.types import Info
 
 from karakter import models
 from api.management import types
+from api.management.authz import DENIED, get_user
+from graphql import GraphQLError
 
 logger = logging.getLogger(__name__)
 
@@ -16,8 +18,13 @@ class CreateProfileInput:
 
 
 def create_profile(info: Info, input: CreateProfileInput) -> types.ManagementProfile:
-    trace = models.User.objects.get(pk=input.user)
-    profile = models.Profile(user=trace, name=input.name)
+    # A profile may only be created for yourself; the `user` input is kept for
+    # backwards compatibility but must match the caller.
+    user = get_user(info)
+    if str(input.user) != str(user.id):
+        raise GraphQLError(DENIED)
+
+    profile = models.Profile(user=user, name=input.name)
     profile.save()
     return profile
 
@@ -31,7 +38,14 @@ class UpdateProfileInput:
 
 
 def update_profile(info: Info, input: UpdateProfileInput) -> types.ManagementProfile:
-    profile = models.Profile.objects.get(pk=input.id)
+    try:
+        profile = models.Profile.objects.get(pk=input.id)
+    except models.Profile.DoesNotExist:
+        raise GraphQLError(DENIED)
+
+    if profile.user_id != get_user(info).id:
+        raise GraphQLError(DENIED)
+
     if input.name:
         profile.name = input.name
     if input.avatar:
@@ -48,7 +62,11 @@ class DeleteProfileInput:
 
 
 def delete_profile(info: Info, input: DeleteProfileInput) -> strawberry.ID:
-    profile = models.Profile.objects.get(pk=input.id)
-    assert profile.user == info.context.request.user
+    try:
+        profile = models.Profile.objects.get(pk=input.id)
+    except models.Profile.DoesNotExist:
+        raise GraphQLError(DENIED)
+    if profile.user_id != get_user(info).id:
+        raise GraphQLError(DENIED)
     profile.delete()
     return input.id

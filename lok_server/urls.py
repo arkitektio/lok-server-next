@@ -58,7 +58,10 @@ hallo = "hallsssoss"
 
 urlpatterns = [
     dynamicpath("", index, name="mainhome"),
-    dynamicpath("managementgraphql/", AsyncGraphQLView.as_view(schema=schema)),
+    # allow_queries_via_get=False: GET is exempt from Django's CSRF check, so
+    # leaving GET queries on lets an unauthenticated caller read data cross-site.
+    # The SPA only ever POSTs, so this is safe and closes that bypass.
+    dynamicpath("managementgraphql/", AsyncGraphQLView.as_view(schema=schema, allow_queries_via_get=False)),
     dynamicpath("managementschema/", csrf_exempt(management_schema), name="management_schema"),
     dynamicpath("admin/", admin.site.urls),
     dynamicpath("f/", include("fakts.urls", namespace="fakts")),

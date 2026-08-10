@@ -3,7 +3,9 @@ import strawberry
 from api.management import types
 from karakter import models
 import kante
+from api.management.authz import DENIED, assert_member
 from fakts import models as fakts_models
+from graphql import GraphQLError
 
 
 @kante.input
@@ -17,8 +19,12 @@ class CreateDeviceGroupInput:
 def create_device_group(info: Info, input: CreateDeviceGroupInput) -> types.ManagementDeviceGroup:
     """ """
 
-    user = info.context.request.user
-    organization = models.Organization.objects.get(id=input.organization)
+    try:
+        organization = models.Organization.objects.get(id=input.organization)
+    except models.Organization.DoesNotExist:
+        raise GraphQLError(DENIED)
+
+    assert_member(info, organization)
 
     dg = fakts_models.DeviceGroup.objects.create(
         name=input.name,
@@ -44,7 +50,9 @@ def delete_device_group(info: Info, input: DeleteDeviceGroupInput) -> strawberry
     try:
         dg = fakts_models.DeviceGroup.objects.get(id=input.id)
     except fakts_models.DeviceGroup.DoesNotExist:
-        raise Exception("Invalid device group ID")
+        raise GraphQLError(DENIED)
+
+    assert_member(info, dg.organization)
 
     dg.delete()
     return input.id
@@ -64,12 +72,19 @@ def add_device_to_group(info: Info, input: AddDeviceToGroupInput) -> types.Manag
     try:
         dg = fakts_models.DeviceGroup.objects.get(id=input.device_group)
     except fakts_models.DeviceGroup.DoesNotExist:
-        raise Exception("Invalid device group ID")
+        raise GraphQLError(DENIED)
 
     try:
         device = fakts_models.Device.objects.get(id=input.device)
     except fakts_models.Device.DoesNotExist:
-        raise Exception("Invalid device ID")
+        raise GraphQLError(DENIED)
+
+    # Both sides must belong to an org the caller is in, and to the *same* org --
+    # otherwise membership in one tenant would let you move another tenant's device.
+    assert_member(info, dg.organization)
+    assert_member(info, device.organization)
+    if dg.organization_id != device.organization_id:
+        raise GraphQLError(DENIED)
 
     device.device_groups.add(dg)
     device.save()
@@ -91,12 +106,19 @@ def remove_device_from_group(info: Info, input: RemoveDeviceFromGroupInput) -> t
     try:
         dg = fakts_models.DeviceGroup.objects.get(id=input.device_group)
     except fakts_models.DeviceGroup.DoesNotExist:
-        raise Exception("Invalid device group ID")
+        raise GraphQLError(DENIED)
 
     try:
         device = fakts_models.Device.objects.get(id=input.device)
     except fakts_models.Device.DoesNotExist:
-        raise Exception("Invalid device ID")
+        raise GraphQLError(DENIED)
+
+    # Both sides must belong to an org the caller is in, and to the *same* org --
+    # otherwise membership in one tenant would let you move another tenant's device.
+    assert_member(info, dg.organization)
+    assert_member(info, device.organization)
+    if dg.organization_id != device.organization_id:
+        raise GraphQLError(DENIED)
 
     device.device_groups.remove(dg)
     device.save()

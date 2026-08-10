@@ -4,6 +4,8 @@ from api.management import types
 from karakter import models
 from karakter.hashers import hash_device_id
 from fakts import models as fakts_models
+from api.management.authz import DENIED, assert_member
+from graphql import GraphQLError
 from fakts import logic, builders, base_models, enums
 from fakts.services import aliases as alias_services
 import kante
@@ -27,8 +29,14 @@ def accept_hub_device_code(info: Info, input: AcceptHubDeviceCodeInput) -> types
     If no roles are specified, the 'guest' role will be assigned.
     """
     user = info.context.request.user
-    device_code = fakts_models.HubDeviceCode.objects.get(id=input.device_code)
-    organization = models.Organization.objects.get(id=input.organization)
+    try:
+        device_code = fakts_models.HubDeviceCode.objects.get(id=input.device_code)
+        organization = models.Organization.objects.get(id=input.organization)
+    except (fakts_models.HubDeviceCode.DoesNotExist, models.Organization.DoesNotExist):
+        raise GraphQLError(DENIED)
+
+    # Creates a hub (plus service instances and auth keys) inside `organization`.
+    assert_member(info, organization)
 
     manifest = device_code.manifest_as_model
 
@@ -146,11 +154,11 @@ def decline_hub_device_code(info: Info, input: DeclineHubDeviceCodeInput) -> typ
     Marks the invite as declined.
     """
     try:
-        invite = fakts_models.HubDeviceCode.objects.get(token=input.device_code)
+        device_code = fakts_models.HubDeviceCode.objects.get(id=input.device_code)
     except fakts_models.HubDeviceCode.DoesNotExist:
-        raise Exception("Invalid invite token")
+        raise GraphQLError(DENIED)
 
-    invite.declined = True
-    invite.save()
+    device_code.denied = True
+    device_code.save()
 
-    return invite
+    return device_code

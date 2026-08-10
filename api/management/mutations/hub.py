@@ -4,7 +4,9 @@ import strawberry
 from kante.types import Info
 
 from api.management import types
+from api.management.authz import DENIED, assert_owner_or_admin
 from fakts import models as fakts_models
+from graphql import GraphQLError
 
 logger = logging.getLogger(__name__)
 
@@ -17,10 +19,22 @@ class UpdateHubInput:
 
 
 def update_hub(info: Info, input: UpdateHubInput) -> types.ManagementHub:
-    profile = fakts_models.Hub.objects.get(pk=input.id)
+    try:
+        hub = fakts_models.Hub.objects.get(pk=input.id)
+    except fakts_models.Hub.DoesNotExist:
+        raise GraphQLError(DENIED)
 
-    profile.save()
-    return profile
+    assert_owner_or_admin(info, hub.organization)
+
+    # Previously this saved the hub without ever applying the input, so the
+    # mutation reported success and changed nothing.
+    if input.name is not None:
+        hub.name = input.name
+    if input.description is not None:
+        hub.description = input.description
+
+    hub.save()
+    return hub
 
 
 @strawberry.input
@@ -29,7 +43,11 @@ class DeleteHubInput:
 
 
 def delete_hub(info: Info, input: DeleteHubInput) -> strawberry.ID:
-    hub = fakts_models.Hub.objects.get(pk=input.id)
-    assert hub.organization.owner == info.context.request.user, "Only organization owners can delete hubs"
+    try:
+        hub = fakts_models.Hub.objects.get(pk=input.id)
+    except fakts_models.Hub.DoesNotExist:
+        raise GraphQLError(DENIED)
+    if hub.organization.owner_id != info.context.request.user.id:
+        raise GraphQLError(DENIED)
     hub.delete()
     return input.id

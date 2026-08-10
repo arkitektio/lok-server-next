@@ -3,6 +3,7 @@ import strawberry
 from api.management import types
 from karakter import models
 from fakts import models as fakts_models
+from api.management.authz import assert_member
 from fakts import logic
 import kante
 
@@ -30,8 +31,7 @@ def accept_mesh_device_code(info: Info, input: AcceptMeshDeviceCodeInput) -> typ
     device_code = fakts_models.MeshDeviceCode.objects.get(id=input.device_code)
     organization = models.Organization.objects.get(id=input.organization)
 
-    if not organization.memberships.filter(user=user).exists():
-        raise PermissionError("You are not a member of this organization.")
+    assert_member(info, organization)
 
     key = logic.create_mesh_auth_key(
         user=user,

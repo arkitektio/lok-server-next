@@ -173,11 +173,18 @@ DELETE_ALIAS = """
 
 
 def _mutation_setup():
-    """Sync setup: an authenticated user/org plus a service instance to alias."""
+    """Sync setup: an authenticated user/org plus a service instance to alias.
+
+    The instance is created inside the caller's own organization: alias mutations
+    are restricted to members of the instance's org (an alias is a routing entry,
+    so editing one redirects that service's traffic). Previously this built the
+    instance in an unrelated org, which only passed because there was no check.
+    """
     membership = factories.make_membership()
     # auth resolves the OAuth2Client back to its backing fakts Client
     request_client = factories.make_client(membership=membership)
-    instance = factories.make_service_instance()
+    hub = factories.make_hub(organization=membership.organization)
+    instance = factories.make_service_instance(hub=hub)
     context = build_auth_context(membership.user, membership.organization, request_client.oauth2_client)
     return context, instance
 

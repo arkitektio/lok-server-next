@@ -381,6 +381,11 @@ class ManagementMembership:
     brand_hue: Optional[float] = strawberry.field(description="The member's personal brand hue (0–360) for this organization, if set.")
     role_requests: List["ManagementRoleRequest"] = strawberry_django.field(description="The role requests this member has made in the organization")
 
+    @classmethod
+    def get_queryset(cls, queryset, info: Info):
+        # A caller may only see memberships of organizations they themselves belong to.
+        return queryset.filter(organization__memberships__user=info.context.request.user).distinct()
+
 
 @strawberry_django.type(
     models.RoleRequest,

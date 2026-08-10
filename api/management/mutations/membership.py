@@ -16,11 +16,25 @@ class UpdateMembershipInput:
 
 
 def update_membership(info: Info, input: UpdateMembershipInput) -> types.ManagementMembership:
-    profile = models.Membership.objects.get(pk=input.id)
+    membership = models.Membership.objects.get(pk=input.id)
+    organization = membership.organization
+    user = info.context.request.user
+
+    # Only the organization's owner or an admin may change a member's roles —
+    # otherwise any member could grant themselves (or anyone) admin.
+    can_manage_organization = organization.owner_id == user.id or organization.memberships.filter(
+        user=user,
+        roles__identifier="admin",
+    ).exists()
+    assert can_manage_organization, "You are not allowed to manage memberships for this organization."
+
     if input.roles:
-        profile.roles.set(models.Role.objects.filter(pk__in=input.roles))
-    profile.save()
-    return profile
+        # Roles must belong to the membership's own organization; never let a role
+        # id from another organization be attached.
+        roles = models.Role.objects.filter(pk__in=input.roles, organization=organization)
+        membership.roles.set(roles)
+    membership.save()
+    return membership
 
 
 @strawberry.input

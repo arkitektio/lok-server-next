@@ -11,6 +11,11 @@ from ionscale.repo import IonscaleRepository
 from karakter.models import Membership, Organization, User
 
 
+def _info_for(user):
+    """Minimal Info stand-in carrying a principal, matching ``tests/test_mesh``."""
+    return SimpleNamespace(context=SimpleNamespace(request=SimpleNamespace(user=user)))
+
+
 def _repo() -> IonscaleRepository:
     # Bypass the binary lookup in __init__ so the arg-building logic can be tested
     # without an ionscale binary present.
@@ -88,7 +93,7 @@ def test_create_ionscale_layer_syncs_existing_members(ionscale_repo):
     Membership.objects.create(user=second_user, organization=organization)
 
     layer = create_ionscale_layer(
-        info=None,
+        info=_info_for(first_user),
         input=cast(
             CreateIonscaleLayerInput,
             SimpleNamespace(organization_id=organization.pk, name="Default"),

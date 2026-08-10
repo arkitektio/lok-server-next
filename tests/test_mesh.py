@@ -8,6 +8,7 @@ an actionable message when there is none, instead of a bare failure.
 from types import SimpleNamespace
 
 import pytest
+from graphql import GraphQLError
 from django.test import override_settings
 
 from fakts import models as fakts_models
@@ -203,7 +204,8 @@ def test_update_mesh_rejects_non_member(ionscale_repo):
     outsider = factories.make_user()
     ionscale_repo.dns_configs.clear()
 
-    with pytest.raises(PermissionError):
+    # Denials are GraphQLErrors so they reach the client as errors, not 500s.
+    with pytest.raises(GraphQLError):
         update_ionscale_layer(
             _info_for(outsider),
             UpdateIonscaleLayerInput(
@@ -397,7 +399,8 @@ def test_accept_mesh_device_code_rejects_non_member(ionscale_repo):
 
     dc = start_mesh_device_code(base_models.MeshDeviceCodeStartRequest())
 
-    with pytest.raises(PermissionError):
+    # Denials are GraphQLErrors so they reach the client as errors, not 500s.
+    with pytest.raises(GraphQLError):
         accept_mesh_device_code(
             _info_for(outsider),
             AcceptMeshDeviceCodeInput(device_code=str(dc.pk), organization=str(org.pk)),

@@ -4,6 +4,8 @@ from api.management import types
 from karakter import models
 from karakter.hashers import hash_device_id
 from fakts import models as fakts_models
+from api.management.authz import DENIED, assert_member
+from graphql import GraphQLError
 from fakts import logic
 from fakts.services import aliases as alias_services
 import kante
@@ -26,8 +28,14 @@ def accept_service_device_code(info: Info, input: AcceptServiceDeviceCodeInput) 
     If no roles are specified, the 'guest' role will be assigned.
     """
     user = info.context.request.user
-    device_code = fakts_models.ServiceDeviceCode.objects.get(id=input.device_code)
-    organization = models.Organization.objects.get(id=input.organization)
+    try:
+        device_code = fakts_models.ServiceDeviceCode.objects.get(id=input.device_code)
+        organization = models.Organization.objects.get(id=input.organization)
+    except (fakts_models.ServiceDeviceCode.DoesNotExist, models.Organization.DoesNotExist):
+        raise GraphQLError(DENIED)
+
+    # Creates a service instance (and its aliases/tokens) inside `organization`.
+    assert_member(info, organization)
 
     manifest = device_code.manifest_as_model
     aliases = device_code.aliases_as_models
@@ -114,15 +122,11 @@ def decline_service_device_code(info: Info, input: DeclineServiceDeviceCodeInput
     Marks the invite as declined.
     """
     try:
-        invite = models.Invite.objects.get(token=input.token)
-    except models.Invite.DoesNotExist:
-        raise Exception("Invalid invite token")
+        device_code = fakts_models.ServiceDeviceCode.objects.get(id=input.device_code)
+    except fakts_models.ServiceDeviceCode.DoesNotExist:
+        raise GraphQLError(DENIED)
 
-    # Check if invite is still pending
-    if invite.status != models.Invite.Status.PENDING:
-        raise Exception(f"This invite has already been {invite.status}")
+    device_code.denied = True
+    device_code.save()
 
-    user = info.context.request.user
-    invite.decline(user)
-
-    return invite
+    return device_code

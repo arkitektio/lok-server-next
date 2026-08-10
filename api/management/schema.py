@@ -11,6 +11,8 @@ from karakter import models as karakter_models
 from karakter.hashers import hash_device_id
 from fakts import models as fakts_models
 from .datalayer import DatalayerExtension
+from .extensions import RequireAuthenticationExtension
+from .authz import get_scoped
 from allauth.socialaccount import models as smodels
 from authapp.models import OAuth2Client
 from strawberry.schema.config import StrawberryConfig
@@ -49,7 +51,7 @@ class Query:
 
     @kante.django_field()
     def social_account(self, info: Info, id: strawberry.ID) -> types.ManagementSocialAccount:
-        return smodels.SocialAccount.objects.get(id=id)
+        return get_scoped(types.ManagementSocialAccount, smodels.SocialAccount.objects.filter(id=id), info)
     
     @kante.django_field()
     def kommunity_partner(self, info: Info, id: strawberry.ID) -> types.ManagementKommunityPartner:
@@ -61,20 +63,20 @@ class Query:
 
     @kante.django_field()
     def role(self, info: Info, id: strawberry.ID) -> types.ManagementRole:
-        return karakter_models.Role.objects.get(id=id)
+        return get_scoped(types.ManagementRole, karakter_models.Role.objects.filter(id=id), info)
 
 
     @kante.django_field()
     def membership(self, info: Info, id: strawberry.ID) -> types.ManagementMembership:
-        return karakter_models.Membership.objects.get(id=id)
+        return get_scoped(types.ManagementMembership, karakter_models.Membership.objects.filter(id=id), info)
 
     @kante.django_field()
     def scope(self, info: Info, id: strawberry.ID) -> types.ManagementScope:
-        return karakter_models.Scope.objects.get(id=id)
+        return get_scoped(types.ManagementScope, karakter_models.Scope.objects.filter(id=id), info)
 
     @kante.django_field()
     def organization(self, info: Info, id: strawberry.ID) -> types.ManagementOrganization:
-        return karakter_models.Organization.objects.get(id=id)
+        return get_scoped(types.ManagementOrganization, karakter_models.Organization.objects.filter(id=id), info)
 
     @kante.django_field()
     def used_alias(self, info: Info, id: strawberry.ID) -> types.ManagementUsedAlias:
@@ -98,11 +100,11 @@ class Query:
 
     @kante.django_field()
     def hub(self, info: Info, id: strawberry.ID) -> types.ManagementHub:
-        return fakts_models.Hub.objects.get(id=id)
+        return get_scoped(types.ManagementHub, fakts_models.Hub.objects.filter(id=id), info)
 
     @kante.django_field(name="composition", deprecation_reason="Renamed to `hub`. Use `hub` instead.")
     def composition(self, info: Info, id: strawberry.ID) -> types.ManagementHub:
-        return fakts_models.Hub.objects.get(id=id)
+        return get_scoped(types.ManagementHub, fakts_models.Hub.objects.filter(id=id), info)
 
     @kante.django_field()
     def oauth2_client_by_client_id(self, info: Info, client_id: str) -> types.ManagementOAuth2Client:
@@ -203,11 +205,11 @@ class Query:
 
     @kante.django_field()
     def layer(self, info: Info, id: strawberry.ID) -> types.ManagementLayer:
-        return fakts_models.IonscaleLayer.objects.get(id=id)
+        return get_scoped(types.ManagementLayer, fakts_models.IonscaleLayer.objects.filter(id=id), info)
 
     @kante.django_field()
     def ionscale_auth_key(self, info: Info, id: strawberry.ID) -> types.ManagementIonscaleAuthKey:
-        return fakts_models.IonscaleAuthKey.objects.get(id=id)
+        return get_scoped(types.ManagementIonscaleAuthKey, fakts_models.IonscaleAuthKey.objects.filter(id=id), info)
 
 
     @kante.django_field()
@@ -274,11 +276,11 @@ class Query:
 
     @kante.django_field()
     def client(self, info: Info, id: strawberry.ID) -> types.ManagementClient:
-        return fakts_models.Client.objects.get(id=id)
+        return get_scoped(types.ManagementClient, fakts_models.Client.objects.filter(id=id), info)
 
     @kante.django_field()
     def report(self, info: Info, id: strawberry.ID) -> types.ManagementReport:
-        return fakts_models.Report.objects.get(id=id)
+        return get_scoped(types.ManagementReport, fakts_models.Report.objects.filter(id=id), info)
 
     @kante.django_field()
     def service_instance_mapping(self, info: Info, id: strawberry.ID) -> types.ManagementServiceInstanceMapping:
@@ -286,7 +288,7 @@ class Query:
 
     @kante.django_field()
     def device(self, info: Info, id: strawberry.ID) -> types.ManagementDevice:
-        return fakts_models.Device.objects.get(id=id)
+        return get_scoped(types.ManagementDevice, fakts_models.Device.objects.filter(id=id), info)
 
     @kante.django_field()
     def service_release(self, info: Info, id: strawberry.ID) -> types.ManagementServiceRelease:
@@ -294,7 +296,7 @@ class Query:
 
     @kante.django_field()
     def device_group(self, info: Info, id: strawberry.ID) -> types.ManagementDeviceGroup:
-        return fakts_models.DeviceGroup.objects.get(id=id)
+        return get_scoped(types.ManagementDeviceGroup, fakts_models.DeviceGroup.objects.filter(id=id), info)
 
     @kante.django_field()
     def device_code(self, info: Info, id: strawberry.ID) -> types.ManagementDeviceCode:
@@ -544,6 +546,7 @@ schema = kante.Schema(
     mutation=Mutation,
     types=[types.ManagementGithubAccount, types.ManagementGenericAccount, types.ManagementGoogleAccount, types.ManagementOrcidAccount],
     extensions=[
+        RequireAuthenticationExtension,
         DatalayerExtension,
     ],
     config=StrawberryConfig(scalar_map={**fakts_scalar_map, **management_scalar_map}),
