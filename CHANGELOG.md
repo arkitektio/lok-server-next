@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.21 (2026-08-10)
+
+### Bug Fixes
+
+- Hardened lok
+  ([`affa4cb`](https://github.com/arkitektio/lok-server-next/commit/affa4cb715c45a51606a1fc37cc82e3713d88965))
+
+
 ## v1.0.0-rc.20 (2026-07-08)
 
 ### Bug Fixes
