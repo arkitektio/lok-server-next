@@ -133,9 +133,10 @@ class Query:
 
 @strawberry.type
 class Mutation:
-    create_user = strawberry_django.mutation(
-        resolver=karakter_mutations.create_user,
-    )
+    # NOTE: `create_user` was removed. It was unauthenticated user creation, and it
+    # could never have worked — the resolver read `input.user` from an input that only
+    # declares `name`, and assigned it to a `name` field the User model does not have,
+    # so every call raised before touching the database. Nothing can depend on it.
 
     add_user_to_organization = strawberry_django.mutation(
         resolver=karakter_mutations.add_user_to_organization,

@@ -5,6 +5,8 @@ from django.utils import timezone
 from datetime import timedelta
 import kante
 
+from api.management.authz import assert_owner
+
 
 @kante.input
 class CreateInviteInput:
@@ -22,11 +24,18 @@ def create_invite(info: Info, input: CreateInviteInput) -> types.Invite:
     Returns an invite with a unique token that can be shared.
     The link can only be used once and expires after the specified days.
     If no roles are specified, the 'guest' role will be assigned.
+
+    Requires the caller to own the organization, matching `createInvite` on the
+    management API. An invite token is a bearer credential that grants membership
+    and whatever roles it carries, so minting one for an arbitrary organization must
+    not be possible just by passing its id.
     """
     if input.organization:
-        organization = models.Organization.objects.get(id=input.organization)
+        organization = models.Organization.objects.filter(id=input.organization).first()
     else:
         organization = info.context.request.organization
+
+    assert_owner(info, organization)
 
     # Calculate expiration date if specified
     expires_at = None

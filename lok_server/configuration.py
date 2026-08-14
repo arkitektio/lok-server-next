@@ -435,25 +435,88 @@ class Settings(BaseSettings):
 
         ``social_email_verification: none`` opens the login gate for *all* social
         providers globally (allauth has no per-provider verification level). Leaving
-        a provider without ``VERIFIED_EMAIL: true`` then means its users are admitted
-        *and* their email is stored unverified with no path to ever verify it — a
-        silent, unintended exemption, especially for a provider added later. Requiring
-        ``VERIFIED_EMAIL`` on each provider makes the trust decision explicit and
-        per-provider, matching the intent behind the global switch."""
-        if self.account.social_email_verification == "none":
-            untrusted = [
-                name
-                for name, cfg in self.socialaccount_providers.items()
-                if not getattr(cfg, "VERIFIED_EMAIL", None)
-            ]
-            if untrusted:
-                raise ValueError(
-                    "account.social_email_verification is 'none' (social logins skip "
-                    "email verification), but these providers are not marked trusted: "
-                    f"{', '.join(sorted(untrusted))}. Add `VERIFIED_EMAIL: true` to each "
-                    "so the exemption is an explicit, per-provider trust decision, or "
-                    "raise social_email_verification to 'optional'/'mandatory'."
-                )
+        a provider untrusted then means its users are admitted *and* their email is
+        stored unverified with no path to ever verify it — a silent, unintended
+        exemption, especially for a provider added later. Requiring an explicit trust
+        declaration makes that decision deliberate, matching the intent behind the
+        global switch.
+
+        Trust can be declared at two levels, mirroring allauth's own lookup order in
+        ``SocialAccountAdapter.is_email_verified``: per *app*, via
+        ``settings.verified_email`` on each entry, and per *provider*, via the
+        top-level ``VERIFIED_EMAIL``. Either may be a bool or a list of domains.
+
+        Two kinds of provider must instead give **every app a non-empty domain list**,
+        because for them neither a provider-wide flag nor a per-app bare ``true`` is
+        expressive enough — both say "believe this IdP about any address at all", which
+        lets it mark a domain it does not own as verified:
+
+        * **SAML**, at any app count. Its apps are institutional identity providers, and
+          an institution has no business asserting addresses outside its own domains.
+        * **Any provider with several apps**, since one flag cannot distinguish between
+          independent identity providers and would silently cover the next app added.
+
+        Single-app OAuth providers (google, orcid, cilogon) are unaffected and keep
+        using a provider-wide ``VERIFIED_EMAIL``.
+
+        Note allauth matches those domains **exactly**, not by suffix: an app scoped to
+        ``acme.edu`` does not cover ``student.acme.edu``. Enumerate every subdomain the
+        IdP actually asserts."""
+        if self.account.social_email_verification != "none":
+            return self
+
+        def apps_of(cfg: SocialProviderConfig) -> List[SocialAppConfig]:
+            apps = list(cfg.APPS or [])
+            if cfg.APP is not None:
+                apps.append(cfg.APP)
+            return apps
+
+        def is_domain_list(value: Any) -> bool:
+            return isinstance(value, list) and len(value) > 0
+
+        untrusted: List[str] = []
+        needs_domain_list: List[str] = []
+
+        for name, cfg in self.socialaccount_providers.items():
+            apps = apps_of(cfg)
+            per_app_values = [app.settings.get("verified_email") for app in apps]
+
+            if name == "saml" or len(apps) > 1:
+                # Only domain-scoped per-app trust is expressive enough here.
+                if apps and all(is_domain_list(value) for value in per_app_values):
+                    continue
+                if any(per_app_values) or getattr(cfg, "VERIFIED_EMAIL", None):
+                    needs_domain_list.append(name)
+                else:
+                    untrusted.append(name)
+                continue
+
+            if (apps and all(per_app_values)) or getattr(cfg, "VERIFIED_EMAIL", None):
+                continue
+            untrusted.append(name)
+
+        if untrusted:
+            raise ValueError(
+                "account.social_email_verification is 'none' (social logins skip "
+                "email verification), but these providers are not marked trusted: "
+                f"{', '.join(sorted(untrusted))}. Add `VERIFIED_EMAIL: true` to each "
+                "provider, or `settings.verified_email: [\"<domain>\"]` to each of its "
+                "apps, so the exemption is an explicit trust decision — or raise "
+                "social_email_verification to 'optional'/'mandatory'."
+            )
+
+        if needs_domain_list:
+            raise ValueError(
+                "Every app of these providers must declare `settings.verified_email` as "
+                f"a non-empty list of domains: {', '.join(sorted(needs_domain_list))}. "
+                "A provider-wide VERIFIED_EMAIL cannot express per-IdP trust, and a bare "
+                "`verified_email: true` trusts an identity provider about *any* address "
+                "— including domains it does not own. This is required for SAML at any "
+                "app count, and for any provider configuring several apps. Use e.g. "
+                "`verified_email: [\"acme.edu\", \"student.acme.edu\"]`; matching is exact, "
+                "so enumerate every subdomain the IdP asserts."
+            )
+
         return self
 
     @classmethod

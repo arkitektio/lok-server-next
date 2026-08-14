@@ -4,7 +4,7 @@ from karakter.datalayer import get_current_datalayer
 import strawberry
 import strawberry_django
 from kante.types import Info
-from karakter import enums, filters, models, scalars
+from karakter import filters, models, scalars
 from allauth.socialaccount import models as smodels
 import kante
 from .type_gen import create_stats_type
@@ -166,7 +166,11 @@ always available, but typed accounts are only available for some providers.
 """,
 )
 class SocialAccount:
-    provider: enums.ProviderType = strawberry.field(description="The provider of the account. This can be used to determine the type of the account.")
+    provider: str = strawberry.field(
+        description="The provider of the account. This can be used to determine the type of the account. "
+        "For ordinary providers this is the provider id ('google', 'orcid'); for sub-providers "
+        "(SAML, OpenID Connect) it is the configured `provider_id` of the specific app, e.g. 'saml:acme'."
+    )
     uid: str = strawberry.field(description="The unique identifier of the account. This is unique for the provider.")
     extra_data: scalars.ExtraData = strawberry.field(description="Extra data that is specific to the provider. This is a json field and can be used to store arbitrary data.")
 

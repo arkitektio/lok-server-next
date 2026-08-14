@@ -3,6 +3,8 @@ import strawberry
 from karakter import types, models, managers
 import logging
 
+from api.management.authz import assert_owner
+
 logger = logging.getLogger(__name__)
 
 
@@ -26,8 +28,15 @@ def create_random_slug(name: str) -> str:
 
 
 def update_organization(info: Info, input: UpdateOrganizationInput) -> types.Organization:
-    """Update an organization's details including name, description, slug, and avatar."""
-    organization = models.Organization.objects.get(pk=input.id)
+    """Update an organization's details including name, description, slug, and avatar.
+
+    Requires the caller to own the organization, matching `updateOrganization` on the
+    management API. The `slug` is part of an organization's identity — it appears in
+    URLs and in token `active_org` claims — so letting any authenticated principal
+    rewrite it (or rename any tenant) would be a cross-tenant defacement.
+    """
+    organization = models.Organization.objects.filter(pk=input.id).first()
+    assert_owner(info, organization)
 
     if input.name is not None:
         organization.name = input.name

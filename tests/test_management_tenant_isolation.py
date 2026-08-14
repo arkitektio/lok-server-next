@@ -167,3 +167,69 @@ def test_upload_key_is_namespaced_to_the_caller():
     # Traversal and absolute paths cannot escape the per-user prefix.
     assert _scoped_key(info, "../../victim/avatar.png") == f"users/{attacker.id}/avatar.png"
     assert _scoped_key(info, "/etc/passwd") == f"users/{attacker.id}/passwd"
+
+
+def _invite_leak_setup():
+    """An org with a pending admin invite, plus a plain (non-admin) member of it.
+
+    The member is deliberately given no roles: they are the least-privileged
+    principal who can still traverse `organization { invites }`.
+    """
+    from karakter.models import Invite, Role
+
+    owner = factories.make_user()
+    org = factories.make_organization(owner=owner)
+
+    guest_membership = factories.make_membership(organization=org)
+    guest = guest_membership.user
+    guest_membership.roles.clear()
+
+    invite = Invite.objects.create(created_by=owner, created_for=org)
+    invite.roles.add(Role.objects.get(organization=org, identifier="admin"))
+
+    request_client = factories.make_client(membership=guest_membership)
+    guest_context = build_auth_context(guest, org, request_client.oauth2_client)
+
+    owner_membership = org.memberships.get(user=owner)
+    owner_client = factories.make_client(membership=owner_membership)
+    owner_context = build_auth_context(owner, org, owner_client.oauth2_client)
+
+    return guest_context, owner_context, org, invite
+
+
+INVITES_QUERY = "query ($id: ID!) { organization(id: $id) { invites { id token inviteUrl } } }"
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.asyncio
+async def test_plain_member_cannot_read_their_orgs_invite_tokens():
+    """An invite token is a bearer credential.
+
+    `ManagementInvite` had no `get_queryset`, so any member — including one with no
+    roles at all — could reach it through `organization { invites }` and read the
+    tokens of pending invites, then redeem one granting `admin`.
+    """
+    guest_context, _owner_context, org, _invite = await sync_to_async(_invite_leak_setup)()
+
+    result = await management_schema.execute(
+        INVITES_QUERY, context_value=guest_context, variable_values={"id": str(org.id)}
+    )
+
+    assert not result.errors, result.errors
+    assert result.data["organization"]["invites"] == []
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.asyncio
+async def test_owner_can_still_read_their_orgs_invites():
+    """The scoping must not be so tight that legitimate invite management breaks."""
+    _guest_context, owner_context, org, invite = await sync_to_async(_invite_leak_setup)()
+
+    result = await management_schema.execute(
+        INVITES_QUERY, context_value=owner_context, variable_values={"id": str(org.id)}
+    )
+
+    assert not result.errors, result.errors
+    tokens = [row["token"] for row in result.data["organization"]["invites"]]
+    assert tokens == [str(invite.token)]
+

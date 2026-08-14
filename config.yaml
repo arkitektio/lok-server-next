@@ -101,9 +101,15 @@ account:
   # live on a different host — an absolute value (with scheme) is used verbatim:
   #   headless_frontend_urls:
   #     account_confirm_email: https://other-host/account/verify-email/{key}
+  # NOTE: the `saml` app imports `onelogin.saml2` at module scope, so it only
+  # works with the `saml` extra installed (see pyproject.toml). It is listed
+  # here — not just in the deployment config — because settings_test.py reads
+  # this file, and without it `reverse("saml_metadata")` raises NoReverseMatch
+  # in every SAML test.
   social_provider_apps:
   - allauth.socialaccount.providers.orcid
   - allauth.socialaccount.providers.google
+  - allauth.socialaccount.providers.saml
 
 # Policy for integrated login widgets that load third-party scripts and can track
 # before a click (e.g. Google One Tap). strict = never load; opt-in = consent

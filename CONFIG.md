@@ -487,6 +487,40 @@ provider is `https://<your-host>/lok/accounts/<provider>/login/callback/`.
 > and treat every `secret` as sensitive (inject via environment or a secret
 > file, never commit it).
 
+### SAML (institutional single sign-on)
+
+SAML uses the same two steps, with the `saml` extra installed
+(`django-allauth[…,saml]`). It is **server configuration only** — there is no
+self-service IdP registration — and it is purely an authentication method:
+**organizations are orthogonal to it.** A SAML login registers or signs in a user;
+it grants no organization membership, and joining an organization still goes
+through the ordinary invite flow.
+
+```yaml
+socialaccount_providers:
+  saml:
+    APPS:
+      - client_id: acme-university      # IdP name + URL segment. NOT an organization.
+        provider_id: "saml:acme-university"   # == SocialAccount.provider — immutable
+        name: "Acme University"
+        settings:
+          verified_email: ["acme.edu", "student.acme.edu"]
+          attribute_mapping: {uid: [...], email: [...]}
+          idp: {metadata_url: "https://idp.acme.edu/idp/shibboleth"}
+```
+
+Endpoints to register with the IdP are
+`https://<your-host>/lok/accounts/saml/<client_id>/{acs,metadata,sls}/` — note this
+differs from the OAuth callback URL above.
+
+One rule differs from OAuth providers: when `account.social_email_verification` is
+`none` and a provider configures **more than one app**, each app must set
+`settings.verified_email` to a non-empty **list of domains**. A bare `true` is
+rejected, since it would let one institution's IdP mark another's domain as
+verified. Matching is exact, so enumerate every subdomain. See
+[docs/social_accounts/README.md §6](docs/social_accounts/README.md) for the full
+picture, including why `EMAIL_AUTHENTICATION` is deliberately left off.
+
 ### Integrated login widgets (Google One Tap)
 
 Some providers offer an *integrated* sign-in widget — most notably **Google One

@@ -102,3 +102,37 @@ async def test_get_queries_are_disabled(db):
     client = AsyncClient()
     response = await client.get(MANAGEMENT_URL, {"query": "{ __typename }"})
     assert response.status_code in (400, 405), response.status_code
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+async def test_anonymous_can_still_preview_a_public_invite(db):
+    """`inviteByCode` is the pre-login preview the SPA hits from an invite link.
+
+    `ManagementInvite` is now scoped by `get_queryset` to an organization's owner
+    and admins, because it exposes bearer tokens. This asserts that scoping did not
+    close the one invite flow whose caller is, by design, not a member of the
+    organization at all — it resolves a model instance directly, so the type-level
+    queryset filter must not apply.
+    """
+    from asgiref.sync import sync_to_async
+
+    from karakter.models import Invite, Organization
+
+    def _setup():
+        owner = User.objects.create_user(username="inviteowner", password="hunter2hunter2")
+        org = Organization.objects.create(slug="previeworg", name="Preview Org", owner=owner)
+        return Invite.objects.create(created_by=owner, created_for=org, public=True)
+
+    invite = await sync_to_async(_setup)()
+
+    payload = await _json(
+        await _post(
+            AsyncClient(),
+            "query ($code: String!) { inviteByCode(inviteCode: $code) { id public } }",
+            {"code": str(invite.token)},
+        )
+    )
+
+    assert "errors" not in payload, payload
+    assert payload["data"]["inviteByCode"]["public"] is True

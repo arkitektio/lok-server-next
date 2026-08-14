@@ -70,6 +70,143 @@ def test_social_provider_rejects_bad_app_credentials():
         Settings(socialaccount_providers={"google": {"APP": {"clientid": "typo"}}})
 
 
+def _saml_app(client_id="acme-university", trusted=True):
+    """A SAML APPS entry of the shape allauth's `list_apps` reads.
+
+    `client_id` is an identity-provider name and the URL segment — it carries no
+    organization meaning.
+    """
+    settings = {
+        "attribute_mapping": {"uid": ["urn:oasis:names:tc:SAML:attribute:subject-id"]},
+        "idp": {"entity_id": f"https://idp.{client_id}.edu/idp", "sso_url": "https://idp/sso"},
+    }
+    if trusted:
+        settings["verified_email"] = [f"{client_id}.edu"]
+    return {"client_id": client_id, "provider_id": f"saml:{client_id}", "name": client_id, "settings": settings}
+
+
+def test_saml_app_validates_without_oauth_credentials():
+    """A SAML app carries no OAuth secret/key, and the `extra="forbid"` app model
+    accepts it unchanged — this is why SAML needs no config-schema change."""
+    s = Settings(socialaccount_providers={"saml": {"APPS": [_saml_app()]}})
+    app = s.socialaccount_providers["saml"].APPS[0]
+    assert app.client_id == "acme-university"
+    assert app.provider_id == "saml:acme-university"
+    assert app.secret == "" and app.key == ""
+    # The settings blob is passed through to allauth verbatim.
+    assert app.settings["idp"]["sso_url"] == "https://idp/sso"
+    assert app.settings["verified_email"] == ["acme-university.edu"]
+
+
+def test_saml_provider_dumps_to_allauth_shape():
+    """The typed SAML entry round-trips to the dict allauth expects."""
+    s = Settings(socialaccount_providers={"saml": {"APPS": [_saml_app()]}})
+    dumped = {p: c.model_dump(exclude_none=True) for p, c in s.socialaccount_providers.items()}
+    assert dumped["saml"]["APPS"] == [
+        {
+            "client_id": "acme-university",
+            "provider_id": "saml:acme-university",
+            "name": "acme-university",
+            "secret": "",
+            "key": "",
+            "settings": _saml_app()["settings"],
+        }
+    ]
+
+
+def test_saml_app_rejects_unknown_top_level_key():
+    """Misplacing a SAML setting at app level (instead of under `settings`) is caught."""
+    with pytest.raises(ValidationError):
+        Settings(socialaccount_providers={"saml": {"APPS": [{"client_id": "acme", "idp": {}}]}})
+
+
+def _relaxed(**providers):
+    return dict(
+        account={"email_verification": "none", "social_email_verification": "none"},
+        socialaccount_providers=providers,
+    )
+
+
+def test_per_app_domain_list_satisfies_trust_requirement():
+    """Domain-scoped per-app trust is the accepted form for a multi-app provider."""
+    s = Settings(**_relaxed(saml={"APPS": [_saml_app("acme"), _saml_app("beta")]}))
+    assert s.socialaccount_providers["saml"].APPS[0].settings["verified_email"] == ["acme.edu"]
+
+
+def test_untrusted_saml_app_is_rejected_when_verification_relaxed():
+    """One untrusted app among several is caught, not silently exempted."""
+    with pytest.raises(ValidationError, match="not marked trusted"):
+        Settings(**_relaxed(saml={"APPS": [_saml_app("acme", trusted=False), _saml_app("beta", trusted=False)]}))
+
+
+def test_multi_app_provider_cannot_declare_trust_with_one_flat_flag():
+    """A provider-wide VERIFIED_EMAIL cannot express per-IdP trust."""
+    with pytest.raises(ValidationError, match="list of domains"):
+        Settings(
+            **_relaxed(
+                saml={
+                    "VERIFIED_EMAIL": True,
+                    "APPS": [_saml_app("acme", trusted=False), _saml_app("beta", trusted=False)],
+                }
+            )
+        )
+
+
+def test_multi_app_provider_cannot_declare_trust_with_bare_true():
+    """The hole this rule closes: `verified_email: true` is truthy, so it used to pass
+    the per-app check while trusting the IdP about *any* address — including domains it
+    does not own. With EMAIL_AUTHENTICATION that was an account-takeover vector."""
+    app = _saml_app("acme", trusted=False)
+    app["settings"]["verified_email"] = True
+
+    with pytest.raises(ValidationError, match="does not own"):
+        Settings(**_relaxed(saml={"APPS": [app, _saml_app("beta")]}))
+
+
+def test_multi_app_provider_rejects_an_empty_domain_list():
+    """An empty list trusts nothing and is far more likely a mistake than intent."""
+    app = _saml_app("acme", trusted=False)
+    app["settings"]["verified_email"] = []
+
+    with pytest.raises(ValidationError, match="list of domains"):
+        Settings(**_relaxed(saml={"APPS": [app, _saml_app("beta")]}))
+
+
+def test_single_app_saml_provider_also_needs_a_domain_list():
+    """SAML needs domain scoping at *any* app count, not just when several are
+    configured. An institution's IdP has no business asserting addresses outside its
+    own domains, and that is true whether or not a second IdP exists."""
+    app = _saml_app("acme", trusted=False)
+    app["settings"]["verified_email"] = True
+
+    with pytest.raises(ValidationError, match="does not own"):
+        Settings(**_relaxed(saml={"APPS": [app]}))
+
+
+def test_single_app_oauth_provider_may_still_use_a_bare_flag():
+    """The stricter rule must not disturb google/orcid/cilogon, which are single
+    well-known providers declaring trust with one provider-wide VERIFIED_EMAIL."""
+    Settings(
+        **_relaxed(
+            google={"VERIFIED_EMAIL": True, "APPS": [{"client_id": "gid", "secret": "s"}]},
+            orcid={"VERIFIED_EMAIL": True, "APPS": [{"client_id": "oid", "secret": "s"}]},
+        )
+    )
+
+
+def test_single_app_provider_may_still_use_flat_verified_email():
+    """Regression guard for the deployed google/orcid/cilogon shape, which declares
+    trust with one top-level VERIFIED_EMAIL per single-app provider."""
+    s = Settings(
+        account={"email_verification": "none", "social_email_verification": "none"},
+        socialaccount_providers={
+            "google": {"VERIFIED_EMAIL": True, "APPS": [{"client_id": "gid", "secret": "s"}]},
+            "orcid": {"VERIFIED_EMAIL": True, "APPS": [{"client_id": "oid", "secret": "s"}]},
+        },
+    )
+    assert s.account.social_email_verification == "none"
+
+
 def test_privacy_guards_defaults_to_opt_in():
     """Integrated-widget policy defaults to the current consent-prompt behavior."""
     assert Settings().privacy_guards == "opt-in"

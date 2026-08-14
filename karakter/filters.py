@@ -1,5 +1,5 @@
 import strawberry
-from karakter import models, enums
+from karakter import models
 from typing import Optional
 from strawberry_django.filters import FilterLookup
 import strawberry_django
@@ -137,8 +137,8 @@ class SocialAccountFilter:
         return Q(**{f"{prefix}uid__contains": value})
 
     @strawberry_django.filter_field
-    def provider(self, value: enums.ProviderType, prefix: str) -> Q:
-        return Q(**{f"{prefix}provider": value.value})
+    def provider(self, value: str, prefix: str) -> Q:
+        return Q(**{f"{prefix}provider": value})
 
 
 @strawberry_django.order_type(models.User)

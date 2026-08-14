@@ -17,6 +17,11 @@ WORKDIR /workspace
 # Dependency layer — cached until pyproject.toml / uv.lock change:
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-install-project --no-dev
+# django-allauth[saml] pulls xmlsec + lxml, which resolve to self-contained
+# manylinux_2_28 wheels on this glibc-2.36 base — so no libxmlsec1/libxml2 apt
+# packages are needed. Fail the build loudly if that ever stops being true
+# (a source fallback would otherwise produce an image that 500s on first login).
+RUN /opt/venv/bin/python -c "import xmlsec, lxml.etree, onelogin.saml2.auth"
 # Project layer:
 COPY . .
 RUN uv sync --frozen --no-dev

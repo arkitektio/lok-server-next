@@ -483,6 +483,30 @@ class ManagementInvite:
         """Generate the full URL for accepting this invite on the kontrol SPA."""
         return f"{settings.KONTROL_FRONTEND_URL}/invite/{self.token}"
 
+    @classmethod
+    def get_queryset(cls, queryset, info: Info, **kwargs):
+        """Only an organization's owner or admins may list its invites.
+
+        This type exposes `token` (and `invite_url`, which embeds it), and an invite
+        token is a bearer credential: whoever holds it can redeem it and receive
+        whatever roles the invite carries. Without this scoping the type had none,
+        so any member — including a `guest` — could reach it through
+        `ManagementOrganization.invites` and read pending tokens for their own
+        organization, redeeming one that grants `admin`.
+
+        The bar matches the single-invite `invite(id)` query and the privileged bar
+        in `authz.assert_owner_or_admin`. `inviteByCode` is unaffected: it returns a
+        model instance directly, and its caller already holds the token.
+        """
+        user = info.context.request.user
+        return queryset.filter(
+            Q(created_for__owner=user)
+            | Q(
+                created_for__memberships__user=user,
+                created_for__memberships__roles__identifier="admin",
+            )
+        ).distinct()
+
 
 @pydantic.type(base_models.Requirement)
 class ManagementStagingRequirement:
