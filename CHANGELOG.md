@@ -1,7 +1,15 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.23 (2026-08-14)
+
+
 ## v1.0.0-rc.22 (2026-08-14)
+
+### Bug Fixes
+
+- More auth fixes
+  ([`9506541`](https://github.com/arkitektio/lok-server-next/commit/9506541f146ece90a808943f6510a49070c9b8bb))
 
 
 ## v1.0.0-rc.21 (2026-08-10)
