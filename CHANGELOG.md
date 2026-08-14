@@ -1,12 +1,18 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.22 (2026-08-14)
+
+
 ## v1.0.0-rc.21 (2026-08-10)
 
 ### Bug Fixes
 
 - Hardened lok
   ([`affa4cb`](https://github.com/arkitektio/lok-server-next/commit/affa4cb715c45a51606a1fc37cc82e3713d88965))
+
+- Saml support and fixed stuff
+  ([`f423dba`](https://github.com/arkitektio/lok-server-next/commit/f423dba59dcd15d8b2ab87a4271a2b1158c812fd))
 
 
 ## v1.0.0-rc.20 (2026-07-08)
