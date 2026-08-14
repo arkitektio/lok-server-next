@@ -5,6 +5,8 @@ from karakter import models
 from django.utils import timezone
 from datetime import timedelta
 import kante
+from graphql import GraphQLError
+from api.management.authz import is_owner
 
 
 @kante.input
@@ -27,7 +29,8 @@ def create_invite(info: Info, input: CreateInviteInput) -> types.ManagementInvit
     """
     if input.organization:
         organization = models.Organization.objects.get(id=input.organization)
-        assert organization.owner == info.context.request.user, "You must own the organization to create an invite"
+        if not is_owner(info.context.request.user, organization):
+            raise GraphQLError("You must own the organization to create an invite")
     else:
         raise Exception("Organization ID must be provided")
 

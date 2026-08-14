@@ -1214,7 +1214,7 @@ wheels = [
 
 [[package]]
 name = "lok-server"
-version = "1.0.0rc20"
+version = "1.0.0rc21"
 source = { virtual = "." }
 dependencies = [
     { name = "aiohttp" },

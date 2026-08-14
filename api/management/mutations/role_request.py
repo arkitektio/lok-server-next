@@ -5,6 +5,8 @@ from kante.types import Info
 
 from karakter import models
 from api.management import types
+from graphql import GraphQLError
+from api.management.authz import is_owner
 
 logger = logging.getLogger(__name__)
 
@@ -55,9 +57,8 @@ def approve_role_request(info: Info, input: ResolveRoleRequestInput) -> types.Ma
     Approval adds the requested role to the member's membership.
     """
     role_request = models.RoleRequest.objects.get(pk=input.id)
-    assert (
-        role_request.membership.organization.owner == info.context.request.user
-    ), "You must own the organization to approve role requests."
+    if not is_owner(info.context.request.user, role_request.membership.organization):
+        raise GraphQLError("You must own the organization to approve role requests.")
     role_request.approve(info.context.request.user)
     return role_request
 
@@ -65,9 +66,8 @@ def approve_role_request(info: Info, input: ResolveRoleRequestInput) -> types.Ma
 def decline_role_request(info: Info, input: ResolveRoleRequestInput) -> types.ManagementRoleRequest:
     """Decline a pending role request. Only the organization owner may do this."""
     role_request = models.RoleRequest.objects.get(pk=input.id)
-    assert (
-        role_request.membership.organization.owner == info.context.request.user
-    ), "You must own the organization to decline role requests."
+    if not is_owner(info.context.request.user, role_request.membership.organization):
+        raise GraphQLError("You must own the organization to decline role requests.")
     role_request.decline(info.context.request.user)
     return role_request
 
@@ -75,8 +75,7 @@ def decline_role_request(info: Info, input: ResolveRoleRequestInput) -> types.Ma
 def cancel_role_request(info: Info, input: ResolveRoleRequestInput) -> strawberry.ID:
     """Withdraw one's own role request. Only the requesting member may do this."""
     role_request = models.RoleRequest.objects.get(pk=input.id)
-    assert (
-        role_request.membership.user == info.context.request.user
-    ), "You can only cancel your own role requests."
+    if role_request.membership.user_id != info.context.request.user.id:
+        raise GraphQLError("You can only cancel your own role requests.")
     role_request.delete()
     return input.id

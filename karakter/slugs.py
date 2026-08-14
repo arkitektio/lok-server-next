@@ -45,17 +45,25 @@ def normalize_slug(raw: str) -> str:
 
 
 def validate_slug(slug: str) -> None:
-    """Assert that ``slug`` is a valid canonical slug.
+    """Check that ``slug`` is a valid canonical slug.
 
-    Raises ``AssertionError`` (surfaced to the client as a GraphQL error) when
-    the slug is empty (e.g. a name made entirely of symbols) or otherwise
-    malformed.
+    Raises ``ValueError`` (surfaced to the client as a GraphQL error) when the slug
+    is empty (e.g. a name made entirely of symbols) or otherwise malformed.
+
+    Deliberately a raise rather than an ``assert``: this is input validation, and
+    ``assert`` is stripped under ``python -O``, which would silently admit malformed
+    slugs. ``ValueError`` keeps this module free of a GraphQL dependency — its
+    callers are resolvers, and graphql-core surfaces the message either way.
     """
-    assert slug, "A slug is required — please provide a name or handle with at least one letter or number."
-    assert SLUG_RE.match(slug), (
-        "Handle must be lowercase letters, numbers and single hyphens only "
-        "(e.g. 'my-organization')."
-    )
+    if not slug:
+        raise ValueError(
+            "A slug is required — please provide a name or handle with at least one letter or number."
+        )
+    if not SLUG_RE.match(slug):
+        raise ValueError(
+            "Handle must be lowercase letters, numbers and single hyphens only "
+            "(e.g. 'my-organization')."
+        )
 
 
 def is_slug_taken(slug: str) -> bool:

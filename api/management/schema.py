@@ -18,6 +18,8 @@ from authapp.models import OAuth2Client
 from strawberry.schema.config import StrawberryConfig
 from fakts.scalars import scalar_map as fakts_scalar_map
 from .scalars import scalar_map as management_scalar_map
+from graphql import GraphQLError
+from api.management.authz import is_owner
 
 
 @strawberry.type
@@ -196,7 +198,8 @@ class Query:
     @kante.django_field()
     def invite(self, info: Info, id: strawberry.ID) -> types.ManagementInvite:
         invite = karakter_models.Invite.objects.get(id=id)
-        assert invite.created_for.owner == info.context.request.user, "Not authorized to view this invite."
+        if not is_owner(info.context.request.user, invite.created_for):
+            raise GraphQLError("Not authorized to view this invite.")
         return invite
 
     @kante.django_field()

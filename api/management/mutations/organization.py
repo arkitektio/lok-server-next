@@ -7,6 +7,8 @@ import logging
 from django.db import IntegrityError
 from fakts import models as fakts_models
 from fakts.logic import create_hub_from_partner
+from graphql import GraphQLError
+from api.management.authz import is_owner, is_owner_or_admin
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +32,8 @@ def update_organization(info: Info, input: UpdateOrganizationInput) -> types.Man
     default brand hue).
     """
     organization = models.Organization.objects.get(pk=input.id)
-    assert organization.owner == info.context.request.user, "You must own the organization to update it."
+    if not is_owner(info.context.request.user, organization):
+        raise GraphQLError("You must own the organization to update it.")
 
     if input.name is not None:
         organization.name = input.name
@@ -42,9 +45,10 @@ def update_organization(info: Info, input: UpdateOrganizationInput) -> types.Man
         candidate = slugs.normalize_slug(input.slug)
         slugs.validate_slug(candidate)
         if candidate != organization.slug:
-            assert not slugs.is_slug_taken(candidate), (
-                f"The handle '{candidate}' is already taken. Try '{slugs.suggest_slug(candidate)}'."
-            )
+            if slugs.is_slug_taken(candidate):
+                raise GraphQLError(
+                    f"The handle '{candidate}' is already taken. Try '{slugs.suggest_slug(candidate)}'."
+                )
         organization.slug = candidate
 
     if input.avatar is not None:
@@ -90,9 +94,10 @@ def create_organization(info: Info, input: CreateOrganizationInput) -> types.Man
     # Prefer an explicit (user-chosen) slug, otherwise derive one from the name.
     candidate = slugs.normalize_slug(input.slug) if input.slug else slugs.slugify_name(input.name)
     slugs.validate_slug(candidate)
-    assert not slugs.is_slug_taken(candidate), (
-        f"The handle '{candidate}' is already taken. Try '{slugs.suggest_slug(candidate)}'."
-    )
+    if slugs.is_slug_taken(candidate):
+        raise GraphQLError(
+            f"The handle '{candidate}' is already taken. Try '{slugs.suggest_slug(candidate)}'."
+        )
 
     try:
         organization = models.Organization.objects.create(
@@ -104,7 +109,7 @@ def create_organization(info: Info, input: CreateOrganizationInput) -> types.Man
         )
     except IntegrityError:
         # Closes the check->create race: another org grabbed the slug in between.
-        raise AssertionError(
+        raise GraphQLError(
             f"The handle '{candidate}' is already taken. Try '{slugs.suggest_slug(candidate)}'."
         )
     logger.info(f"Created Organization: {organization.id} with name: {organization.name}")
@@ -140,12 +145,14 @@ def change_organization_owner(info: Info, organization_id: strawberry.ID, new_ow
         types.ManagementOrganization: The updated organization with the new owner.
     """
     organization = models.Organization.objects.get(id=organization_id)
-    assert organization.owner == info.context.request.user, "Only the current owner can transfer ownership of the organization."
+    if not is_owner(info.context.request.user, organization):
+        raise GraphQLError("Only the current owner can transfer ownership of the organization.")
 
     new_owner = models.AbstractUser.objects.get(id=new_owner_id)
     # The new owner must already belong to the organization — ownership cannot be
     # handed to an unrelated user.
-    assert organization.memberships.filter(user=new_owner).exists(), "The new owner must be a member of the organization."
+    if not organization.memberships.filter(user=new_owner).exists():
+        raise GraphQLError("The new owner must be a member of the organization.")
 
     organization.owner = new_owner
     organization.save()
@@ -162,7 +169,8 @@ class DeleteOrganizationInput:
 def delete_organization(info: Info, input: DeleteOrganizationInput) -> strawberry.ID:
     """Delete an organization by its ID."""
     organization = models.Organization.objects.get(pk=input.id)
-    assert organization.owner == info.context.request.user, "Only the organization owner can delete the organization."
+    if not is_owner(info.context.request.user, organization):
+        raise GraphQLError("Only the organization owner can delete the organization.")
     organization.delete()
     logger.info(f"Deleted Organization: {organization.id}")
     return input.id
@@ -181,21 +189,20 @@ def connect_kommunity_partner(info: Info, input: ConnectKommunityPartnerInput) -
     partner = fakts_models.KommunityPartner.objects.get(pk=input.partner_id)
     user = info.context.request.user
 
-    can_manage_organization = organization.owner_id == user.id or organization.memberships.filter(
-        user=user,
-        roles__identifier="admin",
-    ).exists()
-    assert can_manage_organization, "You are not allowed to connect partners for this organization."
-    assert partner.partner_kind == "preauthorized", "Only preauthorized partners can be connected directly."
-    if partner.license_agreement:
-        assert input.license_signature and input.license_signature.strip(), "You must sign the partner license agreement before continuing."
+    if not is_owner_or_admin(user, organization):
+        raise GraphQLError("You are not allowed to connect partners for this organization.")
+    if partner.partner_kind != "preauthorized":
+        raise GraphQLError("Only preauthorized partners can be connected directly.")
+    if partner.license_agreement and not (input.license_signature and input.license_signature.strip()):
+        raise GraphQLError("You must sign the partner license agreement before continuing.")
 
     hub = create_hub_from_partner(
         partner=partner,
         organization=organization,
         license_signature=input.license_signature.strip() if input.license_signature else None,
     )
-    assert hub is not None, "This partner has no preconfigured hub."
+    if hub is None:
+        raise GraphQLError("This partner has no preconfigured hub.")
 
     logger.info(
         "Connected kommunity partner '%s' to organization '%s' as hub '%s'",

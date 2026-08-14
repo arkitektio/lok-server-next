@@ -3,6 +3,8 @@ import strawberry
 from api.management import types
 from karakter import models
 import kante
+from graphql import GraphQLError
+from api.management.authz import is_owner
 
 
 @kante.input
@@ -15,7 +17,8 @@ class CreateRoleSetInput:
 
 
 def _assert_owner(info: Info, organization: models.Organization) -> None:
-    assert organization.owner == info.context.request.user, "You must own the organization to manage role sets"
+    if not is_owner(info.context.request.user, organization):
+        raise GraphQLError("You must own the organization to manage role sets")
 
 
 def _roles_for_org(role_ids: list[strawberry.ID] | None, organization: models.Organization):

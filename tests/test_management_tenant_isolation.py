@@ -233,3 +233,111 @@ async def test_owner_can_still_read_their_orgs_invites():
     tokens = [row["token"] for row in result.data["organization"]["invites"]]
     assert tokens == [str(invite.token)]
 
+
+
+def _org_with_admin_and_member():
+    """An org with an owner, an admin, and a plain member — each with a context."""
+    from karakter.models import Role
+
+    owner_membership = factories.make_membership()
+    owner = owner_membership.user
+    org = owner_membership.organization
+    org.owner = owner
+    org.save()
+
+    admin_membership = factories.make_membership(organization=org)
+    admin_membership.roles.add(Role.objects.get(organization=org, identifier="admin"))
+
+    member_membership = factories.make_membership(organization=org)
+    member_membership.roles.clear()
+
+    def ctx(membership):
+        client = factories.make_client(membership=membership)
+        return build_auth_context(membership.user, org, client.oauth2_client)
+
+    return {
+        "org": org,
+        "owner": ctx(org.memberships.get(user=owner)),
+        "admin": ctx(admin_membership),
+        "member": ctx(member_membership),
+        "owner_membership": org.memberships.get(user=owner),
+        "admin_membership": admin_membership,
+        "member_membership": member_membership,
+    }
+
+
+DELETE_MEMBERSHIP = 'mutation ($id: ID!) { deleteMembership(input: {id: $id}) }'
+
+
+async def _delete(context, membership):
+    return await management_schema.execute(
+        DELETE_MEMBERSHIP, context_value=context, variable_values={"id": str(membership.id)}
+    )
+
+
+async def _exists(membership):
+    from karakter.models import Membership
+
+    return await sync_to_async(Membership.objects.filter(pk=membership.pk).exists)()
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.asyncio
+async def test_admin_can_remove_a_member():
+    """Previously self-only, so an organization had no way to eject anyone."""
+    s = await sync_to_async(_org_with_admin_and_member)()
+
+    result = await _delete(s["admin"], s["member_membership"])
+
+    assert not result.errors, result.errors
+    assert not await _exists(s["member_membership"])
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.asyncio
+async def test_owner_can_remove_a_member():
+    s = await sync_to_async(_org_with_admin_and_member)()
+
+    result = await _delete(s["owner"], s["member_membership"])
+
+    assert not result.errors, result.errors
+    assert not await _exists(s["member_membership"])
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.asyncio
+async def test_member_can_still_leave():
+    s = await sync_to_async(_org_with_admin_and_member)()
+
+    result = await _delete(s["member"], s["member_membership"])
+
+    assert not result.errors, result.errors
+    assert not await _exists(s["member_membership"])
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.asyncio
+async def test_plain_member_cannot_remove_someone_else():
+    s = await sync_to_async(_org_with_admin_and_member)()
+
+    result = await _delete(s["member"], s["admin_membership"])
+
+    # Not the uniform DENIED text: the caller is already a member of this
+    # organization, so a specific message leaks nothing they don't know.
+    assert result.errors, f"removal succeeded: {result.data}"
+    assert "not allowed to manage memberships" in result.errors[0].message
+    assert await _exists(s["admin_membership"])
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.asyncio
+async def test_admin_cannot_remove_the_owner():
+    """Ejecting the owner would leave the org owned by a non-member, and is a step
+    toward taking it over."""
+    s = await sync_to_async(_org_with_admin_and_member)()
+
+    result = await _delete(s["admin"], s["owner_membership"])
+
+    assert result.errors, f"owner was removable: {result.data}"
+    assert "owner cannot be removed" in result.errors[0].message
+    assert await _exists(s["owner_membership"])

@@ -22,9 +22,14 @@ def download_logo(url: str) -> File:
     used directly in a model."""
     img_tmp = NamedTemporaryFile(delete=True)
     with urlopen(url) as uo:
-        assert uo.status == 200
+        # Raises rather than asserts: this validates a *remote* response, and
+        # `assert` is stripped under `python -O`, which would store whatever the
+        # far end returned — an error page, or a non-image payload.
+        if uo.status != 200:
+            raise ValueError(f"Could not download logo from {url}: HTTP {uo.status}")
         content_type = uo.headers.get('Content-Type', '')
-        assert content_type == 'image/png', f"Expected PNG image, got {content_type}"
+        if content_type != 'image/png':
+            raise ValueError(f"Expected PNG image, got {content_type}")
         img_tmp.write(uo.read())
         img_tmp.flush()
         

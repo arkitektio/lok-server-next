@@ -34,6 +34,28 @@ def get_user(info):
     return user
 
 
+def is_owner(user, organization) -> bool:
+    """Whether ``user`` owns ``organization``. False for a missing organization."""
+    if organization is None:
+        return False
+    return organization.owner_id == user.id
+
+
+def is_owner_or_admin(user, organization) -> bool:
+    """Whether ``user`` owns ``organization`` or holds its ``admin`` role.
+
+    The predicate behind :func:`assert_owner_or_admin`, exposed separately so
+    resolvers that want to raise their own domain-specific message can share the
+    check rather than re-deriving it. This is the bar for privileged operations
+    (role grants, membership changes, deletes, minting credentials).
+    """
+    if organization is None:
+        return False
+    if is_owner(user, organization):
+        return True
+    return organization.memberships.filter(user=user, roles__identifier="admin").exists()
+
+
 def assert_member(info, organization) -> None:
     """Require that the caller belongs to ``organization``.
 
@@ -53,9 +75,7 @@ def assert_member(info, organization) -> None:
 
 def assert_owner(info, organization) -> None:
     """Require that the caller owns ``organization``."""
-    if organization is None:
-        raise GraphQLError(DENIED)
-    if organization.owner_id != get_user(info).id:
+    if not is_owner(get_user(info), organization):
         raise GraphQLError(DENIED)
 
 
@@ -65,14 +85,8 @@ def assert_owner_or_admin(info, organization) -> None:
     This is the bar for privileged operations (role grants, deletes, minting
     credentials) as opposed to ordinary membership.
     """
-    if organization is None:
+    if not is_owner_or_admin(get_user(info), organization):
         raise GraphQLError(DENIED)
-    user = get_user(info)
-    if organization.owner_id == user.id:
-        return
-    if organization.memberships.filter(user=user, roles__identifier="admin").exists():
-        return
-    raise GraphQLError(DENIED)
 
 
 def get_scoped(type_cls, queryset, info):
