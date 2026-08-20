@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.28 (2026-08-20)
+
+### Bug Fixes
+
+- Device_code changes
+  ([`7548a38`](https://github.com/arkitektio/lok-server-next/commit/7548a384cac21775389a2d509f36d12ea99999c0))
+
+
 ## v1.0.0-rc.27 (2026-08-20)
 
 
