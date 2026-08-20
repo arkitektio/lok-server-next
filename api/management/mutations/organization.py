@@ -8,7 +8,7 @@ from django.db import IntegrityError
 from fakts import models as fakts_models
 from fakts.logic import create_hub_from_partner
 from graphql import GraphQLError
-from api.management.authz import is_owner, is_owner_or_admin
+from api.management.authz import get_or_denied, is_owner, is_owner_or_admin
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ def update_organization(info: Info, input: UpdateOrganizationInput) -> types.Man
     Only the organization owner may change these org-wide settings (including the
     default brand hue).
     """
-    organization = models.Organization.objects.get(pk=input.id)
+    organization = get_or_denied(models.Organization.objects, pk=input.id)
     if not is_owner(info.context.request.user, organization):
         raise GraphQLError("You must own the organization to update it.")
 
@@ -52,7 +52,7 @@ def update_organization(info: Info, input: UpdateOrganizationInput) -> types.Man
         organization.slug = candidate
 
     if input.avatar is not None:
-        organization.avatar = models.MediaStore.objects.get(pk=input.avatar)
+        organization.avatar = get_or_denied(models.MediaStore.objects, pk=input.avatar)
 
     if input.brand_hue is not None:
         organization.brand_hue = input.brand_hue
@@ -60,7 +60,13 @@ def update_organization(info: Info, input: UpdateOrganizationInput) -> types.Man
     if input.require_device_auth is not None:
         organization.require_device_auth = input.require_device_auth
 
-    organization.save()
+    try:
+        organization.save()
+    except IntegrityError:
+        # Closes the check->save race on the slug: another org grabbed it in between.
+        raise GraphQLError(
+            f"The handle '{organization.slug}' is already taken. Try '{slugs.suggest_slug(organization.slug)}'."
+        )
 
     # sync_mine: also copy the new default hue onto the owner's own membership, so
     # the owner's personal colour matches the org default they just set. Snapshots
@@ -133,24 +139,28 @@ def create_organization(info: Info, input: CreateOrganizationInput) -> types.Man
     return organization
 
 
-def change_organization_owner(info: Info, organization_id: strawberry.ID, new_owner_id: strawberry.ID) -> types.ManagementOrganization:
-    """Change the owner of an organization to a new user.
+@strawberry.input
+class ChangeOrganizationOwnerInput:
+    """Input for transferring ownership of an organization."""
 
-    Args:
-        info (Info): The GraphQL request info.
-        organization_id (strawberry.ID): The ID of the organization to change ownership of.
-        new_owner_id (strawberry.ID): The ID of the new owner user.
+    organization: strawberry.ID = strawberry.field(description="The organization to transfer.")
+    new_owner: strawberry.ID = strawberry.field(description="The user who becomes the new owner. Must already be a member.")
 
-    Returns:
-        types.ManagementOrganization: The updated organization with the new owner.
+
+def change_organization_owner(info: Info, input: ChangeOrganizationOwnerInput) -> types.ManagementOrganization:
+    """Transfer ownership of an organization to another member.
+
+    Only the current owner may do this, and the new owner must already belong to
+    the organization — ownership cannot be handed to an unrelated user.
     """
-    organization = models.Organization.objects.get(id=organization_id)
+    organization = get_or_denied(models.Organization.objects, id=input.organization)
     if not is_owner(info.context.request.user, organization):
         raise GraphQLError("Only the current owner can transfer ownership of the organization.")
 
-    new_owner = models.AbstractUser.objects.get(id=new_owner_id)
-    # The new owner must already belong to the organization — ownership cannot be
-    # handed to an unrelated user.
+    try:
+        new_owner = models.User.objects.get(id=input.new_owner)
+    except (models.User.DoesNotExist, ValueError, TypeError):
+        raise GraphQLError("The new owner must be a member of the organization.")
     if not organization.memberships.filter(user=new_owner).exists():
         raise GraphQLError("The new owner must be a member of the organization.")
 
@@ -168,7 +178,7 @@ class DeleteOrganizationInput:
 
 def delete_organization(info: Info, input: DeleteOrganizationInput) -> strawberry.ID:
     """Delete an organization by its ID."""
-    organization = models.Organization.objects.get(pk=input.id)
+    organization = get_or_denied(models.Organization.objects, pk=input.id)
     if not is_owner(info.context.request.user, organization):
         raise GraphQLError("Only the organization owner can delete the organization.")
     organization.delete()
@@ -185,8 +195,8 @@ class ConnectKommunityPartnerInput:
 
 def connect_kommunity_partner(info: Info, input: ConnectKommunityPartnerInput) -> types.ManagementHub:
     """Attach a preauthorized kommunity partner hub to an organization."""
-    organization = models.Organization.objects.get(pk=input.organization_id)
-    partner = fakts_models.KommunityPartner.objects.get(pk=input.partner_id)
+    organization = get_or_denied(models.Organization.objects, pk=input.organization_id)
+    partner = get_or_denied(fakts_models.KommunityPartner.objects, pk=input.partner_id)
     user = info.context.request.user
 
     if not is_owner_or_admin(user, organization):

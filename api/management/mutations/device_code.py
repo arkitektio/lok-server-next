@@ -3,18 +3,21 @@ import strawberry
 from api.management import types
 from karakter import models
 from fakts import models as fakts_models
-from api.management.authz import DENIED, assert_member
+from api.management.authz import DENIED, assert_member, get_or_denied
 from graphql import GraphQLError
 from fakts import logic
 import kante
-from api.management.device_code_authz import resolve_declinable_device_code
+from api.management.device_code_authz import resolve_device_code_with_proof
 
 
 @kante.input
 class AcceptDeviceCodeInput:
-    """Input for creating a single-use magic device code for an organization"""
+    """Input for accepting a pending app device code into one of your hubs."""
 
     device_code: strawberry.ID
+    code: str = strawberry.field(
+        description="The user-facing code the device displayed — proof that the approver actually saw the enrolment request"
+    )
     hub: strawberry.ID
     device_name: str | None = strawberry.field(default=None, description="Name to give a newly created device (ignored if the device already exists).")
     declined_requirements: list[str] = strawberry.field(default_factory=list)
@@ -23,18 +26,18 @@ class AcceptDeviceCodeInput:
 
 def accept_device_code(info: Info, input: AcceptDeviceCodeInput) -> types.ManagementClient:
     """
-    Create a single-use magic invite link for an organization.
+    Accept a pending app device code: bind the staged client to the caller's
+    membership in the hub's organization, map its requirements onto the hub's
+    service instances and mint its credentials.
 
-    Returns an invite with a unique token that can be shared.
-    The link can only be used once and expires after the specified days.
-    If no roles are specified, the 'guest' role will be assigned.
+    Requires the user code the device displayed (proof of possession) and
+    membership in the hub's organization.
     """
     user = info.context.request.user
-    try:
-        device_code = fakts_models.DeviceCode.objects.get(id=input.device_code, kind="app")
-        hub = fakts_models.Hub.objects.get(id=input.hub)
-    except (fakts_models.DeviceCode.DoesNotExist, fakts_models.Hub.DoesNotExist):
-        raise GraphQLError(DENIED)
+    device_code = resolve_device_code_with_proof(
+        fakts_models.DeviceCode, device_code_id=input.device_code, code=input.code, kind="app"
+    )
+    hub = get_or_denied(fakts_models.Hub.objects, id=input.hub)
 
     organization = hub.organization
     # Accepting mints a client and an API token inside `organization`, so the
@@ -69,11 +72,11 @@ class DeclineDeviceCodeInput:
 
 def decline_device_code(info: Info, input: DeclineDeviceCodeInput) -> types.ManagementDeviceCode:
     """
-    Decline an invite to join an organization.
+    Decline a pending app device code.
 
-    Marks the invite as declined.
+    Marks the device code as denied; the polling device receives `access_denied`.
     """
-    device_code = resolve_declinable_device_code(
+    device_code = resolve_device_code_with_proof(
         fakts_models.DeviceCode, device_code_id=input.device_code, code=input.code
     )
 

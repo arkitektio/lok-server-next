@@ -7,7 +7,7 @@ from fakts import models as fakts_models
 from ionscale.repo import get_ionscale_repo
 from ionscale.manager import sync, ensure_org_mesh, apply_dns_config
 from karakter import models as karakter_models
-from api.management.authz import DENIED, assert_member, assert_owner_or_admin
+from api.management.authz import DENIED, assert_owner_or_admin, get_or_denied
 from graphql import GraphQLError
 
 
@@ -25,16 +25,13 @@ def create_ionscale_layer(info: Info, input: CreateIonscaleLayerInput) -> types.
     The mesh is a per-organization singleton: if one already exists it is
     returned unchanged; otherwise it is provisioned. See `ensure_org_mesh`.
     """
-    try:
-        organization = fakts_models.Organization.objects.get(id=input.organization_id)
-    except fakts_models.Organization.DoesNotExist:
-        raise GraphQLError(DENIED)
+    organization = get_or_denied(fakts_models.Organization.objects, id=input.organization_id)
 
     assert_owner_or_admin(info, organization)
 
     layer = ensure_org_mesh(organization)
     if layer is None:
-        raise Exception(
+        raise GraphQLError(
             "Could not enable the mesh: ionscale is not configured on this deployment."
         )
     return layer
@@ -52,14 +49,24 @@ class UpdateIonscaleLayerInput:
 
 
 def update_ionscale_layer(info: Info, input: UpdateIonscaleLayerInput) -> types.ManagementLayer:
-    """Update an organization's mesh: member blocking and/or DNS (MagicDNS/HTTPS)."""
+    """Update an organization's mesh: member blocking and/or DNS (MagicDNS/HTTPS).
 
-    try:
-        layer = fakts_models.IonscaleLayer.objects.get(id=input.id)
-    except fakts_models.IonscaleLayer.DoesNotExist:
-        raise GraphQLError(DENIED)
+    Only the organization's owner or admins may reconfigure the mesh (it decides
+    who can reach it and how it resolves names).
+    """
 
-    assert_member(info, layer.organization)
+    layer = get_or_denied(fakts_models.IonscaleLayer.objects, id=input.id)
+
+    assert_owner_or_admin(info, layer.organization)
+
+    # Validate the DNS combination up front, before anything is mutated — a
+    # rejected request must not leave `blocked_for` half-applied.
+    if input.magic_dns is not None or input.https_certs is not None:
+        magic_dns = input.magic_dns if input.magic_dns is not None else layer.magic_dns_enabled
+        https_certs = input.https_certs if input.https_certs is not None else layer.https_enabled
+        # HTTPS certs require MagicDNS (the cert domain *is* the MagicDNS name).
+        if https_certs and not magic_dns:
+            raise GraphQLError("HTTPS certificates require MagicDNS to be enabled.")
 
     if input.blocked_for is not None:
         # Scope to this layer's organization: unscoped ids would let a member of
@@ -76,9 +83,6 @@ def update_ionscale_layer(info: Info, input: UpdateIonscaleLayerInput) -> types.
             layer.magic_dns_enabled = input.magic_dns
         if input.https_certs is not None:
             layer.https_enabled = input.https_certs
-        # HTTPS certs require MagicDNS (the cert domain *is* the MagicDNS name).
-        if layer.https_enabled and not layer.magic_dns_enabled:
-            raise ValueError("HTTPS certificates require MagicDNS to be enabled.")
         # Save + push atomically: if ionscale rejects the change the model save is
         # rolled back, so the stored "desired state" never drifts ahead of what
         # ionscale actually has. Explicit user action, so the failure propagates
@@ -93,7 +97,7 @@ def update_ionscale_layer(info: Info, input: UpdateIonscaleLayerInput) -> types.
 
 @kante.input
 class DeleteIonscaleLayerInput:
-    """Input for accepting an organization invite"""
+    """Input for disabling (deleting) an organization's mesh layer."""
 
     id: strawberry.ID
 
@@ -108,10 +112,7 @@ def delete_ionscale_layer(info: Info, input: DeleteIonscaleLayerInput) -> strawb
     Note: this removes the layer record only. There is no ionscale-side teardown
     helper, so the tailnet itself is left in place.
     """
-    try:
-        layer = fakts_models.IonscaleLayer.objects.get(id=input.id)
-    except fakts_models.IonscaleLayer.DoesNotExist:
-        raise GraphQLError(DENIED)
+    layer = get_or_denied(fakts_models.IonscaleLayer.objects, id=input.id)
 
     assert_owner_or_admin(info, layer.organization)
 
@@ -129,13 +130,11 @@ class CreateIonscaleAuthKeyInput:
 
 
 def create_ionscale_auth_key(info: Info, input: CreateIonscaleAuthKeyInput) -> types.ManagementIonscaleAuthKey:
-    """ """
-    try:
-        layer = fakts_models.IonscaleLayer.objects.get(id=input.layer_id)
-    except fakts_models.IonscaleLayer.DoesNotExist:
-        raise GraphQLError(DENIED)
+    """Mint a pre-authorized auth key for an organization's mesh. The key lets any
+    machine join the mesh, so only the organization's owner or admins may mint one."""
+    layer = get_or_denied(fakts_models.IonscaleLayer.objects, id=input.layer_id)
 
-    assert_member(info, layer.organization)
+    assert_owner_or_admin(info, layer.organization)
 
     key = get_ionscale_repo().create_auth_key(
         tailnet=layer.tailnet_name,

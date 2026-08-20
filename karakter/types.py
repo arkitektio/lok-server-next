@@ -8,15 +8,7 @@ from karakter import filters, models, scalars
 from allauth.socialaccount import models as smodels
 import kante
 from .type_gen import create_stats_type
-
-
-def build_prescoped_queryset(info, queryset, field="organization"):
-    if info.variable_values.get("filters", {}).get("scope") is None:
-        queryset = queryset.filter(**{field: info.context.request.organization})
-        return queryset
-
-    else:
-        raise Exception("Custom scopes not implemented yet")
+from karakter.authz import build_prescoped_queryset, get_organization, get_user
 
 
 def build_prescoper(field="organization"):
@@ -44,6 +36,18 @@ class Group:
     @strawberry_django.field(description="The users that are in the group")
     def users(self, info: Info) -> List["User"]:
         return models.User.objects.filter(groups=self)
+
+    @classmethod
+    def get_queryset(cls, queryset, info: Info, **kwargs):
+        """Restrict groups to the ones the caller belongs to.
+
+        `Group` is Django's auth group and carries no organization relation, so
+        the only tenant-safe boundary available is membership: you can see the
+        groups you are in. Without this the root `groups` list (and the group
+        profiles hanging off it) enumerated every group in the deployment.
+        """
+        # `User.groups` is declared with `related_query_name="karakter_user"`.
+        return queryset.filter(karakter_user=get_user(info)).distinct()
 
 
 @strawberry_django.type(models.MediaStore)
@@ -109,8 +113,8 @@ UserStats, UserStatsResolver = create_stats_type(
     filters=filters.ProfileFilter,
     pagination=True,
     description="""
-A Profile of a User. A Profile can be used to display personalied information about a user.
-
+A Profile of a User. A Profile can be used to display personalised information about a user,
+such as a display name, a short bio and an avatar.
 """,
 )
 class Profile:
@@ -122,18 +126,18 @@ class Profile:
 
 @strawberry_django.type(
     models.OrganizationProfile,
-    filters=filters.OrganizationFilter,
+    filters=filters.OrganizationProfileFilter,
     pagination=True,
     description="""
-A Profile of a User. A Profile can be used to display personalied information about a user.
-
+A Profile of an Organization. An OrganizationProfile can be used to display public information
+about an organization, such as a display name, a short bio and an avatar (logo).
 """,
 )
 class OrganizationProfile:
     id: strawberry.ID
-    bio: str | None = strawberry.field(description="A short bio of the user")
-    name: str | None = strawberry.field(description="The name of the user")
-    avatar: MediaStore | None = strawberry.field(description="The avatar of the user")
+    bio: str | None = strawberry.field(description="A short bio of the organization")
+    name: str | None = strawberry.field(description="The display name of the organization")
+    avatar: MediaStore | None = strawberry.field(description="The avatar (logo) of the organization")
 
 
 @strawberry_django.type(
@@ -141,11 +145,8 @@ class OrganizationProfile:
     filters=filters.GroupProfileFilter,
     pagination=True,
     description="""
-A Profile of a User. A Profile can be used to display personalied information about a user.
-
-
-
-
+A Profile of a Group. A GroupProfile can be used to display information about a group,
+such as a display name, a short bio and an avatar.
 """,
 )
 class GroupProfile:
@@ -222,9 +223,15 @@ This includes the ORCID Activities, the ORCID Researcher URLs and the ORCID Addr
 """,
 )
 class OrcidAccount(SocialAccount):
-    @strawberry_django.field(description="The ORCID Identifier of the user. The UID of the account is the same as the path of the identifier.")
-    def identifier(self) -> OrcidIdentifier:
-        return OrcidIdentifier(**self.extra_data["orcid-identifier"])
+    @strawberry_django.field(description="The ORCID Identifier of the user. The UID of the account is the same as the path of the identifier. Null if the provider did not return one.")
+    def identifier(self) -> Optional[OrcidIdentifier]:
+        data = (self.extra_data or {}).get("orcid-identifier")
+        if not isinstance(data, dict):
+            return None
+        try:
+            return OrcidIdentifier(uri=data["uri"], path=data["path"], host=data["host"])
+        except KeyError:
+            return None
 
     @strawberry_django.field(description="Information about the person that is specific to the ORCID service.")
     def person(self) -> Optional[OrcidPerson]:
@@ -232,8 +239,8 @@ class OrcidAccount(SocialAccount):
         if not person:
             return None
 
-        researcher_urls = self.extra_data.get("researcher-urls", {}).get("researcher-urls", [])
-        addresses = self.extra_data.get("addresses", {}).get("addresses", [])
+        researcher_urls = (self.extra_data.get("researcher-urls") or {}).get("researcher-urls") or []
+        addresses = (self.extra_data.get("addresses") or {}).get("addresses") or []
 
         return OrcidPerson(researcher_urls=researcher_urls, addresses=addresses)
 
@@ -253,9 +260,10 @@ user that is specific to the Github service. This includes the Github Identifier
 """,
 )
 class GithubAccount(SocialAccount):
-    @strawberry_django.field()
-    def identifier(self) -> OrcidIdentifier:
-        raise NotImplementedError()
+    @strawberry_django.field(description="The GitHub login of the account, if the provider returned one.")
+    def identifier(self) -> str | None:
+        login = (self.extra_data or {}).get("login")
+        return str(login) if login else None
 
     @staticmethod
     def is_type_of(ob, info):
@@ -287,7 +295,7 @@ class Communication:
 
 @strawberry_django.type(
     models.SystemMessage,
-    filters=filters.ProfileFilter,
+    filters=filters.SystemMessageFilter,
     pagination=True,
     description="""
 A System Message is a message that is sent to a user. 
@@ -335,10 +343,6 @@ class Membership:
     organization: "Organization"
     roles: List["Role"] = strawberry.field(description="The roles that the user has in the organization")
 
-    @strawberry_django.field(description="The groups that the user has in the organization")
-    def groups(self) -> List[Group]:
-        return [role.group for role in self.roles]
-
     @classmethod
     def get_queryset(cls, queryset, info: Info):
         return build_prescoped_queryset(info, queryset, field="organization")
@@ -368,17 +372,18 @@ class Organization:
         return self.name or self.slug or f"organization-{self.id}"
 
     @classmethod
-    def get_queryset(cls, queryset, info: Info):
-        return queryset.filter(memberships__organization=info.context.request.organization).distinct()
+    def get_queryset(cls, queryset, info: Info, **kwargs):
+        """Only the caller's active organization is visible on this schema."""
+        return queryset.filter(id=get_organization(info).id)
 
 
-@strawberry_django.type(models.ComChannel, filters=filters.OrganizationFilter, pagination=True, description="""An Organization is a group of users that can work together on a project.""", ordering=filters.ComChannelOrdering)
+@strawberry_django.type(models.ComChannel, filters=filters.ComChannelFilter, pagination=True, description="""A communication channel through which a user can be notified (e.g. a push token).""", ordering=filters.ComChannelOrdering)
 class ComChannel:
     id: strawberry.ID
     user: User
 
 
-@strawberry_django.type(models.Invite, filters=filters.OrganizationFilter, pagination=True, description="""A single-use magic invite link that allows one person to join an organization.""", ordering=filters.InviteOrdering)
+@strawberry_django.type(models.Invite, filters=filters.InviteFilter, pagination=True, description="""A single-use magic invite link that allows one person to join an organization.""", ordering=filters.InviteOrdering)
 class Invite:
     id: strawberry.ID
     token: str

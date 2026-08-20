@@ -9,6 +9,7 @@ returned when the caller is allowed to see it, and returns a not-found error
 otherwise (rather than leaking existence).
 """
 
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from graphql import GraphQLError
 
 # Reused for every authorization denial. Deliberately identical to the not-found
@@ -100,7 +101,45 @@ def get_scoped(type_cls, queryset, info):
     if get_queryset is not None:
         queryset = get_queryset(queryset, info)
 
-    obj = queryset.first()
+    try:
+        obj = queryset.first()
+    except (ValueError, ValidationError, TypeError):
+        # A malformed id (``"abc"`` for an integer pk) must not be a 500.
+        raise GraphQLError(DENIED)
     if obj is None:
-        raise GraphQLError("Not found, or you are not authorized to access it.")
+        raise GraphQLError(DENIED)
     return obj
+
+
+def get_scoped_lookup(type_cls, manager, info, **lookup):
+    """:func:`get_scoped` for a ``manager.filter(**lookup)`` built here.
+
+    Django validates lookup values when the filter is *built*, so
+    ``Model.objects.filter(id="abc")`` raises ``ValueError`` before
+    :func:`get_scoped` ever sees a queryset. Building the filter inside the
+    guard turns that into the same not-found/denied error.
+    """
+    try:
+        queryset = manager.filter(**lookup)
+    except (ValueError, ValidationError, TypeError):
+        raise GraphQLError(DENIED)
+    return get_scoped(type_cls, queryset, info)
+
+
+def get_or_denied(manager, **lookup):
+    """``manager.get(**lookup)`` that fails closed with :data:`DENIED`.
+
+    A bare ``Model.objects.get(id=...)`` in a resolver turns a miss into a 500 and
+    a malformed id (``"abc"`` for an integer pk, a non-UUID for a ``UUIDField``)
+    into a ``ValueError``/``ValidationError`` 500. Both surface as
+    "Internal server error" to the caller and as noise in the logs, and the
+    distinction between them is itself an existence oracle. Collapse all three
+    into the same not-found/denied GraphQL error.
+
+    Authorization is NOT implied by a successful fetch: callers still have to
+    check the returned object against the caller (``assert_member`` etc.).
+    """
+    try:
+        return manager.get(**lookup)
+    except (ObjectDoesNotExist, ValueError, ValidationError, TypeError):
+        raise GraphQLError(DENIED)

@@ -166,6 +166,9 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https") if conf.django.sec
 
 
 MIDDLEWARE = [
+    # NOTE: "corsheaders.middleware.CorsMiddleware" is inserted at position 0
+    # further down (CORS section) — it must run first so preflights are answered
+    # (and ACAO headers added) before anything else can short-circuit the response.
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -328,6 +331,46 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 CSRF_TRUSTED_ORIGINS = conf.django.csrf_trusted_origins
 MY_SCRIPT_NAME = conf.django.force_script_name
 STATIC_URL = MY_SCRIPT_NAME.lstrip("/") + "/" + "static/"
+
+# --- CORS (django-cors-headers), config-driven -------------------------------
+#
+# Only the browser-facing *API* surfaces get CORS headers: the OAuth/OIDC
+# endpoints (/o/), the fakts protocol endpoints (/f/) and discovery
+# (/.well-known/). The session-authenticated SPA surfaces (management GraphQL,
+# allauth headless, admin) deliberately stay same-origin — they ride on cookies
+# and CSRF, and CORS would only widen that surface.
+#
+# ``dynamicpath`` bakes ``force_script_name`` into the URL patterns, so
+# ``request.path_info`` (what CorsMiddleware matches) carries the prefix when
+# lok is served under one. The regex accepts both shapes (with and without the
+# prefix) so it keeps working however the prefix ends up being applied.
+import logging as _cors_logging
+import re as _re
+
+_cors_prefix = _re.escape("/" + MY_SCRIPT_NAME.strip("/")) if MY_SCRIPT_NAME.strip("/") else ""
+CORS_URLS_REGEX = rf"^({_cors_prefix})?/(o/|f/|\.well-known/)" if _cors_prefix else r"^/(o/|f/|\.well-known/)"
+CORS_ALLOW_ALL_ORIGINS = conf.django.cors_allow_all_origins
+CORS_ALLOWED_ORIGINS = conf.django.cors_allowed_origins
+# Bearer tokens travel in the Authorization header (not cookies), so it must be
+# allowed in preflights; credentials (cookies) are not shared cross-origin.
+CORS_ALLOW_CREDENTIALS = False
+
+try:
+    from corsheaders.defaults import default_headers as _cors_default_headers  # noqa: E402
+except ImportError:  # pragma: no cover — only an image built before the dependency was added
+    # Degrade loudly rather than refusing to boot: a lok that serves no CORS
+    # headers is strictly what it did before this setting existed, while a
+    # crash-looping identity server takes every client down with it.
+    _cors_logging.getLogger(__name__).error(
+        "django-cors-headers is not installed — CORS headers are DISABLED on /o/, /f/ "
+        "and /.well-known/ until the image is rebuilt with the current dependencies "
+        "(uv sync / docker compose build lok). django.cors_* settings are ignored."
+    )
+    CORS_ALLOW_HEADERS = ["authorization"]
+else:
+    CORS_ALLOW_HEADERS = [*_cors_default_headers, "authorization"]
+    INSTALLED_APPS.insert(1, "corsheaders")
+    MIDDLEWARE.insert(0, "corsheaders.middleware.CorsMiddleware")
 
 # WhiteNoise serves static directly from the staticfiles finders at request time
 # (works under both runserver and daphne), so no collectstatic / STATIC_ROOT is needed.

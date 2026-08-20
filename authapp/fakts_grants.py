@@ -39,9 +39,11 @@ import logging
 from django.utils import timezone
 
 from authlib.oauth2.rfc6749 import BaseGrant, TokenEndpointMixin
+from authlib.oauth2 import OAuth2Error
 from authlib.oauth2.rfc6749.errors import (
     InvalidGrantError,
     InvalidRequestError,
+    InvalidScopeError,
 )
 from authlib.oauth2.rfc8628 import DeviceCodeGrant
 
@@ -155,13 +157,22 @@ class FaktsDeviceCodeGrant(FaktsEnvelopeMixin, DeviceCodeGrant):
     def create_token_response(self):
         client = self.request.client
         credential = self.request.credential
-        scope = credential.get_scope()
-        token = self.generate_token(
-            user=self.request.user,
-            scope=scope,
-            include_refresh_token=client.check_grant_type("refresh_token"),
-        )
-        self.save_token(token)
+        try:
+            scope = credential.get_scope()
+            token = self.generate_token(
+                user=self.request.user,
+                scope=scope,
+                include_refresh_token=client.check_grant_type("refresh_token"),
+            )
+            self.save_token(token)
+        except OAuth2Error:
+            raise
+        except Exception as e:
+            # Anything unexpected on the credential → token path (a membership
+            # that vanished between approval and poll, a claims lookup failing,
+            # ...) must surface as an OAuth error, not a 500 at /o/token/.
+            logger.exception("Device-code grant failed to mint tokens for client %s", client.client_id)
+            raise InvalidGrantError(description=str(e))
         self.append_fakts_envelope(token)
         # Single-use: burn the code once it has yielded its tokens. Continuity
         # from here on is the refresh-token chain, not the device code.
@@ -202,6 +213,11 @@ class FaktsRedeemGrant(FaktsEnvelopeMixin, BaseGrant, TokenEndpointMixin):
             raise InvalidRequestError(f"Malformed 'manifest': {e}")
 
         role = data.get("requested_client_role", enums.ClientRoleVanilla.INTERFACE.value)
+        valid_roles = [r.value for r in enums.ClientRoleVanilla]
+        if role not in valid_roles:
+            raise InvalidRequestError(
+                f"Invalid 'requested_client_role' {role!r}; expected one of {', '.join(valid_roles)}."
+            )
 
         try:
             fakts_client = client_services.redeem_token(redeem_token, manifest, role=role)
@@ -210,6 +226,18 @@ class FaktsRedeemGrant(FaktsEnvelopeMixin, BaseGrant, TokenEndpointMixin):
         except client_services.RedeemTokenExpired:
             raise InvalidGrantError(description="Redeem token expired.")
         except client_services.RedeemTokenManifestChanged as e:
+            raise InvalidGrantError(description=str(e))
+        except client_services.UnknownScope as e:
+            raise InvalidScopeError(description=str(e))
+        except client_services.DeviceAuthRequired as e:
+            raise InvalidGrantError(description=str(e))
+        except OAuth2Error:
+            raise
+        except Exception as e:
+            # redeem_token/bind_client can fail in many domain-specific ways
+            # (logo download, a hub whose owner lost membership, ...). Every one
+            # of them is an OAuth error to the caller — never a 500.
+            logger.exception("Redeem grant failed for manifest %s", manifest.identifier)
             raise InvalidGrantError(description=str(e))
 
         membership = fakts_client.membership

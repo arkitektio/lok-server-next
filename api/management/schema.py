@@ -12,13 +12,13 @@ from karakter.hashers import hash_device_id
 from fakts import models as fakts_models
 from .datalayer import DatalayerExtension
 from .extensions import RequireAuthenticationExtension
-from .authz import get_scoped
+from .authz import DENIED, assert_member, get_or_denied, get_scoped_lookup, is_owner_or_admin
+from .device_code_authz import resolve_device_code_with_proof
 from allauth.socialaccount import models as smodels
 from strawberry.schema.config import StrawberryConfig
 from fakts.scalars import scalar_map as fakts_scalar_map
 from .scalars import scalar_map as management_scalar_map
 from graphql import GraphQLError
-from api.management.authz import is_owner
 
 
 @strawberry.type
@@ -46,16 +46,16 @@ class Query:
     scopes: list[types.ManagementScope] = kante.django_field()
     roles: list[types.ManagementRole] = kante.django_field()
     hubs: list[types.ManagementHub] = kante.django_field()
-    management_layers: list[types.ManagementLayer] = kante.django_field()
     ionscale_auth_keys: list[types.ManagementIonscaleAuthKey] = kante.django_field()
 
     @kante.django_field()
     def social_account(self, info: Info, id: strawberry.ID) -> types.ManagementSocialAccount:
-        return get_scoped(types.ManagementSocialAccount, smodels.SocialAccount.objects.filter(id=id), info)
+        return get_scoped_lookup(types.ManagementSocialAccount, smodels.SocialAccount.objects, info, id=id)
     
     @kante.django_field()
     def kommunity_partner(self, info: Info, id: strawberry.ID) -> types.ManagementKommunityPartner:
-        return fakts_models.KommunityPartner.objects.get(id=id)
+        # Partners are a global catalog, deliberately not tenant-scoped.
+        return get_or_denied(fakts_models.KommunityPartner.objects, id=id)
 
     @kante.django_field()
     def me(self, info: Info) -> ManagementUser:
@@ -63,61 +63,76 @@ class Query:
 
     @kante.django_field()
     def role(self, info: Info, id: strawberry.ID) -> types.ManagementRole:
-        return get_scoped(types.ManagementRole, karakter_models.Role.objects.filter(id=id), info)
+        return get_scoped_lookup(types.ManagementRole, karakter_models.Role.objects, info, id=id)
 
 
     @kante.django_field()
     def membership(self, info: Info, id: strawberry.ID) -> types.ManagementMembership:
-        return get_scoped(types.ManagementMembership, karakter_models.Membership.objects.filter(id=id), info)
+        return get_scoped_lookup(types.ManagementMembership, karakter_models.Membership.objects, info, id=id)
 
     @kante.django_field()
     def scope(self, info: Info, id: strawberry.ID) -> types.ManagementScope:
-        return get_scoped(types.ManagementScope, karakter_models.Scope.objects.filter(id=id), info)
+        return get_scoped_lookup(types.ManagementScope, karakter_models.Scope.objects, info, id=id)
 
     @kante.django_field()
     def organization(self, info: Info, id: strawberry.ID) -> types.ManagementOrganization:
-        return get_scoped(types.ManagementOrganization, karakter_models.Organization.objects.filter(id=id), info)
+        return get_scoped_lookup(types.ManagementOrganization, karakter_models.Organization.objects, info, id=id)
 
     @kante.django_field()
     def used_alias(self, info: Info, id: strawberry.ID) -> types.ManagementUsedAlias:
-        return fakts_models.UsedAlias.objects.get(id=id)
+        return get_scoped_lookup(types.ManagementUsedAlias, fakts_models.UsedAlias.objects, info, id=id)
 
     @kante.django_field()
     def instance_alias(self, info: Info, id: strawberry.ID) -> types.ManagementInstanceAlias:
-        return fakts_models.InstanceAlias.objects.get(id=id)
+        return get_scoped_lookup(types.ManagementInstanceAlias, fakts_models.InstanceAlias.objects, info, id=id)
 
     @kante.django_field(name="service")
     def _service(self, info: Info, id: strawberry.ID) -> types.ManagementService:
-        return fakts_models.Service.objects.get(id=id)
+        return get_scoped_lookup(types.ManagementService, fakts_models.Service.objects, info, id=id)
 
     @kante.django_field()
     def app(self, info: Info, id: strawberry.ID) -> types.ManagementApp:
-        return fakts_models.App.objects.get(id=id)
+        return get_scoped_lookup(types.ManagementApp, fakts_models.App.objects, info, id=id)
 
     @kante.django_field()
     def service_instance(self, info: Info, id: strawberry.ID) -> types.ManagementServiceInstance:
-        return fakts_models.ServiceInstance.objects.get(id=id)
+        return get_scoped_lookup(types.ManagementServiceInstance, fakts_models.ServiceInstance.objects, info, id=id)
 
     @kante.django_field()
     def hub(self, info: Info, id: strawberry.ID) -> types.ManagementHub:
-        return get_scoped(types.ManagementHub, fakts_models.Hub.objects.filter(id=id), info)
+        return get_scoped_lookup(types.ManagementHub, fakts_models.Hub.objects, info, id=id)
 
     @kante.django_field()
     def oauth2_client_by_client_id(self, info: Info, client_id: str) -> types.ManagementOAuth2Client:
-        try:
-            return fakts_models.Client.objects.get(client_id=client_id)
-        except fakts_models.Client.DoesNotExist:
-            raise Exception(
-                f"OAuth2 client '{client_id}' is not registered. Add it to `openid_apps` "
-                f"in the lok config and restart — `ensureopenid` provisions it on boot."
-            )
+        # A miss is reported as the generic not-found so the endpoint cannot be
+        # used to enumerate registered client ids.
+        return get_or_denied(fakts_models.Client.objects, client_id=client_id)
 
     @kante.django_field()
-    def validate_device_code(self, info: Info, device_code: strawberry.ID, hub: strawberry.ID) -> types.ValidationResult:
-        device_code_obj = fakts_models.DeviceCode.objects.get(id=device_code)
-        hub_obj = fakts_models.Hub.objects.get(id= hub)
+    def validate_device_code(
+        self,
+        info: Info,
+        device_code: strawberry.ID,
+        hub: strawberry.ID,
+        code: str,
+    ) -> types.ValidationResult:
+        """Dry-run an app device-code acceptance against one of the caller's hubs.
+
+        ``code`` is the user code the device displayed (proof of possession): it
+        is what stops a caller who guessed a sequential id from reading another
+        tenant's pending manifest. The hub must belong to an organization the
+        caller is a member of — the same bar as ``acceptDeviceCode``.
+        """
+        hub_obj = get_or_denied(fakts_models.Hub.objects, id=hub)
+        assert_member(info, hub_obj.organization)
+        device_code_obj = resolve_device_code_with_proof(
+            fakts_models.DeviceCode, device_code_id=device_code, code=code, kind="app"
+        )
         user = info.context.request.user
-        manifest = device_code_obj.manifest_as_model
+        try:
+            manifest = device_code_obj.manifest_as_model
+        except Exception:
+            raise GraphQLError("The staged manifest of this device code is malformed.")
         errors: list[str] = []
 
         mappings: list[types.PotentialMapping] = []
@@ -178,35 +193,42 @@ class Query:
 
     @kante.django_field()
     def device_code_by_code(self, info: Info, device_code: str) -> types.ManagementDeviceCode:
-        return fakts_models.DeviceCode.objects.get(code=device_code, kind="app")
+        # The code itself is the capability (it is what the device displayed).
+        return get_or_denied(fakts_models.DeviceCode.objects, code=device_code, kind="app")
 
     @kante.django_field()
     def invite_by_code(self, info: Info, invite_code: str) -> types.ManagementInvite:
-        invite = karakter_models.Invite.objects.get(token=invite_code)
+        # `Invite.token` is a UUIDField: a non-UUID code used to raise a
+        # ValidationError (a 500) instead of a clean not-found.
+        invite = get_or_denied(karakter_models.Invite.objects, token=invite_code)
         # Public invites can be previewed by anyone with the link before signing in;
         # private invites reveal nothing until the visitor is authenticated.
-        if not info.context.request.user.is_authenticated and not invite.public:
-            raise Exception("Please sign in to view this invitation")
+        try:
+            authenticated = bool(info.context.request.user.is_authenticated)
+        except Exception:
+            authenticated = False
+        if not authenticated and not invite.public:
+            raise GraphQLError("Please sign in to view this invitation")
         return invite
 
     @kante.django_field()
     def invite(self, info: Info, id: strawberry.ID) -> types.ManagementInvite:
-        invite = karakter_models.Invite.objects.get(id=id)
-        if not is_owner(info.context.request.user, invite.created_for):
-            raise GraphQLError("Not authorized to view this invite.")
+        invite = get_or_denied(karakter_models.Invite.objects, id=id)
+        if not is_owner_or_admin(info.context.request.user, invite.created_for):
+            raise GraphQLError(DENIED)
         return invite
 
     @kante.django_field()
     def release(self, info: Info, id: strawberry.ID) -> types.ManagementRelease:
-        return fakts_models.Release.objects.get(id=id)
+        return get_scoped_lookup(types.ManagementRelease, fakts_models.Release.objects, info, id=id)
 
     @kante.django_field()
     def layer(self, info: Info, id: strawberry.ID) -> types.ManagementLayer:
-        return get_scoped(types.ManagementLayer, fakts_models.IonscaleLayer.objects.filter(id=id), info)
+        return get_scoped_lookup(types.ManagementLayer, fakts_models.IonscaleLayer.objects, info, id=id)
 
     @kante.django_field()
     def ionscale_auth_key(self, info: Info, id: strawberry.ID) -> types.ManagementIonscaleAuthKey:
-        return get_scoped(types.ManagementIonscaleAuthKey, fakts_models.IonscaleAuthKey.objects.filter(id=id), info)
+        return get_scoped_lookup(types.ManagementIonscaleAuthKey, fakts_models.IonscaleAuthKey.objects, info, id=id)
 
 
     @kante.django_field()
@@ -273,47 +295,49 @@ class Query:
 
     @kante.django_field()
     def client(self, info: Info, id: strawberry.ID) -> types.ManagementClient:
-        return get_scoped(types.ManagementClient, fakts_models.Client.objects.filter(id=id), info)
+        return get_scoped_lookup(types.ManagementClient, fakts_models.Client.objects, info, id=id)
 
     @kante.django_field()
     def report(self, info: Info, id: strawberry.ID) -> types.ManagementReport:
-        return get_scoped(types.ManagementReport, fakts_models.Report.objects.filter(id=id), info)
+        return get_scoped_lookup(types.ManagementReport, fakts_models.Report.objects, info, id=id)
 
     @kante.django_field()
     def service_instance_mapping(self, info: Info, id: strawberry.ID) -> types.ManagementServiceInstanceMapping:
-        return fakts_models.ServiceInstanceMapping.objects.get(id=id)
+        return get_scoped_lookup(types.ManagementServiceInstanceMapping, fakts_models.ServiceInstanceMapping.objects, info, id=id)
 
     @kante.django_field()
     def device(self, info: Info, id: strawberry.ID) -> types.ManagementDevice:
-        return get_scoped(types.ManagementDevice, fakts_models.Device.objects.filter(id=id), info)
+        return get_scoped_lookup(types.ManagementDevice, fakts_models.Device.objects, info, id=id)
 
     @kante.django_field()
     def service_release(self, info: Info, id: strawberry.ID) -> types.ManagementServiceRelease:
-        return fakts_models.ServiceRelease.objects.get(id=id)
+        return get_scoped_lookup(types.ManagementServiceRelease, fakts_models.ServiceRelease.objects, info, id=id)
 
     @kante.django_field()
     def device_group(self, info: Info, id: strawberry.ID) -> types.ManagementDeviceGroup:
-        return get_scoped(types.ManagementDeviceGroup, fakts_models.DeviceGroup.objects.filter(id=id), info)
+        return get_scoped_lookup(types.ManagementDeviceGroup, fakts_models.DeviceGroup.objects, info, id=id)
 
     @kante.django_field()
     def device_code(self, info: Info, id: strawberry.ID) -> types.ManagementDeviceCode:
-        return fakts_models.DeviceCode.objects.get(id=id, kind="app")
+        # By id only codes already accepted into one of the caller's organizations
+        # are visible; a pending code is reached through `deviceCodeByCode`.
+        return get_scoped_lookup(types.ManagementDeviceCode, fakts_models.DeviceCode.objects, info, id=id, kind="app")
 
     @kante.django_field()
     def hub_device_code(self, info: Info, id: strawberry.ID) -> types.ManagementHubDeviceCode:
-        return fakts_models.DeviceCode.objects.get(id=id, kind="hub")
+        return get_scoped_lookup(types.ManagementHubDeviceCode, fakts_models.DeviceCode.objects, info, id=id, kind="hub")
 
     @kante.django_field()
     def hub_device_code_by_code(self, info: Info, code: str) -> types.ManagementHubDeviceCode:
-        return fakts_models.DeviceCode.objects.get(code=code, kind="hub")
+        return get_or_denied(fakts_models.DeviceCode.objects, code=code, kind="hub")
 
     @kante.django_field()
     def mesh_device_code(self, info: Info, id: strawberry.ID) -> types.ManagementMeshDeviceCode:
-        return fakts_models.MeshDeviceCode.objects.get(id=id)
+        return get_scoped_lookup(types.ManagementMeshDeviceCode, fakts_models.MeshDeviceCode.objects, info, id=id)
 
     @kante.django_field()
     def mesh_device_code_by_code(self, info: Info, code: str) -> types.ManagementMeshDeviceCode:
-        return fakts_models.MeshDeviceCode.objects.get(code=code)
+        return get_or_denied(fakts_models.MeshDeviceCode.objects, code=code)
 
 
 @strawberry.type

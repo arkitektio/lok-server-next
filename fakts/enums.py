@@ -93,6 +93,14 @@ class ClientKind(str, Enum):
         "desktop",
         description="""A desktop client. Desktop clients need to undergo an authentication flow, where the user is redirect back to the application. They use redirect but only on loopback adapters.""",
     )
+    HUB = strawberry.enum_value(
+        "hub",
+        description="A hub server's own identity: the client a hub authenticates as to claim its configuration and report. Never bound to an app release.",
+    )
+    RELYING_PARTY = strawberry.enum_value(
+        "relying_party",
+        description="A confidential OIDC relying party provisioned from config (ensureopenid). Global — belongs to no organization.",
+    )
 
 
 @strawberry.enum

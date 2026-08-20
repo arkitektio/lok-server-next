@@ -4,7 +4,6 @@ from django.db.models import Q
 from kante.types import Info
 from fakts import models as fakts_models
 from fakts import enums as fakts_enums
-from allauth.socialaccount import models as smodels
 from karakter import models as karakter_models
 
 
@@ -154,7 +153,7 @@ class ManagementMembershipFilter:
 
     @strawberry_django.filter_field
     def search(self, value: str, prefix: str) -> Q:
-        return Q(**{f"{prefix}name__contains": value})
+        return Q(**{f"{prefix}user__username__icontains": value})
 
     @strawberry_django.filter_field
     def organization(self, value: strawberry.ID, prefix: str) -> Q:
@@ -268,11 +267,11 @@ class ServiceInstanceMappingFilter:
 
     @strawberry_django.filter_field
     def search(self, value: str, prefix: str) -> Q:
-        return Q(**{f"{prefix}name__contains": value})
+        return Q(**{f"{prefix}key__icontains": value})
 
     @strawberry_django.filter_field
     def organization(self, value: strawberry.ID, prefix: str) -> Q:
-        return Q(**{f"{prefix}organization__id": value})
+        return Q(**{f"{prefix}instance__organization__id": value})
 
 
 @strawberry_django.order_type(fakts_models.ServiceInstance)
@@ -288,7 +287,7 @@ class ManagementServiceInstanceFilter:
 
     @strawberry_django.filter_field
     def search(self, value: str, prefix: str) -> Q:
-        return Q(**{f"{prefix}backend__contains": value})
+        return Q(**{f"{prefix}instance_id__icontains": value})
 
     @strawberry_django.filter_field
     def organization(self, value: strawberry.ID, prefix: str) -> Q:
@@ -313,7 +312,9 @@ class ManagementRedeemTokenFilter:
 
     @strawberry_django.filter_field
     def search(self, value: str, prefix: str) -> Q:
-        return Q(**{f"{prefix}token__contains": value})
+        # Never search on the token itself: a substring match on a bearer
+        # credential is a character-by-character oracle for it.
+        return Q(**{f"{prefix}hub__name__icontains": value})
 
     @strawberry_django.filter_field
     def organization(self, value: strawberry.ID, prefix: str) -> Q:
@@ -322,26 +323,6 @@ class ManagementRedeemTokenFilter:
     @strawberry_django.filter_field
     def hub(self, value: strawberry.ID, prefix: str) -> Q:
         return Q(**{f"{prefix}hub__id": value})
-
-
-@strawberry_django.order_type(smodels.SocialAccount)
-class ManagementSocialAccountOrdering:
-    id: strawberry.auto
-
-
-@strawberry_django.filter_type(smodels.SocialAccount)
-class ManagementSocialAccountFilter:
-    @strawberry_django.filter_field
-    def ids(self, value: list[strawberry.ID], prefix: str) -> Q:
-        return Q(**{f"{prefix}id__in": value})
-
-    @strawberry_django.filter_field
-    def search(self, value: str, prefix: str) -> Q:
-        return Q(**{f"{prefix}uid__contains": value})
-
-    @strawberry_django.filter_field
-    def organization(self, value: strawberry.ID, prefix: str) -> Q:
-        return Q(**{f"{prefix}organization__id": value})
 
 
 @strawberry_django.order_type(karakter_models.Role)
@@ -357,7 +338,7 @@ class ManagementRoleFilter:
 
     @strawberry_django.filter_field
     def search(self, value: str, prefix: str) -> Q:
-        return Q(**{f"{prefix}name__contains": value})
+        return Q(**{f"{prefix}identifier__icontains": value})
 
     @strawberry_django.filter_field
     def organization(self, value: strawberry.ID, prefix: str) -> Q:
@@ -381,7 +362,7 @@ class ManagementScopeFilter:
 
     @strawberry_django.filter_field
     def search(self, value: str, prefix: str) -> Q:
-        return Q(**{f"{prefix}name__contains": value})
+        return Q(**{f"{prefix}identifier__icontains": value})
 
     @strawberry_django.filter_field
     def organization(self, value: strawberry.ID, prefix: str) -> Q:
@@ -406,7 +387,8 @@ class ManagementIonscaleAuthKeyFilter:
 
     @strawberry_django.filter_field
     def search(self, value: str, prefix: str) -> Q:
-        return Q(**{f"{prefix}key__contains": value})
+        # Never search on the key itself (a live mesh credential).
+        return Q(**{f"{prefix}layer__name__icontains": value})
 
     @strawberry_django.filter_field
     def layer(self, value: strawberry.ID, prefix: str) -> Q:
@@ -454,3 +436,124 @@ class ManagementReleaseOrdering:
 @strawberry_django.order_type(fakts_models.UsedAlias)
 class ManagementUsedAliasOrdering:
     id: strawberry.auto
+
+
+# --- Minimal per-type filters ------------------------------------------------
+#
+# Several management types used to borrow a filter class declared for a
+# *different* model (``karakter_filters.OrganizationFilter`` on invites, device
+# codes, com channels ...; ``ProfileFilter`` on system messages). Their ``search``
+# then filtered on a column the model does not have and every search request
+# 500'd with a FieldError. Each type now gets its own filter over real columns.
+
+
+@strawberry_django.filter_type(karakter_models.Invite)
+class ManagementInviteFilter:
+    @strawberry_django.filter_field
+    def ids(self, value: list[strawberry.ID], prefix: str) -> Q:
+        return Q(**{f"{prefix}id__in": value})
+
+    @strawberry_django.filter_field
+    def search(self, value: str, prefix: str) -> Q:
+        return Q(**{f"{prefix}created_for__name__icontains": value})
+
+    @strawberry_django.filter_field
+    def organization(self, value: strawberry.ID, prefix: str) -> Q:
+        return Q(**{f"{prefix}created_for__id": value})
+
+    @strawberry_django.filter_field
+    def status(self, value: str, prefix: str) -> Q:
+        return Q(**{f"{prefix}status": value})
+
+
+@strawberry_django.filter_type(fakts_models.DeviceCode)
+class ManagementDeviceCodeFilter:
+    @strawberry_django.filter_field
+    def ids(self, value: list[strawberry.ID], prefix: str) -> Q:
+        return Q(**{f"{prefix}id__in": value})
+
+    @strawberry_django.filter_field
+    def search(self, value: str, prefix: str) -> Q:
+        return Q(**{f"{prefix}client__name__icontains": value})
+
+    @strawberry_django.filter_field
+    def organization(self, value: strawberry.ID, prefix: str) -> Q:
+        return Q(**{f"{prefix}organization__id": value})
+
+
+@strawberry_django.filter_type(fakts_models.DeviceCode)
+class ManagementHubDeviceCodeFilter:
+    @strawberry_django.filter_field
+    def ids(self, value: list[strawberry.ID], prefix: str) -> Q:
+        return Q(**{f"{prefix}id__in": value})
+
+    @strawberry_django.filter_field
+    def search(self, value: str, prefix: str) -> Q:
+        return Q(**{f"{prefix}client__name__icontains": value})
+
+    @strawberry_django.filter_field
+    def organization(self, value: strawberry.ID, prefix: str) -> Q:
+        return Q(**{f"{prefix}organization__id": value})
+
+
+@strawberry_django.filter_type(fakts_models.MeshDeviceCode)
+class ManagementMeshDeviceCodeFilter:
+    @strawberry_django.filter_field
+    def ids(self, value: list[strawberry.ID], prefix: str) -> Q:
+        return Q(**{f"{prefix}id__in": value})
+
+    @strawberry_django.filter_field
+    def search(self, value: str, prefix: str) -> Q:
+        return Q(**{f"{prefix}requested_machine_name__icontains": value}) | Q(
+            **{f"{prefix}machine_name__icontains": value}
+        )
+
+
+@strawberry_django.filter_type(karakter_models.ComChannel)
+class ManagementComChannelFilter:
+    @strawberry_django.filter_field
+    def ids(self, value: list[strawberry.ID], prefix: str) -> Q:
+        return Q(**{f"{prefix}id__in": value})
+
+    @strawberry_django.filter_field
+    def search(self, value: str, prefix: str) -> Q:
+        return Q(**{f"{prefix}name__icontains": value})
+
+
+@strawberry_django.filter_type(fakts_models.Client)
+class ManagementOAuth2ClientFilter:
+    @strawberry_django.filter_field
+    def ids(self, value: list[strawberry.ID], prefix: str) -> Q:
+        return Q(**{f"{prefix}id__in": value})
+
+    @strawberry_django.filter_field
+    def search(self, value: str, prefix: str) -> Q:
+        return Q(**{f"{prefix}name__icontains": value})
+
+
+@strawberry_django.filter_type(karakter_models.SystemMessage)
+class ManagementSystemMessageFilter:
+    @strawberry_django.filter_field
+    def ids(self, value: list[strawberry.ID], prefix: str) -> Q:
+        return Q(**{f"{prefix}id__in": value})
+
+    @strawberry_django.filter_field
+    def search(self, value: str, prefix: str) -> Q:
+        return Q(**{f"{prefix}title__icontains": value})
+
+
+@strawberry_django.filter_type(fakts_models.ServiceRelease)
+class ManagementServiceReleaseFilter:
+    @strawberry_django.filter_field
+    def ids(self, value: list[strawberry.ID], prefix: str) -> Q:
+        return Q(**{f"{prefix}id__in": value})
+
+    @strawberry_django.filter_field
+    def search(self, value: str, prefix: str) -> Q:
+        return Q(**{f"{prefix}service__name__icontains": value}) | Q(
+            **{f"{prefix}version__icontains": value}
+        )
+
+    @strawberry_django.filter_field
+    def service(self, value: strawberry.ID, prefix: str) -> Q:
+        return Q(**{f"{prefix}service__id": value})

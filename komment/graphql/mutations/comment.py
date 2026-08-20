@@ -1,6 +1,7 @@
 from kante.types import Info
 import strawberry
 from komment import types, models, inputs, scalars
+from karakter.authz import get_or_denied, get_organization, get_user
 import logging
 from typing import Dict, Tuple, List, Any
 
@@ -69,7 +70,8 @@ class CreateCommentInput:
 
 
 def create_comment(info: Info, input: CreateCommentInput) -> types.Comment:
-    creator = info.context.request.user
+    creator = get_user(info)
+    organization = get_organization(info)
 
     serialized_descendants = strawberry.asdict(input)["descendants"]
 
@@ -86,7 +88,17 @@ def create_comment(info: Info, input: CreateCommentInput) -> types.Comment:
         parent_id=input.parent,
     )
 
-    users = [get_user_model().objects.get(id=m["user"]) for m in mentions]
+    # Mentioned users must be members of the caller's organization: a mention
+    # notifies the user and grants them read access to the comment, so it must
+    # not reach across tenants. A malformed or foreign id is denied uniformly.
+    users = [
+        get_or_denied(
+            get_user_model().objects.distinct(),
+            id=m.get("user"),
+            memberships__organization=organization,
+        )
+        for m in mentions
+    ]
     if input.notify:
         for user in users:
             user.notify(

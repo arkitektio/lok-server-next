@@ -91,7 +91,7 @@ async def test_cannot_take_over_another_organization():
     context, _org_a, org_b, attacker, victim = await sync_to_async(_two_org_setup)()
 
     result = await management_schema.execute(
-        "mutation ($org: ID!, $new: ID!) { changeOrganizationOwner(organizationId: $org, newOwnerId: $new) { id } }",
+        "mutation ($org: ID!, $new: ID!) { changeOrganizationOwner(input: {organization: $org, newOwner: $new}) { id } }",
         context_value=context,
         variable_values={"org": str(org_b.id), "new": str(attacker.id)},
     )

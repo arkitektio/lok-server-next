@@ -5,7 +5,7 @@ from kante.types import Info
 
 from karakter import models
 from api.management import types
-from api.management.authz import DENIED, assert_owner_or_admin
+from api.management.authz import DENIED, assert_owner_or_admin, get_or_denied
 from graphql import GraphQLError
 
 logger = logging.getLogger(__name__)
@@ -18,15 +18,18 @@ class CreateOrganizationProfileInput:
 
 
 def create_organization_profile(info: Info, input: CreateOrganizationProfileInput) -> types.ManagementOrganizationProfile:
-    try:
-        organization = models.Organization.objects.get(pk=input.organization)
-    except models.Organization.DoesNotExist:
-        raise GraphQLError(DENIED)
+    """Create (or, since a profile row is auto-created for every organization,
+    update) the organization's profile."""
+    organization = get_or_denied(models.Organization.objects, pk=input.organization)
 
     assert_owner_or_admin(info, organization)
 
-    profile = models.OrganizationProfile(organization=organization, name=input.name)
-    profile.save()
+    # `OrganizationProfile.organization` is a OneToOne and a post_save signal
+    # creates the row with the organization, so a plain create() always hit
+    # the unique constraint.
+    profile, _ = models.OrganizationProfile.objects.update_or_create(
+        organization=organization, defaults={"name": input.name}
+    )
     return profile
 
 
@@ -39,19 +42,16 @@ class UpdateOrganizationProfileInput:
 
 
 def update_organization_profile(info: Info, input: UpdateOrganizationProfileInput) -> types.ManagementOrganizationProfile:
-    try:
-        profile = models.OrganizationProfile.objects.get(pk=input.id)
-    except models.OrganizationProfile.DoesNotExist:
-        raise GraphQLError(DENIED)
+    profile = get_or_denied(models.OrganizationProfile.objects, pk=input.id)
 
     assert_owner_or_admin(info, profile.organization)
 
     if input.name:
         profile.name = input.name
     if input.avatar:
-        profile.avatar = models.MediaStore.objects.get(pk=input.avatar)
+        profile.avatar = get_or_denied(models.MediaStore.objects, pk=input.avatar)
     if input.banner:
-        profile.banner = models.MediaStore.objects.get(pk=input.banner)
+        profile.banner = get_or_denied(models.MediaStore.objects, pk=input.banner)
     profile.save()
     return profile
 
@@ -62,11 +62,7 @@ class DeleteOrganizationProfileInput:
 
 
 def delete_organization_profile(info: Info, input: DeleteOrganizationProfileInput) -> strawberry.ID:
-    try:
-        profile = models.OrganizationProfile.objects.get(pk=input.id)
-    except models.OrganizationProfile.DoesNotExist:
-        raise GraphQLError(DENIED)
-    if profile.organization.owner_id != info.context.request.user.id:
-        raise GraphQLError(DENIED)
+    profile = get_or_denied(models.OrganizationProfile.objects, pk=input.id)
+    assert_owner_or_admin(info, profile.organization)
     profile.delete()
     return input.id

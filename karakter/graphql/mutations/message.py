@@ -1,10 +1,9 @@
 import logging
 
 import strawberry
-from graphql import GraphQLError
 from kante.types import Info
 from karakter import models, types
-from karakter.authz import DENIED, get_user
+from karakter.authz import get_or_denied, get_user
 
 logger = logging.getLogger(__name__)
 
@@ -24,11 +23,7 @@ def acknowledge_message(
     scoped to the caller rather than to an organization. It previously fetched by
     bare pk, letting any principal acknowledge anyone's messages.
     """
-    user = get_user(info)
-    try:
-        message = models.SystemMessage.objects.get(id=input.id, user=user)
-    except models.SystemMessage.DoesNotExist:
-        raise GraphQLError(DENIED)
+    message = get_or_denied(models.SystemMessage.objects, id=input.id, user=get_user(info))
     message.acknowledged = input.acknowledged
     message.save()
     return message

@@ -4,7 +4,7 @@ import strawberry
 from kante.types import Info
 
 from api.management import types
-from api.management.authz import DENIED, assert_owner_or_admin
+from api.management.authz import DENIED, assert_owner_or_admin, get_or_denied
 from fakts import models as fakts_models
 from graphql import GraphQLError
 
@@ -19,10 +19,7 @@ class UpdateHubInput:
 
 
 def update_hub(info: Info, input: UpdateHubInput) -> types.ManagementHub:
-    try:
-        hub = fakts_models.Hub.objects.get(pk=input.id)
-    except fakts_models.Hub.DoesNotExist:
-        raise GraphQLError(DENIED)
+    hub = get_or_denied(fakts_models.Hub.objects, pk=input.id)
 
     assert_owner_or_admin(info, hub.organization)
 
@@ -43,10 +40,7 @@ class DeleteHubInput:
 
 
 def delete_hub(info: Info, input: DeleteHubInput) -> strawberry.ID:
-    try:
-        hub = fakts_models.Hub.objects.get(pk=input.id)
-    except fakts_models.Hub.DoesNotExist:
-        raise GraphQLError(DENIED)
+    hub = get_or_denied(fakts_models.Hub.objects, pk=input.id)
     if hub.organization.owner_id != info.context.request.user.id:
         raise GraphQLError(DENIED)
     hub.delete()

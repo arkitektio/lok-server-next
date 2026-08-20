@@ -8,6 +8,7 @@ Depends on :mod:`fakts.services.rendering` for ``auto_compose``.
 
 import hashlib
 import json
+import logging
 
 from django.conf import settings
 from django.db import transaction
@@ -19,6 +20,8 @@ from fakts.models import generate_client_id
 from fakts.services.rendering import auto_compose
 from karakter import models as karakter_models
 from karakter.hashers import hash_device_id
+
+logger = logging.getLogger(__name__)
 
 # Every fakts client is a *public* OAuth2 client: it holds no secret, exchanges
 # its device code (or redeem token) once, and from then on its identity is the
@@ -43,6 +46,14 @@ class RedeemTokenExpired(Exception):
 class RedeemTokenManifestChanged(Exception):
     """Raised when an already-redeemed token is re-redeemed with a different
     manifest while ``allow_reredeem`` is not set."""
+
+
+class UnknownScope(Exception):
+    """Raised when a manifest requests a scope the organization does not define.
+
+    A clean domain error (instead of ``Scope.DoesNotExist`` leaking out of the
+    token endpoint as a 500) so the OAuth grants can map it to ``invalid_scope``.
+    """
 
 
 def hash_manifest(manifest: Manifest) -> str:
@@ -184,7 +195,10 @@ def bind_client(
 
     client.scopes.clear()
     for scope in manifest.scopes or []:
-        client.scopes.add(karakter_models.Scope.objects.get(identifier=scope, organization=organization))
+        try:
+            client.scopes.add(karakter_models.Scope.objects.get(identifier=scope, organization=organization))
+        except karakter_models.Scope.DoesNotExist:
+            raise UnknownScope(f"Scope '{scope}' is not available in organization '{organization.slug}'")
 
     finalize_client_scope(client)
 
@@ -274,6 +288,34 @@ def redeem_token(token: str, manifest: Manifest, role: enums.ClientRoleVanilla =
     raise RedeemTokenExpired("Redeem token expired")
 
 
+def _resolve_reported_alias(client: models.Client, alias_id: str | None) -> models.InstanceAlias | None:
+    """Resolve an alias id from a self-report, scoped to the client's organization.
+
+    The alias id arrives from a Bearer-authenticated client and must never be
+    trusted verbatim: scoping the lookup to the instances of the client's own
+    organization keeps one tenant from attaching its reports to (or probing the
+    existence of) another tenant's aliases. An unknown or foreign id is treated
+    as "no alias" — the key's valid/reason are still recorded, but the foreign
+    reference is not applied.
+    """
+    if not alias_id:
+        return None
+    if client.organization_id is None:
+        return None
+    alias = (
+        models.InstanceAlias.objects.filter(id=alias_id, instance__hub__organization_id=client.organization_id)
+        .select_related("instance")
+        .first()
+    )
+    if alias is None:
+        logger.warning(
+            "Client %s reported alias %r which is not visible in its organization; ignoring the reference",
+            client.client_id,
+            alias_id,
+        )
+    return alias
+
+
 @transaction.atomic
 def report_client(client: models.Client, claim: base_models.ReportRequest) -> models.Client:
     """Record a client's self-report (functional flag + per-requirement alias reports).
@@ -292,7 +334,7 @@ def report_client(client: models.Client, claim: base_models.ReportRequest) -> mo
     client.save()
 
     for req_key, alias_report in claim.alias_reports.items():
-        alias = models.InstanceAlias.objects.get(id=alias_report.alias_id) if alias_report.alias_id else None
+        alias = _resolve_reported_alias(client, alias_report.alias_id)
 
         models.UsedAlias.objects.update_or_create(
             client=client,

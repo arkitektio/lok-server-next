@@ -1,8 +1,7 @@
 from kante.types import Info
 import strawberry
-from graphql import GraphQLError
 from karakter import types, models
-from karakter.authz import DENIED, assert_is_self, get_user, resolve_own_media_store
+from karakter.authz import assert_is_self, get_or_denied, get_user, resolve_own_media_store
 import logging
 
 logger = logging.getLogger(__name__)
@@ -22,7 +21,7 @@ def create_profile(info: Info, input: CreateProfileInput) -> types.Profile:
     the same rule. Previously any principal could create a profile for any user.
     """
     assert_is_self(info, input.user)
-    trace = models.User.objects.get(pk=input.user)
+    trace = get_or_denied(models.User.objects, pk=input.user)
     profile = models.Profile(user=trace, name=input.name)
     profile.save()
     return profile
@@ -37,11 +36,7 @@ class UpdateProfileInput:
 
 def update_profile(info: Info, input: UpdateProfileInput) -> types.Profile:
     """Update the calling user's own profile."""
-    user = get_user(info)
-    try:
-        profile = models.Profile.objects.get(pk=input.id, user=user)
-    except models.Profile.DoesNotExist:
-        raise GraphQLError(DENIED)
+    profile = get_or_denied(models.Profile.objects, pk=input.id, user=get_user(info))
     profile.name = input.name
     profile.avatar = resolve_own_media_store(info, input.avatar, models.MediaStore)
     profile.save()

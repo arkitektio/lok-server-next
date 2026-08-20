@@ -14,7 +14,10 @@ from fakts import models as fakts_models
 from fakts import filters as fakts_filters
 from fakts import scalars as fakts_scalars
 from fakts import base_models
+from fakts import enums as fakts_enums
 from api.management import filters, enums, scalars
+from api.management.authz import is_owner_or_admin
+from pydantic import ValidationError as PydanticValidationError
 from karakter import filters as karakter_filters
 from strawberry.experimental import pydantic
 from ionscale.base_models import Machine
@@ -26,6 +29,60 @@ def build_prescoper(field="organization"):
         return queryset
 
     return prescoper
+
+
+def _caller(info: Info):
+    """The authenticated caller, or ``None``.
+
+    Field resolvers on types reachable from the public ``inviteByCode`` root run
+    for anonymous visitors too, and reading ``request.user`` raises on kante's
+    ``UniversalRequest`` when no principal was set — so this never raises and
+    fails closed (``None``) instead.
+    """
+    try:
+        user = info.context.request.user
+    except Exception:
+        return None
+    if user is None or not getattr(user, "is_authenticated", False):
+        return None
+    return user
+
+
+def _can_see_user_details(info: Info, target) -> bool:
+    """Whether the caller may read ``target``'s personal details.
+
+    Mirrors the ``friends`` scoping in ``ManagementUser.get_queryset``: the user
+    themselves, or anyone who shares an organization with them. ``get_queryset``
+    only runs for list fields — a forward FK hop (``createdBy { email }``,
+    ``membership { user { email } }``) reaches the type unscoped, so the
+    per-field gate is what actually protects the data.
+    """
+    caller = _caller(info)
+    if caller is None:
+        return False
+    if caller.id == target.id:
+        return True
+    request = getattr(info.context, "request", None)
+    cache = getattr(request, "_lok_visible_user_ids", None)
+    if cache is None:
+        cache = {}
+        try:
+            setattr(request, "_lok_visible_user_ids", cache)
+        except Exception:
+            pass
+    key = (caller.id, target.id)
+    if key not in cache:
+        cache[key] = models.User.objects.filter(
+            id=target.id, memberships__organization__memberships__user=caller
+        ).exists()
+    return cache[key]
+
+
+def _membership_scoped(queryset, info: Info, path: str):
+    """Filter ``queryset`` to rows whose organization (reached via ``path``) the
+    caller belongs to. ``path`` is the ORM lookup from the row to its
+    organization, e.g. ``"organization"`` or ``"instance__organization"``."""
+    return queryset.filter(**{f"{path}__memberships__user": info.context.request.user}).distinct()
 
 
 @strawberry_django.type(
@@ -80,8 +137,6 @@ such as ORCID or GitHub.
 class ManagementUser:
     id: strawberry.ID
     username: str
-    first_name: str | None
-    last_name: str | None
     groups: list[ManagementGroup]
     memberships: list["ManagementMembership"] = strawberry_django.field(description="The memberships of the user in organizations")
     avatar: str | None
@@ -89,29 +144,45 @@ class ManagementUser:
     com_channels: list["ManagementComChannel"] = strawberry_django.field(description="The communication channels that the user has")
 
     @strawberry_django.field(
-        description="The user's email address. Only returned to authenticated callers.",
+        description="The user's email address. Only returned to the user themselves and to people who share an organization with them.",
         only=["email"],
     )
     def email(self, info: Info) -> str | None:
-        """Hide the email from anonymous callers.
+        """Gate personal details on the `friends` relationship.
 
         `get_queryset` below scopes *listings*, but it does not run on FK
         traversal — and `inviteByCode` is a deliberately public root field, so an
         anonymous visitor holding a public invite code could read the inviter's
-        email through `createdBy { email }`. (Verified: it resolved.) The kontrol
-        invite page renders `username` and the avatar, never the email, so this
-        costs the SPA nothing.
+        email through `createdBy { email }`. The kontrol invite page renders
+        `username` and the avatar, never the email, so this costs the SPA nothing.
         """
-        try:
-            user = info.context.request.user
-        except Exception:
-            return None
-        if user is None or not getattr(user, "is_authenticated", False):
+        if not _can_see_user_details(info, self):
             return None
         return self.email
 
-    @strawberry_django.field(description="The full name of the user")
+    @strawberry_django.field(
+        description="The user's first name. Only returned to the user themselves and to people who share an organization with them.",
+        only=["first_name"],
+    )
+    def first_name(self, info: Info) -> str | None:
+        if not _can_see_user_details(info, self):
+            return None
+        return self.first_name
+
+    @strawberry_django.field(
+        description="The user's last name. Only returned to the user themselves and to people who share an organization with them.",
+        only=["last_name"],
+    )
+    def last_name(self, info: Info) -> str | None:
+        if not _can_see_user_details(info, self):
+            return None
+        return self.last_name
+
+    @strawberry_django.field(description="The social (external login) accounts linked to this user. Only the user themselves can see their own; empty for everyone else.")
     def social_accounts(self, info: Info) -> List["ManagementSocialAccount"]:
+        caller = _caller(info)
+        if caller is None or caller.id != self.id:
+            return []
         return smodels.SocialAccount.objects.filter(user_id=self.id)
 
     @classmethod
@@ -155,15 +226,15 @@ class ManagementProfile:
     filters=karakter_filters.OrganizationFilter,
     pagination=True,
     description="""
-A Profile of a User. A Profile can be used to display personalied information about a user.
+A Profile of an Organization. A Profile can be used to display personalised information about an organization.
 
 """,
 )
 class ManagementOrganizationProfile:
     id: strawberry.ID
     organization: "ManagementOrganization"
-    bio: str | None = strawberry.field(description="A short bio of the user")
-    name: str | None = strawberry.field(description="The name of the user")
+    bio: str | None = strawberry.field(description="A short bio of the organization")
+    name: str | None = strawberry.field(description="The display name of the organization")
     avatar: ManagementMediaStore | None = strawberry.field(description="The avatar of the organization")
     banner: ManagementMediaStore | None = strawberry.field(description="The banner of the organization")
 
@@ -173,7 +244,7 @@ class ManagementOrganizationProfile:
     filters=karakter_filters.GroupProfileFilter,
     pagination=True,
     description="""
-A Profile of a User. A Profile can be used to display personalied information about a user.
+A Profile of a Group. A Profile can be used to display personalised information about a group.
 
 """,
 )
@@ -253,8 +324,14 @@ This includes the ORCID Activities, the ORCID Researcher URLs and the ORCID Addr
 )
 class ManagementOrcidAccount(ManagementSocialAccount):
     @strawberry_django.field(description="The ORCID Identifier of the user. The UID of the account is the same as the path of the identifier.")
-    def identifier(self) -> ManagementOrcidIdentifier:
-        return ManagementOrcidIdentifier(**self.extra_data["orcid-identifier"])
+    def identifier(self) -> Optional[ManagementOrcidIdentifier]:
+        data = (self.extra_data or {}).get("orcid-identifier")
+        if not isinstance(data, dict):
+            return None
+        try:
+            return ManagementOrcidIdentifier(uri=data["uri"], path=data["path"], host=data["host"])
+        except (KeyError, TypeError):
+            return None
 
     @strawberry_django.field(description="Information about the person that is specific to the ORCID service.")
     def person(self) -> Optional[ManagementOrcidPerson]:
@@ -283,9 +360,9 @@ user that is specific to the Github service. This includes the Github Identifier
 """,
 )
 class ManagementGithubAccount(ManagementSocialAccount):
-    @strawberry_django.field()
-    def identifier(self) -> ManagementOrcidIdentifier:
-        raise NotImplementedError()
+    @strawberry_django.field(description="Not available for GitHub accounts; always null.")
+    def identifier(self) -> str | None:
+        return None
 
     @staticmethod
     def is_type_of(ob, info):
@@ -334,7 +411,7 @@ class ManagementCommunication:
 
 @strawberry_django.type(
     models.SystemMessage,
-    filters=karakter_filters.ProfileFilter,
+    filters=filters.ManagementSystemMessageFilter,
     pagination=True,
     description="""
 A System Message is a message that is sent to a user. 
@@ -491,17 +568,16 @@ class ManagementOrganization:
         return queryset.filter(memberships__user=info.context.request.user).distinct()
 
 
-@strawberry_django.type(models.ComChannel, filters=karakter_filters.OrganizationFilter, pagination=True, description="""An Organization is a group of users that can work together on a project.""")
+@strawberry_django.type(models.ComChannel, filters=filters.ManagementComChannelFilter, pagination=True, description="""A communication channel (e.g. a push-notification endpoint) through which a user can be notified.""")
 class ManagementComChannel:
     id: strawberry.ID
     user: ManagementUser
 
 
-@strawberry_django.type(models.Invite, filters=karakter_filters.OrganizationFilter, pagination=True, description="""A single-use magic invite link that allows one person to join an organization.""")
+@strawberry_django.type(models.Invite, filters=filters.ManagementInviteFilter, pagination=True, description="""A single-use magic invite link that allows one person to join an organization.""")
 class ManagementInvite:
     id: strawberry.ID
     token: str
-    email: str | None
     created_by: ManagementUser
     created_for: ManagementOrganization
     created_at: datetime.datetime
@@ -513,6 +589,19 @@ class ManagementInvite:
     responded_at: datetime.datetime | None
     roles: list["ManagementRole"]
     created_memberships: list["ManagementMembership"]
+
+    @strawberry_django.field(
+        description="The e-mail address this invite was addressed to, if any. Only visible to the organization's owner and admins.",
+        only=["email", "created_for"],
+        select_related=["created_for"],
+    )
+    def email(self, info: Info) -> str | None:
+        """`inviteByCode` is public, so an anonymous visitor with a public invite
+        link must not learn who it was addressed to."""
+        caller = _caller(info)
+        if caller is None or not is_owner_or_admin(caller, self.created_for):
+            return None
+        return self.email
 
     @strawberry_django.field(description="Check if the invite is still valid and pending")
     def valid(self) -> bool:
@@ -571,7 +660,6 @@ class ManagementStagingManifest:
     description: str | None = None
     logo: str | None = None
     scopes: list[str]
-    node_id: strawberry.ID | None = None
     authors: list[str]
     keywords: list[str]
     license: str | None = None
@@ -579,6 +667,14 @@ class ManagementStagingManifest:
     repo_url: str | None = None
     public_sources: list[ManagementStagingPublicSource] | None = strawberry.field(description="Public sources for this staging service")
     requirements: list[ManagementStagingRequirement]
+    # The raw device node id is a secret-ish identifier (it is hashed per organization
+    # before it is ever persisted on a Device). It is deliberately NOT exposed; the UI only
+    # needs to know whether the manifest is device-bound.
+    node_id: strawberry.Private[str | None] = None
+
+    @strawberry.field(description="Whether this manifest is bound to a device (carries a node id). The id itself is never exposed.")
+    def has_node_id(self) -> bool:
+        return bool(self.node_id)
 
 
 @pydantic.type(base_models.Role)
@@ -613,7 +709,6 @@ class ManagementStagingServiceManifest:
     description: str | None = None
     logo: str | None = None
     scopes: list[StagingScope] | None = None
-    node_id: strawberry.ID | None = None
     roles: list[StagingRole] | None = None
     instance_id: str | None = None
     public_sources: list[ManagementStagingPublicSource] | None = None
@@ -656,7 +751,11 @@ class ManagementService:
     releases: list["ManagementServiceRelease"] = strawberry_django.field(
         description="The releases of the service. A service release is a configured instance of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."
     )
-    logo: ManagementMediaStore | None = strawberry.field(description="The logo of the app. This should be a url to a logo that can be used to represent the app.")
+    logo: ManagementMediaStore | None = strawberry.field(description="The logo of the service. This should be a url to a logo that can be used to represent the service.")
+
+    @classmethod
+    def get_queryset(cls, queryset, info: Info):
+        return _membership_scoped(queryset, info, "organization")
 
 
 @strawberry_django.type(
@@ -681,15 +780,6 @@ class ManagementKommunityPartner:
     kommunity_kind: str = strawberry.field(description="The kind of kommunity (e.g., 'open', 'restricted', 'private').")
     auto_configure: bool = strawberry.field(description="Whether this partner should automatically create hubs for new organizations.")
     oauth_client: Optional["ManagementOAuth2Client"] = strawberry.field(description="The OAuth2 client associated with this partner, if any.")
-    
-    @strawberry.field(description="The preconfigured hub manifest for this partner, if any.")
-    def preconfigured_hub(self) -> strawberry.scalars.JSON | None:
-        return self.preconfigured_hub
-
-    @strawberry.field(description="Filter conditions that determine which users/organizations this partner applies to. "
-                                   "Conditions include: email_domain_equals, email_domain_ends_with, username_equals, username_contains.")
-    def filter_config(self) -> strawberry.scalars.JSON | None:
-        return self.filter_config
 
     @strawberry.field(description="Check if this partner applies to the current user based on filter conditions.")
     def applies_to_me(self, info: Info) -> bool:
@@ -725,17 +815,21 @@ class ValidationResult:
 @strawberry_django.type(
     fakts_models.ServiceRelease,
     ordering=filters.ManagementServiceReleaseOrdering,
-    description="A ServiceInstance is a configured instance of a Service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information.",
+    description="A ServiceRelease is a specific version of a Service. Service instances are always instances of one release.",
     pagination=True,
-    filters=fakts_filters.ServiceInstanceFilter,
+    filters=filters.ManagementServiceReleaseFilter,
 )
 class ManagementServiceRelease:
     id: strawberry.ID
-    service: ManagementService = strawberry_django.field(description="The service that this instance belongs to.")
+    service: ManagementService = strawberry_django.field(description="The service that this release belongs to.")
     version: str = strawberry.field(description="The version of the service release.")
     instances: list["ManagementServiceInstance"] = strawberry_django.field(
         description="The instances of the service release. A service instance is a configured instance of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."
     )
+
+    @classmethod
+    def get_queryset(cls, queryset, info: Info):
+        return _membership_scoped(queryset, info, "service__organization")
 
 
 @strawberry_django.type(
@@ -763,9 +857,13 @@ class ManagementServiceInstance:
     roles: list["ManagementRole"] = strawberry_django.field(description="The roles that are associated with this instance. These roles will be assigned to users that are allowed to use this instance.")
     scopes: list["ManagementScope"] = strawberry_django.field(description="The scopes that are associated with this instance. These scopes will be assigned to users that are allowed to use this instance.")
 
-    @strawberry_django.field(description="The steward of the instance. The steward is the user who is responsible for this instance.")
+    @strawberry_django.field(description="A human-readable identifier of the instance: `instance_id @ device @ organization`.")
     def identifier(self) -> str:
         return f"{self.instance_id} @ {self.device.name if self.device else 'no-device'} @ {self.organization.slug}"
+
+    @classmethod
+    def get_queryset(cls, queryset, info: Info):
+        return _membership_scoped(queryset, info, "organization")
 
 
 @strawberry_django.type(
@@ -779,7 +877,6 @@ class ManagementHub:
     id: strawberry.ID
     name: str = strawberry.field(description="The name of the hub")
     description: str | None = strawberry.field(description="The description of the hub. This should be a human readable description of the hub.")
-    token: str = strawberry.field(description="The token used to claim this hub")
     creator: ManagementUser = strawberry_django.field(description="The user who created this hub")
     organization: "ManagementOrganization" = strawberry_django.field(description="The organization that owns this hub.")
     instances: list["ManagementServiceInstance"] = strawberry_django.field(
@@ -818,19 +915,28 @@ class ManagementInstanceAlias:
     def organization(self) -> "ManagementOrganization":
         return self.instance.organization
 
+    @classmethod
+    def get_queryset(cls, queryset, info: Info):
+        return _membership_scoped(queryset, info, "instance__organization")
+
+
 @strawberry_django.type(
     fakts_models.ServiceInstanceMapping,
     ordering=filters.ManagementServiceInstanceMappingOrdering,
     filters=filters.ServiceInstanceMappingFilter,
     pagination=True,
-    description="A ServiceInstance is a configured instance of a Service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information.",
+    description="A ServiceInstanceMapping binds one of a client's requirement keys to the service instance that fulfils it.",
 )
 class ManagementServiceInstanceMapping:
     id: strawberry.ID
-    instance: ManagementServiceInstance = strawberry_django.field(description="The service that this instance belongs to.")
-    client: "ManagementClient" = strawberry_django.field(description="The client that this instance belongs to.")
-    key: str = strawberry.field(description="The key of the instance. This is a unique string that identifies the instance. It is used to identify the instance in the code and in the database.")
+    instance: ManagementServiceInstance = strawberry_django.field(description="The service instance this mapping points at.")
+    client: "ManagementClient" = strawberry_django.field(description="The client this mapping belongs to.")
+    key: str = strawberry.field(description="The requirement key of the client that this mapping fulfils.")
     optional: bool = strawberry.field(description="Is this mapping optional? If a mapping is optional, you can configure the client without this mapping.")
+
+    @classmethod
+    def get_queryset(cls, queryset, info: Info):
+        return _membership_scoped(queryset, info, "instance__organization")
 
 
 @strawberry_django.type(
@@ -848,6 +954,10 @@ class ManagementApp:
     releases: list["ManagementRelease"] = strawberry_django.field(description="The releases of the app. A release is a version of the app that can be installed by a user.")
 
     logo: ManagementMediaStore | None = strawberry.field(description="The logo of the app. This should be a url to a logo that can be used to represent the app.")
+
+    @classmethod
+    def get_queryset(cls, queryset, info: Info):
+        return _membership_scoped(queryset, info, "organization")
 
 
 @strawberry.type
@@ -956,9 +1066,8 @@ class ManagementLayer:
     name: str = strawberry.field(description="The name of the layer")
     description: str | None = strawberry.field(description="The description of the layer. This should be a human readable description of the layer.")
     logo: ManagementMediaStore | None = strawberry.field(description="The logo of the layer. This should be a url to a logo that can be used to represent the layer.")
-    description: str | None = strawberry.field(description="The description of the service. This should be a human readable description of the service.")
     aliases: list["ManagementInstanceAlias"] = strawberry_django.field(
-        description="The instances of the service. A service instance is a configured instance of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."
+        description="The aliases that are reachable through this layer. An alias is a way to reach a service instance over this transport layer."
     )
     tailnet_name: str = strawberry.field(description="The tailnet name of the layer. This is only set for Ionscale layers.")
     magic_dns_enabled: bool = strawberry.field(description="Whether MagicDNS is enabled for this mesh.")
@@ -969,14 +1078,14 @@ class ManagementLayer:
     
     @strawberry.field(description="The machines associated with this layer (only works for IonscaleLayers)")
     def machines(self, info: Info) -> List[ManagementMachine]:
-        if hasattr(self, "tailnet_name"):
+        if self.tailnet_name:
              machines = get_ionscale_repo().list_machines(self.tailnet_name)
              return [ManagementMachine(instance=m, tailnet=self.tailnet_name, layer_id=self.id, magic_dns_enabled=self.magic_dns_enabled) for m in machines]
         return []
 
     @strawberry.field(description="A specific machine associated with this layer (only works for IonscaleLayers)")
     def machine(self, info: Info, id: str) -> Optional[ManagementMachine]:
-        if hasattr(self, "tailnet_name"):
+        if self.tailnet_name:
              try:
                 machine = get_ionscale_repo().get_machine(str(id))
                 return ManagementMachine(instance=machine, tailnet=self.tailnet_name, layer_id=self.id, magic_dns_enabled=self.magic_dns_enabled)
@@ -997,12 +1106,24 @@ class ManagementLayer:
 )
 class ManagementIonscaleAuthKey:
     id: strawberry.ID
-    key: str
     created_at: datetime.datetime
     ephemeral: bool
     tags: list[str]
     creator: "ManagementUser"
     layer: ManagementLayer
+
+    @strawberry_django.field(
+        description="The pre-authorized mesh key. A live mesh-join credential: only returned to the key's creator and to the organization's owner/admins, null for everyone else.",
+        only=["key", "creator", "layer"],
+        select_related=["layer"],
+    )
+    def key(self, info: Info) -> str | None:
+        caller = _caller(info)
+        if caller is None:
+            return None
+        if self.creator_id == caller.id or is_owner_or_admin(caller, self.layer.organization):
+            return self.key
+        return None
 
     @classmethod
     def get_queryset(cls, queryset, info: Info):
@@ -1021,8 +1142,28 @@ class ManagementRelease:
     name: str = strawberry.field(description="The name of the release. This should be a string that identifies the release beyond the version number. E.g. `canary`.")
     logo: ManagementMediaStore | None = strawberry.field(description="The logo of the release. This should be a url to a logo that can be used to represent the release.")
     scopes: list[str] = strawberry.field(description="The scopes of the release. Scopes are used to limit the access of a client to a user's data. They represent app-level permissions.")
-    requirements: list[str] = strawberry.field(description="The requirements of the release. Requirements are used to limit the access of a client to a user's data. They represent app-level permissions.")
     clients: list["ManagementClient"] = strawberry_django.field(description="The clients of the release")
+
+    @strawberry_django.field(description="The requirements of the release: the services a client of this release needs mapped before it can run.")
+    def requirements(self, info: Info) -> list[ManagementStagingRequirement]:
+        raw = self.requirements
+        if isinstance(raw, dict):
+            raw = list(raw.values())
+        if not isinstance(raw, list):
+            return []
+        out: list[ManagementStagingRequirement] = []
+        for entry in raw:
+            if not isinstance(entry, dict):
+                continue
+            try:
+                out.append(ManagementStagingRequirement.from_pydantic(base_models.Requirement(**entry)))
+            except (PydanticValidationError, TypeError):
+                continue
+        return out
+
+    @classmethod
+    def get_queryset(cls, queryset, info: Info):
+        return _membership_scoped(queryset, info, "app__organization")
 
 
 @strawberry_django.type(
@@ -1078,6 +1219,10 @@ class ManagementUsedAlias:
     client: "ManagementClient" = strawberry_django.field(description="The client that is using the alias.")
     valid: bool = strawberry.field(description="Is the alias valid for the client?")
     reason: Optional[str] = strawberry.field(description="If the alias is not valid, the reason why it is not valid.")
+
+    @classmethod
+    def get_queryset(cls, queryset, info: Info):
+        return _membership_scoped(queryset, info, "client__organization")
 
 
 @strawberry.type(description="One per-requirement entry in a client report snapshot: which alias was resolved for a requirement key and whether it was reachable.")
@@ -1136,9 +1281,29 @@ class ManagementClient:
     id: strawberry.ID
     functional: bool = strawberry_django.field(description="Is this client functional? A non-functional client cannot be used to authenticate users.")
     release: ManagementRelease | None = strawberry_django.field(description="The release that this client belongs to. Null for clients that are not bound to an app release: hub identities, relying parties, and registrations that are still awaiting approval.")
-    kind: str = strawberry_django.field(description="The kind of the client. The kind defines the authentication flow that is used to authenticate users with this client.")
-    role: str = strawberry_django.field(description="The operational role of the client: INTERFACE (a human interface operated by a user) vs AGENT (an autonomous client authorized once that then runs unattended, receiving tasks).")
-    public: bool = strawberry_django.field(description="Is this client public? If a client is public ")
+    public: bool = strawberry_django.field(description="Is this client public? A public client has no client secret and authenticates through a user-facing flow (device code / PKCE) instead.")
+
+    @strawberry_django.field(
+        description="The kind of the client. The kind defines the authentication flow that is used to authenticate users with this client.",
+        only=["kind"],
+    )
+    def kind(self, info: Info) -> fakts_enums.ClientKind:
+        # The strawberry enum members wrap `enum_value(...)` definitions, so map
+        # by member name (the model stores the lowercase value).
+        try:
+            return fakts_enums.ClientKind[str(self.kind or "").upper()]
+        except KeyError:
+            return fakts_enums.ClientKind.DEVELOPMENT
+
+    @strawberry_django.field(
+        description="The operational role of the client: INTERFACE (a human interface operated by a user) vs AGENT (an autonomous client authorized once that then runs unattended, receiving tasks).",
+        only=["role"],
+    )
+    def role(self, info: Info) -> fakts_enums.ClientRole:
+        try:
+            return fakts_enums.ClientRole[str(self.role or "").upper()]
+        except KeyError:
+            return fakts_enums.ClientRole.INTERFACE
     @strawberry_django.field(
         description="The user this client acts for (derived from its membership).",
         only=["membership"],
@@ -1157,12 +1322,14 @@ class ManagementClient:
     reports: list["ManagementReport"] = strawberry_django.field(description="The retained self-reports of this client, most recent first.")
     last_healthy_report: Optional["ManagementReport"] = strawberry_django.field(description="The most recent report where the client was functional; null if it has never reported healthy.")
 
-    @strawberry_django.field(description="Check if the device code is still valid")
+    @strawberry_django.field(description="The app manifest this client was registered with, if it parses.")
     def manifest(self, info: Info) -> Optional[ManagementStagingManifest]:
         if not self.manifest:
             return None
-
-        return ManagementStagingManifest.from_pydantic(base_models.Manifest(**self.manifest))
+        try:
+            return ManagementStagingManifest.from_pydantic(base_models.Manifest(**self.manifest))
+        except (PydanticValidationError, TypeError):
+            return None
 
     @strawberry_django.field(description="The issue url of the client. This is the url where users can report issues and get more information about the client.")
     def issue_url(self, info: Info) -> str | None:
@@ -1184,7 +1351,7 @@ class ManagementClient:
             )
         return sources
 
-    @strawberry_django.field(description="Check if the client is active")
+    @strawberry_django.field(description="The device (compute node) this client runs on, if it registered one.")
     def device(self, info: Info) -> Optional["ManagementDevice"]:
         return self.node
 
@@ -1197,22 +1364,29 @@ class ManagementClient:
         return queryset.filter(organization__memberships__user=info.context.request.user).distinct()
 
 
-@strawberry_django.type(fakts_models.Client, filters=karakter_filters.OrganizationFilter, pagination=True, description="""The OAuth2 identity view of a (unified) client — what the consent page needs to display.""")
+@strawberry_django.type(fakts_models.Client, filters=filters.ManagementOAuth2ClientFilter, pagination=True, description="""The OAuth2 identity view of a (unified) client — what the consent page needs to display.""")
 class ManagementOAuth2Client:
     id: strawberry.ID
     name: str
     client_id: str
     kind: str
-    redirect_uris: str
 
 
-@strawberry_django.type(fakts_models.DeviceCode, filters=karakter_filters.OrganizationFilter, pagination=True, description="""A DeviceCode is used for the device code flow for client authentication.""")
+@strawberry_django.type(fakts_models.DeviceCode, filters=filters.ManagementDeviceCodeFilter, pagination=True, description="""A DeviceCode is used for the device code flow for client authentication.""")
 class ManagementDeviceCode:
     id: strawberry.ID
     created_at: datetime.datetime
     expires_at: datetime.datetime
     code: str
     denied: bool
+
+    @classmethod
+    def get_queryset(cls, queryset, info: Info):
+        """By-id access is scoped to codes accepted into one of the caller's
+        organizations. A *pending* code has no organization yet and is therefore
+        not reachable by id at all — the `...ByCode` queries are the capability
+        path for it (the code is what the device displayed)."""
+        return _membership_scoped(queryset, info, "organization")
 
     @strawberry_django.field(
         description="The (bound) client this code was accepted into. Null while pending — the staged registration exists but is not approved yet.",
@@ -1233,10 +1407,13 @@ class ManagementDeviceCode:
     def staging_manifest(self, info: Info) -> Optional[ManagementStagingManifest]:
         if not self.staging_manifest:
             return None
-        return ManagementStagingManifest.from_pydantic(base_models.Manifest(**self.staging_manifest))
+        try:
+            return ManagementStagingManifest.from_pydantic(base_models.Manifest(**self.staging_manifest))
+        except (PydanticValidationError, TypeError):
+            return None
 
 
-@strawberry_django.type(fakts_models.DeviceCode, filters=karakter_filters.OrganizationFilter, pagination=True, description="""A HubDeviceCode is a hub-kind staged authorization (unified DeviceCode model).""")
+@strawberry_django.type(fakts_models.DeviceCode, filters=filters.ManagementHubDeviceCodeFilter, pagination=True, description="""A HubDeviceCode is a hub-kind staged authorization (unified DeviceCode model).""")
 class ManagementHubDeviceCode:
     id: strawberry.ID
     created_at: datetime.datetime
@@ -1244,22 +1421,41 @@ class ManagementHubDeviceCode:
     code: str
     denied: bool
 
-    @strawberry_django.field(description="The hub this code was accepted into. Null while pending.", only=["client"])
+    @strawberry_django.field(
+        description="The hub this code was accepted into. Null while pending, and null unless the caller is a member of the hub's organization.",
+        only=["client"],
+    )
     def hub(self, info: Info) -> Optional[ManagementHub]:
         try:
-            return self.client.hub_identity
+            hub = self.client.hub_identity
         except fakts_models.Hub.DoesNotExist:
             return None
+        if hub is None:
+            return None
+        caller = _caller(info)
+        if caller is None:
+            return None
+        if not hub.organization.memberships.filter(user=caller).exists():
+            return None
+        return hub
 
     @strawberry_django.field(description="The hub manifest for this device code")
     def manifest(self, info: Info) -> Optional[ManagementHubManifest]:
         if not self.staging_manifest:
             return None
+        try:
+            return ManagementHubManifest.from_pydantic(base_models.HubManifest(**self.staging_manifest))
+        except (PydanticValidationError, TypeError):
+            return None
 
-        return base_models.HubManifest(**self.staging_manifest)
+    @classmethod
+    def get_queryset(cls, queryset, info: Info):
+        """See ``ManagementDeviceCode.get_queryset``: pending hub codes are reachable
+        only through ``hubDeviceCodeByCode``."""
+        return _membership_scoped(queryset, info, "organization")
 
 
-@strawberry_django.type(fakts_models.MeshDeviceCode, filters=karakter_filters.OrganizationFilter, pagination=True, description="""A MeshDeviceCode is used for the device-code flow that lets a machine join an organization's mesh.""")
+@strawberry_django.type(fakts_models.MeshDeviceCode, filters=filters.ManagementMeshDeviceCodeFilter, pagination=True, description="""A MeshDeviceCode is used for the device-code flow that lets a machine join an organization's mesh.""")
 class ManagementMeshDeviceCode:
     id: strawberry.ID
     user: Optional[ManagementUser]
@@ -1270,6 +1466,16 @@ class ManagementMeshDeviceCode:
     machine_name: Optional[str]
     description: Optional[str]
     denied: bool
+
+    @classmethod
+    def get_queryset(cls, queryset, info: Info):
+        """A mesh device code carries no organization of its own; it is tied to a
+        tenant only once accepted (through the minted key's layer) or to the user
+        who requested it. Pending codes are reachable only via ``meshDeviceCodeByCode``."""
+        user = info.context.request.user
+        return queryset.filter(
+            Q(user=user) | Q(auth_key__layer__organization__memberships__user=user)
+        ).distinct()
     # NB: the minted pre-auth key is deliberately NOT exposed here. The by-code lookup is
     # unauthenticated-preview-friendly, so surfacing the secret would leak a live mesh-join
     # credential to anyone who learns the code. The machine receives the key only via the
@@ -1281,10 +1487,22 @@ class ManagementRedeemToken:
     id: strawberry.ID
     created_at: datetime.datetime
     expires_at: datetime.datetime | None
-    token: str = strawberry.field(description="The token of the redeem token")
     hub: ManagementHub = strawberry_django.field(description="The hub that this redeem token grants access to.")
     client: ManagementClient | None = strawberry.field(description="The client that this redeem token belongs to.")
     user: ManagementUser = strawberry_django.field(description="The user that this redeem token belongs to.")
+
+    @strawberry_django.field(
+        description="The redeem token. A bearer credential: only returned to the user who issued it and to the hub organization's owner/admins, null for everyone else.",
+        only=["token", "user", "hub"],
+        select_related=["hub"],
+    )
+    def token(self, info: Info) -> str | None:
+        caller = _caller(info)
+        if caller is None:
+            return None
+        if self.user_id == caller.id or is_owner_or_admin(caller, self.hub.organization):
+            return self.token
+        return None
 
     @classmethod
     def get_queryset(cls, queryset, info: Info):

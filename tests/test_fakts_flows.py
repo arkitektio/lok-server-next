@@ -312,6 +312,7 @@ def test_full_hub_grant_returns_tokens_and_hub_config(client):
         info,
         AcceptHubDeviceCodeInput(
             device_code=str(hub_code.id),
+            code=hub_code.code,
             organization=str(membership.organization.id),
             allow_ionscale=False,
         ),

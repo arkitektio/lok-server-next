@@ -434,7 +434,9 @@ class Hub(models.Model):
     )
     # Deprecated: only the partner-webhook /f/claimhub/ path still uses this.
     # Interactive hubs authenticate via their client identity instead.
-    token = models.CharField(max_length=1000, default=uuid.uuid4)
+    # Unique: it is a bearer secret looked up by value at /f/claimhub/, so it
+    # must identify exactly one hub (and the lookup is an index hit, not a scan).
+    token = models.CharField(max_length=1000, unique=True, default=uuid.uuid4)
     auth_key = models.ForeignKey(
         IonscaleAuthKey,
         on_delete=models.SET_NULL,

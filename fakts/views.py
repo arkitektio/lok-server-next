@@ -1,5 +1,6 @@
 import json
 import logging
+import secrets
 
 from django.conf import settings
 from django.http import JsonResponse
@@ -17,17 +18,88 @@ from fakts.services import clients, device_codes, rendering
 logger = logging.getLogger(__name__)
 
 
+# --------------------------------------------------------------------------- #
+# Error contract
+#
+# Every fakts REST error is an HTTP 4xx/5xx with a structured JSON body:
+#
+#     {"status": "error", "error": "<code>", "error_description": "<text>",
+#      "details": <validation details when available>}
+#
+# ``error`` uses the OAuth / RFC 8628 vocabulary (invalid_request, invalid_grant,
+# access_denied, expired_token, authorization_pending, slow_down, server_error)
+# so fakts clients can branch on the same codes they already handle at the
+# token endpoint. ``status: "error"`` is kept for back-compat with clients that
+# only ever looked at ``status``.
+# --------------------------------------------------------------------------- #
+
+ERROR_INVALID_REQUEST = "invalid_request"
+ERROR_INVALID_GRANT = "invalid_grant"
+ERROR_ACCESS_DENIED = "access_denied"
+ERROR_EXPIRED_TOKEN = "expired_token"
+ERROR_AUTHORIZATION_PENDING = "authorization_pending"
+ERROR_SLOW_DOWN = "slow_down"
+ERROR_SERVER_ERROR = "server_error"
+
+
+def _error(
+    code: str,
+    description: str,
+    *,
+    http_status: int = 400,
+    details=None,
+    legacy_status: str = "error",
+    **extra,
+) -> JsonResponse:
+    """Build the structured fakts error envelope (see the module comment above).
+
+    ``legacy_status`` is the value of the back-compat ``status`` field (the mesh
+    poll endpoint historically answered ``pending``/``denied``/``expired``
+    there); ``extra`` keys (e.g. a legacy ``message``) are merged into the body.
+    """
+    body = {"status": legacy_status, "error": code, "error_description": description}
+    if details is not None:
+        body["details"] = details
+    body.update(extra)
+    return JsonResponse(body, status=http_status)
+
+
 def _parse(request, model, *, error_key="error"):
     """Parse the JSON request body into ``model``.
 
-    Returns ``(instance, None)`` on success or ``(None, JsonResponse)`` with the
-    standard malformed-request envelope on failure.
+    Returns ``(instance, None)`` on success or ``(None, JsonResponse)`` — an
+    HTTP 400 ``invalid_request`` envelope (with pydantic's ``errors()`` under
+    ``details`` when the body parsed but failed validation) on failure.
+
+    ``error_key`` is a legacy knob: older clients read the human text from
+    ``message`` on some endpoints, so the description is mirrored there when
+    asked.
     """
     try:
-        return model(**json.loads(request.body)), None
+        payload = json.loads(request.body)
     except Exception as e:
-        logger.error(e, exc_info=True)
-        return None, JsonResponse({"status": "error", error_key: f"Malformed request: {str(e)}"})
+        logger.info("Malformed JSON body: %s", e)
+        return None, _error(
+            ERROR_INVALID_REQUEST,
+            f"Malformed request: {e}",
+            **({error_key: f"Malformed request: {e}"} if error_key != "error" else {}),
+        )
+
+    try:
+        return model(**payload), None
+    except Exception as e:
+        logger.info("Request body failed validation for %s: %s", getattr(model, "__name__", model), e)
+        details = e.errors() if hasattr(e, "errors") else None
+        if details is not None:
+            # pydantic's ErrorDetails carry the original input and a ctx that may
+            # hold non-JSON-serialisable exception objects; keep only the safe keys.
+            details = [{k: v for k, v in d.items() if k in ("type", "loc", "msg")} for d in details]
+        return None, _error(
+            ERROR_INVALID_REQUEST,
+            f"Malformed request: {e}",
+            details=details,
+            **({error_key: f"Malformed request: {e}"} if error_key != "error" else {}),
+        )
 
 
 def _status(status, message):
@@ -114,8 +186,8 @@ class AppAuthorizationView(View):
 
         try:
             device_code = device_codes.start_device_code(start_grant)
-        except device_codes.LogoDownloadError:
-            return JsonResponse({"status": "error", "error": "Error downloading logo"})
+        except device_codes.LogoDownloadError as e:
+            return _error(ERROR_INVALID_REQUEST, "Error downloading logo", details=[{"msg": str(e)}])
 
         # Opportunistically reap expired, never-approved codes so their orphan
         # dynamically-registered OAuth2 clients don't accumulate.
@@ -162,8 +234,8 @@ class HubAuthorizationView(View):
 
         try:
             device_code = device_codes.start_hub_device_code(start_grant)
-        except device_codes.LogoDownloadError:
-            return JsonResponse({"status": "error", "error": "Error downloading logo"})
+        except device_codes.LogoDownloadError as e:
+            return _error(ERROR_INVALID_REQUEST, "Error downloading logo", details=[{"msg": str(e)}])
 
         device_codes.purge_expired_device_codes()
 
@@ -190,11 +262,19 @@ class MeshStartChallengeView(View):
     """Start endpoint for the mesh device-code flow (a machine joining an org mesh)."""
 
     def post(self, request, *args, **kwargs):
+        # Same anonymous brute-force surface as app authorization; same budget.
+        if is_throttled(request, "authorization", AUTHORIZATION_LIMIT_PER_MINUTE):
+            return throttled_response()
+
         start_grant, err = _parse(request, base_models.MeshDeviceCodeStartRequest)
         if err:
             return err
 
-        device_code = device_codes.start_mesh_device_code(start_grant)
+        try:
+            device_code = device_codes.start_mesh_device_code(start_grant)
+        except Exception as e:
+            logger.warning("Could not stage mesh device code: %s", e, exc_info=True)
+            return _error(ERROR_INVALID_REQUEST, f"Could not start the mesh device-code flow: {e}")
 
         return JsonResponse({"status": "granted", "code": device_code.code, "challenge": device_code.challenge_code})
 
@@ -209,26 +289,42 @@ class MeshChallengeView(View):
     """
 
     def post(self, request, *args, **kwargs):
+        # Polling a secret challenge code is the brute-force target of this flow.
+        if is_throttled(request, "authorization", AUTHORIZATION_LIMIT_PER_MINUTE):
+            return throttled_response()
+
         challenge, err = _parse(request, base_models.DeviceCodeChallengeRequest)
         if err:
             return err
 
         try:
-            device_code = models.MeshDeviceCode.objects.get(challenge_code=challenge.code)
+            device_code = models.MeshDeviceCode.objects.select_related("auth_key").get(challenge_code=challenge.code)
         except models.MeshDeviceCode.DoesNotExist:
-            return JsonResponse({"status": "error", "error": "Challenge does not exist"})
+            # Unknown *or already burned* — a granted code is single-use.
+            return _error(ERROR_INVALID_GRANT, "Challenge does not exist")
 
         if timezone.now() > device_code.expires_at:
             device_code.delete()
-            return _status("expired", "The user has not given an answer in enough time")
+            # RFC 8628 vocabulary; the legacy ``status`` keeps its old value.
+            return _error(
+                ERROR_EXPIRED_TOKEN,
+                "The user has not given an answer in enough time",
+                legacy_status="expired",
+                message="The user has not given an answer in enough time",
+            )
 
         if device_code.denied:
             device_code.delete()
-            return _status("denied", "The user has denied the request")
+            return _error(
+                ERROR_ACCESS_DENIED,
+                "The user has denied the request",
+                legacy_status="denied",
+                message="The user has denied the request",
+            )
 
         auth_key = device_code.auth_key
         if auth_key:
-            return JsonResponse(
+            response = JsonResponse(
                 {
                     "status": "granted",
                     "ionscale_auth_key": auth_key.key,
@@ -236,8 +332,18 @@ class MeshChallengeView(View):
                     "machine_name": device_code.machine_name,
                 }
             )
+            # Single-use: burn the code once it has yielded its key (mirrors the
+            # device-code grant at the token endpoint). The minted auth key is
+            # not touched — ``MeshDeviceCode.auth_key`` is SET_NULL the other way.
+            device_code.delete()
+            return response
 
-        return _status("pending", "User has not verified the challenge")
+        return _error(
+            ERROR_AUTHORIZATION_PENDING,
+            "User has not verified the challenge",
+            legacy_status="pending",
+            message="User has not verified the challenge",
+        )
 
 
 @method_decorator(csrf_exempt, name="dispatch")
@@ -245,20 +351,33 @@ class ClaimHubView(View):
     """Retrieve a hub faktsclaim given a hub token."""
 
     def post(self, request, *args, **kwargs):
+        # The hub token is a long-lived bearer secret; make guessing it expensive.
+        if is_throttled(request, "claim", AUTHORIZATION_LIMIT_PER_MINUTE):
+            return throttled_response()
+
         claim, err = _parse(request, base_models.ServerClaimRequest, error_key="message")
         if err:
             return err
 
+        # ``Hub.token`` is unique, so the indexed lookup finds at most one row;
+        # the constant-time compare on top just avoids leaking anything through
+        # the equality check itself.
+        hub = models.Hub.objects.filter(token=claim.token).select_related("organization").first()
+        if hub is None or not secrets.compare_digest(str(hub.token), str(claim.token)):
+            return _error(ERROR_INVALID_GRANT, "No Hub found for this token", message="No Hub found for this token")
+
         try:
-            hub = models.Hub.objects.get(token=claim.token)
             context = rendering.create_serverlinking_context(request, hub, claim)
             config = rendering.render_server_fakts(hub, context)
             return JsonResponse({"status": "granted", "config": config.model_dump()})
-        except models.Hub.DoesNotExist:
-            return _status("error", "No Hub found for this token")
         except Exception as e:
             logger.error(e, exc_info=True)
-            return _status("error", "Error creating configuration")
+            return _error(
+                ERROR_SERVER_ERROR,
+                "Error creating configuration",
+                http_status=500,
+                message="Error creating configuration",
+            )
 
 
 @method_decorator(csrf_exempt, name="dispatch")
@@ -272,7 +391,7 @@ class ReportView(View):
         try:
             claims = decode_bearer_token(request)
         except InvalidBearerToken as e:
-            return JsonResponse({"status": "error", "message": str(e)}, status=401)
+            return _error(ERROR_INVALID_GRANT, str(e), http_status=401, message=str(e))
 
         claim, err = _parse(request, base_models.ReportRequest, error_key="message")
         if err:
@@ -283,7 +402,17 @@ class ReportView(View):
             clients.report_client(client, claim)
             return _status("reported", "Report processed successfully")
         except models.Client.DoesNotExist:
-            return JsonResponse({"status": "error", "message": "No client found for this token"}, status=401)
+            return _error(
+                ERROR_INVALID_GRANT,
+                "No client found for this token",
+                http_status=401,
+                message="No client found for this token",
+            )
         except Exception as e:
             logger.error(e, exc_info=True)
-            return _status("error", "Error processing report")
+            return _error(
+                ERROR_SERVER_ERROR,
+                "Error processing report",
+                http_status=500,
+                message="Error processing report",
+            )

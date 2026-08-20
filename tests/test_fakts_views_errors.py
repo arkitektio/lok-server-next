@@ -5,10 +5,12 @@ canonical grant) by exercising the error branches: malformed bodies,
 expired/denied device codes at the token endpoint, logo-download failures, and
 the report endpoint's Bearer authentication.
 
-Note: malformed requests return **HTTP 200** with a ``{"status": "error"}`` body
-(``_parse`` builds a default-status ``JsonResponse``), so assertions are on the
-JSON body, not the status code — except the explicit 405 (wrong-method) and the
-report endpoint's 401 cases.
+Error contract: every fakts REST error is an HTTP 4xx/5xx carrying the
+structured envelope ``{"status": "error", "error": "<oauth code>",
+"error_description": "<text>", "details": [...]}`` — malformed/invalid bodies are
+``400 invalid_request``, unknown tokens/codes ``400 invalid_grant``, plus the
+explicit 405 (wrong-method) and the report endpoint's 401 cases. ``status`` and
+the legacy ``message`` key are kept for back-compat.
 """
 
 import json
@@ -59,10 +61,23 @@ def _bearer_headers(fakts_client, exp_offset=60, **claim_overrides):
 def test_start_malformed_json_returns_error(client):
     # Body is not valid JSON -> json.loads raises -> malformed envelope (key "error").
     resp = client.post(reverse("app_authorization"), data="{not json", content_type="application/json")
-    assert resp.status_code == 200
+    assert resp.status_code == 400
     body = resp.json()
     assert body["status"] == "error"
-    assert body["error"].startswith("Malformed request")
+    assert body["error"] == "invalid_request"
+    assert body["error_description"].startswith("Malformed request")
+
+
+@pytest.mark.django_db
+def test_start_invalid_body_returns_validation_details(client):
+    # Valid JSON but not a valid DeviceCodeStartRequest (manifest missing) ->
+    # 400 invalid_request with pydantic's error details.
+    resp = client.post(reverse("app_authorization"), data=json.dumps({"nope": 1}), content_type="application/json")
+    assert resp.status_code == 400
+    body = resp.json()
+    assert body["error"] == "invalid_request"
+    assert isinstance(body["details"], list) and body["details"]
+    assert all({"type", "loc", "msg"} >= set(d) for d in body["details"])
 
 
 @pytest.mark.django_db
@@ -140,14 +155,17 @@ def test_start_logo_download_failure_returns_error(client, monkeypatch):
     # LogoDownloadError into the "Error downloading logo" envelope.
     monkeypatch.setattr(device_codes, "download_logo", _boom)
 
-    body = _post(
+    resp = _post(
         client,
         "app_authorization",
         {"manifest": _manifest(logo="https://example.com/logo.png")},
-    ).json()
+    )
+    body = resp.json()
 
+    assert resp.status_code == 400
     assert body["status"] == "error"
-    assert body["error"] == "Error downloading logo"
+    assert body["error"] == "invalid_request"
+    assert body["error_description"] == "Error downloading logo"
 
 
 # --------------------------------------------------------------------------- #
@@ -157,11 +175,15 @@ def test_start_logo_download_failure_returns_error(client, monkeypatch):
 
 @pytest.mark.django_db
 def test_claim_hub_unknown_token_errors(client):
-    # The view looks up a ``Hub`` and catches ``Hub.DoesNotExist``,
-    # returning the dedicated not-found envelope rather than the generic
-    # "Error creating configuration" fallthrough.
-    body = _post(client, "fakts:hubclaim", {"token": "missing"}).json()
+    # An unknown hub token is an ``invalid_grant`` (400), distinct from the
+    # generic ``server_error`` (500) "Error creating configuration" fallthrough.
+    resp = _post(client, "fakts:hubclaim", {"token": "missing"})
+    body = resp.json()
+    assert resp.status_code == 400
     assert body["status"] == "error"
+    assert body["error"] == "invalid_grant"
+    assert body["error_description"] == "No Hub found for this token"
+    # legacy key kept for older hub clients
     assert body["message"] == "No Hub found for this token"
 
 

@@ -17,7 +17,7 @@ from .grants import AuthorizationCodeGrant, OpenIDCode, RefreshTokenGrant
 from .fakts_grants import FaktsDeviceCodeGrant, FaktsRedeemGrant
 from .token_generators import MyJWTBearerTokenGenerator
 from authlib.oidc.core import UserInfo
-from .token_generators import jwk_dict
+from .token_generators import jwk_dict, public_jwks
 from authlib.oidc.core.userinfo import UserInfoEndpoint
 
 
@@ -93,8 +93,10 @@ class MyBearerTokenValidator(JWTBearerTokenValidator):
     def authenticate_token(self, token_string):
         return OAuth2Token.objects.get(access_token=token_string)
 
-    def get_jwks(self) -> None:
-        return jwk_dict
+    def get_jwks(self) -> dict:
+        # Verification needs the public key only — never hand the private JWK
+        # to a validator (it would be one ``.get_jwks()`` away from leaking).
+        return public_jwks()
 
 
 class Oauth2TokenValidator(BearerTokenValidator):

@@ -1,8 +1,7 @@
 from kante.types import Info
 import strawberry
 from django.db.models import Q
-from graphql import GraphQLError
-from karakter.authz import DENIED, get_user
+from karakter.authz import get_or_denied, get_user
 from pak import types, models, inputs
 import logging
 
@@ -19,12 +18,7 @@ def _writable_stash(info: Info, stash_id: strawberry.ID) -> models.Stash:
     not exist, and raise `FieldError` — that is a separate pre-existing bug).
     """
     user = get_user(info)
-    try:
-        return models.Stash.objects.get(
-            Q(owner=user) | Q(shared_with=user), id=stash_id
-        )
-    except models.Stash.DoesNotExist:
-        raise GraphQLError(DENIED)
+    return get_or_denied(models.Stash.objects.distinct(), Q(owner=user) | Q(shared_with=user), id=stash_id)
 
 
 def create_stash(info: Info, input: inputs.CreateStashInput) -> types.Stash:
@@ -50,11 +44,7 @@ def update_stash(info: Info, input: inputs.UpdateStashInput) -> types.Stash:
 
 def delete_stash(info: Info, input: inputs.DeleteStashInput) -> strawberry.ID:
     # Deleting is owner-only: a stash shared *with* you is not yours to destroy.
-    user = get_user(info)
-    try:
-        stash = models.Stash.objects.get(id=input.stash, owner=user)
-    except models.Stash.DoesNotExist:
-        raise GraphQLError(DENIED)
+    stash = get_or_denied(models.Stash.objects, id=input.stash, owner=get_user(info))
     stash.delete()
 
     return stash
@@ -89,12 +79,11 @@ def delete_stash_items(
     for item_input in input.items:
         # Scope by the *parent stash's* access, not by who added the item, so a
         # stash owner can still clear items someone they shared with added.
-        try:
-            item = models.StashItem.objects.get(
-                Q(stash__owner=user) | Q(stash__shared_with=user), id=item_input
-            )
-        except models.StashItem.DoesNotExist:
-            raise GraphQLError(DENIED)
+        item = get_or_denied(
+            models.StashItem.objects.distinct(),
+            Q(stash__owner=user) | Q(stash__shared_with=user),
+            id=item_input,
+        )
         item.delete()
         deleted.append(item_input)
 

@@ -3,26 +3,23 @@ import strawberry
 from api.management import types
 from karakter import models
 import kante
-from api.management.authz import DENIED, assert_member
+from api.management.authz import DENIED, assert_member, get_or_denied
 from fakts import models as fakts_models
 from graphql import GraphQLError
 
 
 @kante.input
 class CreateDeviceGroupInput:
-    """Input for creating a single-use magic invite link for an organization"""
+    """Input for creating a device group in an organization."""
 
     name: str
     organization: strawberry.ID
 
 
 def create_device_group(info: Info, input: CreateDeviceGroupInput) -> types.ManagementDeviceGroup:
-    """ """
+    """Create a device group in an organization."""
 
-    try:
-        organization = models.Organization.objects.get(id=input.organization)
-    except models.Organization.DoesNotExist:
-        raise GraphQLError(DENIED)
+    organization = get_or_denied(models.Organization.objects, id=input.organization)
 
     assert_member(info, organization)
 
@@ -36,21 +33,14 @@ def create_device_group(info: Info, input: CreateDeviceGroupInput) -> types.Mana
 
 @kante.input
 class DeleteDeviceGroupInput:
-    """Input for accepting an organization invite"""
+    """Input for deleting a device group."""
 
     id: strawberry.ID
 
 
 def delete_device_group(info: Info, input: DeleteDeviceGroupInput) -> strawberry.ID:
-    """
-    Accept an invite to join an organization.
-
-    Validates the invite token and adds the user to the organization.
-    """
-    try:
-        dg = fakts_models.DeviceGroup.objects.get(id=input.id)
-    except fakts_models.DeviceGroup.DoesNotExist:
-        raise GraphQLError(DENIED)
+    """Delete a device group, returning the deleted id. The devices themselves are kept."""
+    dg = get_or_denied(fakts_models.DeviceGroup.objects, id=input.id)
 
     assert_member(info, dg.organization)
 
@@ -67,17 +57,10 @@ class AddDeviceToGroupInput:
 
 
 def add_device_to_group(info: Info, input: AddDeviceToGroupInput) -> types.ManagementDevice:
-    """ """
+    """Add a device to a device group of the same organization."""
 
-    try:
-        dg = fakts_models.DeviceGroup.objects.get(id=input.device_group)
-    except fakts_models.DeviceGroup.DoesNotExist:
-        raise GraphQLError(DENIED)
-
-    try:
-        device = fakts_models.Device.objects.get(id=input.device)
-    except fakts_models.Device.DoesNotExist:
-        raise GraphQLError(DENIED)
+    dg = get_or_denied(fakts_models.DeviceGroup.objects, id=input.device_group)
+    device = get_or_denied(fakts_models.Device.objects, id=input.device)
 
     # Both sides must belong to an org the caller is in, and to the *same* org --
     # otherwise membership in one tenant would let you move another tenant's device.
@@ -101,17 +84,10 @@ class RemoveDeviceFromGroupInput:
 
 
 def remove_device_from_group(info: Info, input: RemoveDeviceFromGroupInput) -> types.ManagementDevice:
-    """ """
+    """Remove a device from a device group."""
 
-    try:
-        dg = fakts_models.DeviceGroup.objects.get(id=input.device_group)
-    except fakts_models.DeviceGroup.DoesNotExist:
-        raise GraphQLError(DENIED)
-
-    try:
-        device = fakts_models.Device.objects.get(id=input.device)
-    except fakts_models.Device.DoesNotExist:
-        raise GraphQLError(DENIED)
+    dg = get_or_denied(fakts_models.DeviceGroup.objects, id=input.device_group)
+    device = get_or_denied(fakts_models.Device.objects, id=input.device)
 
     # Both sides must belong to an org the caller is in, and to the *same* org --
     # otherwise membership in one tenant would let you move another tenant's device.

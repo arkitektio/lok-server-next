@@ -6,7 +6,7 @@ from kante.types import Info
 
 from karakter import models
 from api.management import types
-from api.management.authz import is_owner, is_owner_or_admin
+from api.management.authz import get_or_denied, is_owner, is_owner_or_admin
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ class UpdateMembershipInput:
 
 
 def update_membership(info: Info, input: UpdateMembershipInput) -> types.ManagementMembership:
-    membership = models.Membership.objects.get(pk=input.id)
+    membership = get_or_denied(models.Membership.objects, pk=input.id)
     organization = membership.organization
     user = info.context.request.user
 
@@ -52,7 +52,7 @@ def delete_membership(info: Info, input: DeleteMembershipInput) -> strawberry.ID
     leave the organization owned by a non-member, and is a step towards taking it
     over. Owners may still leave of their own accord.
     """
-    membership = models.Membership.objects.get(pk=input.id)
+    membership = get_or_denied(models.Membership.objects, pk=input.id)
     organization = membership.organization
     user = info.context.request.user
 
@@ -89,8 +89,8 @@ def set_membership_brand_hue(
     Scoped to the caller's own membership, so a user can only recolor their own
     view of an organization. Pass a null `brand_hue` to clear it.
     """
-    membership = models.Membership.objects.get(
-        user=info.context.request.user, organization_id=input.organization
+    membership = get_or_denied(
+        models.Membership.objects, user=info.context.request.user, organization_id=input.organization
     )
     membership.brand_hue = input.brand_hue
     membership.save()

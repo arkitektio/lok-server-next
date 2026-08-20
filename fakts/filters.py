@@ -12,7 +12,8 @@ from fakts import enums as fakts_enums
 class UserFilter:
     """Filter for User model."""
 
-    name: Optional[FilterLookup[str]] | None
+    # `User` has no `name` column; filter on `username` instead.
+    username: Optional[FilterLookup[str]] | None
 
     @strawberry_django.filter_field
     def ids(self, value: list[strawberry.ID], prefix: str) -> Q:
@@ -48,7 +49,12 @@ class ClientFilter:
 
     @strawberry_django.filter_field
     def role(self, value: fakts_enums.ClientRole, prefix: str) -> Q:
-        return Q(**{f"{prefix}role": value.value})
+        # `Client.role` is a TextChoicesField, which only accepts its enum
+        # members in lookups — a bare string raised at query time.
+        # `ClientRole` is a `str, Enum` built from `strawberry.enum_value(...)`,
+        # so its `.value` is the *repr* of the wrapper, not the raw string. The
+        # member *names* line up with the model's choices enum, so map by name.
+        return Q(**{f"{prefix}role": fakts_enums.ClientRoleChoices[value.name]})
 
 
 @strawberry_django.filter_type(fakts_models.App)
@@ -70,7 +76,8 @@ class RedeemTokenFilter:
 
     @strawberry_django.filter_field
     def search(self, value: str, prefix: str) -> Q:
-        return Q(**{f"{prefix}name__contains": value})
+        # RedeemToken has no `name`; search by the hub it was issued for.
+        return Q(**{f"{prefix}hub__name__icontains": value})
 
 
 @strawberry_django.filter_type(fakts_models.Service)
@@ -125,7 +132,7 @@ class ServiceInstanceFilter:
 
     @strawberry_django.filter_field
     def search(self, value: str, prefix: str) -> Q:
-        return Q(**{f"{prefix}backend__contains": value})
+        return Q(**{f"{prefix}instance_id__icontains": value})
 
 
 @strawberry_django.filter_type(fakts_models.ServiceRelease)
@@ -136,7 +143,7 @@ class ServiceReleaseFilter:
 
     @strawberry_django.filter_field
     def search(self, value: str, prefix: str) -> Q:
-        return Q(**{f"{prefix}backend__contains": value})
+        return Q(**{f"{prefix}version__icontains": value})
 
 
 @strawberry_django.filter_type(fakts_models.Hub)
@@ -147,7 +154,7 @@ class HubFilter:
 
     @strawberry_django.filter_field
     def search(self, value: str, prefix: str) -> Q:
-        return Q(**{f"{prefix}backend__contains": value})
+        return Q(**{f"{prefix}name__icontains": value})
 
 
 @strawberry_django.order_type(fakts_models.App)

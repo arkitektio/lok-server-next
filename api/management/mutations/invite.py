@@ -6,7 +6,7 @@ from django.utils import timezone
 from datetime import timedelta
 import kante
 from graphql import GraphQLError
-from api.management.authz import is_owner
+from api.management.authz import DENIED, get_or_denied, is_owner, is_owner_or_admin
 
 
 @kante.input
@@ -28,11 +28,11 @@ def create_invite(info: Info, input: CreateInviteInput) -> types.ManagementInvit
     If no roles are specified, the 'guest' role will be assigned.
     """
     if input.organization:
-        organization = models.Organization.objects.get(id=input.organization)
+        organization = get_or_denied(models.Organization.objects, id=input.organization)
         if not is_owner(info.context.request.user, organization):
             raise GraphQLError("You must own the organization to create an invite")
     else:
-        raise Exception("Organization ID must be provided")
+        raise GraphQLError("Organization ID must be provided")
 
     # Calculate expiration date if specified
     expires_at = None
@@ -80,21 +80,23 @@ def accept_invite(info: Info, input: AcceptInviteInput) -> types.ManagementMembe
 
     Validates the invite token and adds the user to the organization.
     """
+    # `Invite.token` is a UUIDField: a non-UUID token used to 500 (ValidationError)
+    # instead of reporting an invalid token.
     try:
-        invite = models.Invite.objects.get(token=input.token)
-    except models.Invite.DoesNotExist:
-        raise Exception("Invalid invite token")
+        invite = get_or_denied(models.Invite.objects, token=input.token)
+    except GraphQLError:
+        raise GraphQLError("Invalid invite token")
 
     # Check if invite is still valid
     if not invite.is_valid():
         if invite.status == models.Invite.Status.ACCEPTED:
-            raise Exception("This invite has already been accepted")
+            raise GraphQLError("This invite has already been accepted")
         elif invite.status == models.Invite.Status.DECLINED:
-            raise Exception("This invite has been declined")
+            raise GraphQLError("This invite has been declined")
         elif invite.status == models.Invite.Status.CANCELLED:
-            raise Exception("This invite has been cancelled")
+            raise GraphQLError("This invite has been cancelled")
         else:
-            raise Exception("This invite has expired")
+            raise GraphQLError("This invite has expired")
 
     user = info.context.request.user
     organization = invite.created_for
@@ -149,13 +151,13 @@ def decline_invite(info: Info, input: DeclineInviteInput) -> types.ManagementInv
     Marks the invite as declined.
     """
     try:
-        invite = models.Invite.objects.get(token=input.token)
-    except models.Invite.DoesNotExist:
-        raise Exception("Invalid invite token")
+        invite = get_or_denied(models.Invite.objects, token=input.token)
+    except GraphQLError:
+        raise GraphQLError("Invalid invite token")
 
     # Check if invite is still pending
     if invite.status != models.Invite.Status.PENDING:
-        raise Exception(f"This invite has already been {invite.status}")
+        raise GraphQLError(f"This invite has already been {invite.status}")
 
     user = info.context.request.user
     invite.decline(user)
@@ -172,22 +174,21 @@ class CancelInviteInput:
 
 def cancel_invite(info: Info, input: CancelInviteInput) -> types.ManagementInvite:
     """
-    Cancel an invite (only the creator can cancel).
+    Cancel an invite. The organization's owner or admins may cancel any of its
+    invites (an invite is a bearer credential into the organization, so the
+    people who govern membership must be able to revoke it, not only whoever
+    happened to create it).
 
     Marks the invite as cancelled.
     """
-    try:
-        invite = models.Invite.objects.get(id=input.id)
-    except models.Invite.DoesNotExist:
-        raise Exception("Invalid invite ID")
+    invite = get_or_denied(models.Invite.objects.select_related("created_for"), id=input.id)
 
-    # Check if user is the creator
-    if invite.created_by != info.context.request.user:
-        raise Exception("Only the invite creator can cancel it")
+    if not is_owner_or_admin(info.context.request.user, invite.created_for):
+        raise GraphQLError(DENIED)
 
     # Check if invite is still pending
     if invite.status != models.Invite.Status.PENDING:
-        raise Exception(f"Cannot cancel an invite that has been {invite.status}")
+        raise GraphQLError(f"Cannot cancel an invite that has been {invite.status}")
 
     invite.cancel()
 

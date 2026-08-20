@@ -1,46 +1,73 @@
 from kante import Info
 import strawberry
+from django.db import IntegrityError, transaction
+from pydantic import ValidationError as PydanticValidationError
 from api.management import types
 from karakter import models
 from karakter.hashers import hash_device_id
 from fakts import models as fakts_models
-from api.management.authz import DENIED, assert_member
+from api.management.authz import DENIED, assert_member, get_or_denied
 from graphql import GraphQLError
 from fakts import logic, builders, base_models, enums
 from fakts.services import aliases as alias_services
 import kante
-from api.management.device_code_authz import resolve_declinable_device_code
+from api.management.device_code_authz import resolve_device_code_with_proof
 
 
 @kante.input
 class AcceptHubDeviceCodeInput:
-    """Input for creating a single-use magic device code for an organization"""
+    """Input for accepting a pending hub device code into an organization."""
 
     device_code: strawberry.ID
+    code: str = strawberry.field(
+        description="The user-facing code the device displayed — proof that the approver actually saw the enrolment request"
+    )
     organization: strawberry.ID
     allow_ionscale: bool = True
 
 
 def accept_hub_device_code(info: Info, input: AcceptHubDeviceCodeInput) -> types.ManagementHub:
     """
-    Create a single-use magic invite link for an organization.
+    Accept a pending hub device code: provision the hub described by its staged
+    manifest (service instances, roles, scopes, aliases, clients) inside the
+    organization and bind the hub's identity client to the caller's membership.
 
-    Returns an invite with a unique token that can be shared.
-    The link can only be used once and expires after the specified days.
-    If no roles are specified, the 'guest' role will be assigned.
+    Requires the user code the device displayed (proof of possession) and
+    membership in the target organization.
     """
     user = info.context.request.user
-    try:
-        device_code = fakts_models.DeviceCode.objects.get(id=input.device_code, kind="hub")
-        organization = models.Organization.objects.get(id=input.organization)
-    except (fakts_models.DeviceCode.DoesNotExist, models.Organization.DoesNotExist):
-        raise GraphQLError(DENIED)
+    device_code = resolve_device_code_with_proof(
+        fakts_models.DeviceCode, device_code_id=input.device_code, code=input.code, kind="hub"
+    )
+    organization = get_or_denied(models.Organization.objects, id=input.organization)
 
     # Creates a hub (plus service instances and auth keys) inside `organization`.
     assert_member(info, organization)
 
-    manifest = device_code.hub_manifest_as_model
+    try:
+        manifest = device_code.hub_manifest_as_model
+    except (PydanticValidationError, TypeError):
+        raise GraphQLError("The staged hub manifest of this device code is malformed.")
 
+    if fakts_models.Hub.objects.filter(organization=organization, identifier=manifest.identifier).exists():
+        raise GraphQLError(
+            f"A hub with identifier '{manifest.identifier}' already exists in this organization."
+        )
+
+    try:
+        with transaction.atomic():
+            return _provision_hub(info, input, device_code, organization, manifest, user)
+    except IntegrityError:
+        # The pre-check above closes the common case; this closes the race (or a
+        # duplicate further down the manifest) without leaking a half-built hub.
+        if fakts_models.Hub.objects.filter(organization=organization, identifier=manifest.identifier).exists():
+            raise GraphQLError(
+                f"A hub with identifier '{manifest.identifier}' already exists in this organization."
+            )
+        raise GraphQLError("Could not provision the hub: the manifest conflicts with existing objects in this organization.")
+
+
+def _provision_hub(info: Info, input: AcceptHubDeviceCodeInput, device_code, organization, manifest, user) -> fakts_models.Hub:
     hub = fakts_models.Hub.objects.create(
         name=manifest.identifier,
         identifier=manifest.identifier,
@@ -111,7 +138,7 @@ def accept_hub_device_code(info: Info, input: AcceptHubDeviceCodeInput) -> types
             alias_services.upsert_instance_alias(instance, alias)
 
     accepting_user = info.context.request.user
-    membership = models.Membership.objects.get(user=accepting_user, organization=organization)
+    membership = get_or_denied(models.Membership.objects, user=accepting_user, organization=organization)
 
     for clr in manifest.clients:
         client_manifest = clr.manifest
@@ -164,11 +191,11 @@ class DeclineHubDeviceCodeInput:
 
 def decline_hub_device_code(info: Info, input: DeclineHubDeviceCodeInput) -> types.ManagementHubDeviceCode:
     """
-    Decline an invite to join an organization.
+    Decline a pending hub device code.
 
-    Marks the invite as declined.
+    Marks the device code as denied; the polling hub receives `access_denied`.
     """
-    device_code = resolve_declinable_device_code(
+    device_code = resolve_device_code_with_proof(
         fakts_models.DeviceCode, device_code_id=input.device_code, code=input.code
     )
 

@@ -2,7 +2,7 @@ from kante.types import Info
 import strawberry
 from graphql import GraphQLError
 from karakter import types, models
-from karakter.authz import DENIED, get_user, resolve_own_media_store
+from karakter.authz import get_or_denied, get_user, resolve_own_media_store
 import logging
 
 logger = logging.getLogger(__name__)
@@ -15,11 +15,9 @@ def _group_the_caller_belongs_to(info: Info, group_id: strawberry.ID) -> models.
     principal could create or overwrite the profile of any group in the
     deployment.
     """
-    user = get_user(info)
-    try:
-        return models.Group.objects.get(pk=group_id, user=user)
-    except models.Group.DoesNotExist:
-        raise GraphQLError(DENIED)
+    # `User.groups` is declared with `related_query_name="karakter_user"`;
+    # the previous `user=` lookup did not exist and raised on every call.
+    return get_or_denied(models.Group.objects, pk=group_id, karakter_user=get_user(info))
 
 
 @strawberry.input
@@ -44,11 +42,7 @@ class UpdateGroupProfileInput:
     
     
 def update_group_profile(info: Info, input: UpdateGroupProfileInput) -> types.GroupProfile:
-    user = get_user(info)
-    try:
-        profile = models.GroupProfile.objects.get(pk=input.id, group__user=user)
-    except models.GroupProfile.DoesNotExist:
-        raise GraphQLError(DENIED)
+    profile = get_or_denied(models.GroupProfile.objects, pk=input.id, group__karakter_user=get_user(info))
     profile.name = input.name
     profile.avatar = resolve_own_media_store(info, input.avatar, models.MediaStore)
 

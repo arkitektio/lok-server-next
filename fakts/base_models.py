@@ -18,6 +18,10 @@ class WellKnownFakts(BaseModel):
     description: str | None = None
     base_url: str
     frontend_url: str
+    """DEPRECATED. The deployment's base domain. Kept for back-compat only —
+    clients must use the explicit, always-absolute `configure` (and
+    `mesh_configure` / `hub_configure`) templates instead of deriving links
+    from this value. Will be removed in a future protocol version."""
     configure: str | None = None
     """Absolute URL template for the device-code configure page. The literal
     `{code}` placeholder is substituted by the client with the device code.
@@ -71,7 +75,8 @@ class WellKnownFakts(BaseModel):
     """DEPRECATED. Absolute URL of the *hub* claim endpoint — the holder of a
     hub token POSTs it here to receive the rendered server configuration. Only
     the partner-webhook path still uses it; interactive hubs receive their
-    config through the token endpoint."""
+    config through the token endpoint (`hub_authorization_endpoint` +
+    `token_endpoint`). Will be removed in a future protocol version."""
     hub_configure: str | None = None
     """Absolute URL template for the hub configure page. The literal `{code}`
     placeholder is substituted by the client with the hub device code."""

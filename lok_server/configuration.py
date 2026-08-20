@@ -50,6 +50,25 @@ class DjangoSettings(BaseModel):
             "Equivalent to exporting AUTHLIB_INSECURE_TRANSPORT=1."
         ),
     )
+    cors_allowed_origins: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Browser origins (scheme://host[:port]) allowed to call the OAuth/OIDC "
+            "(/o/), fakts (/f/) and discovery (/.well-known/) endpoints cross-origin "
+            "(django-cors-headers CORS_ALLOWED_ORIGINS). Empty means no cross-origin "
+            "browser access unless cors_allow_all_origins is set."
+        ),
+    )
+    cors_allow_all_origins: bool = Field(
+        default=False,
+        description=(
+            "Answer every Origin with Access-Control-Allow-Origin on the OAuth/fakts/"
+            "discovery endpoints (CORS_ALLOW_ALL_ORIGINS). Those endpoints are public "
+            "and bearer-authenticated (no cookies are sent cross-origin), so this is "
+            "safe for deployments whose web apps live on arbitrary hosts; prefer an "
+            "explicit cors_allowed_origins list when the hosts are known."
+        ),
+    )
     admin: AdminSettings = Field(description="Superuser provisioned on first boot.")
     csrf_trusted_origins: List[str] = Field(default_factory=lambda: ["http://localhost", "https://localhost"], description="CSRF_TRUSTED_ORIGINS for unsafe (POST) requests.")
     force_script_name: str = Field(default="", description="URL path prefix (FORCE_SCRIPT_NAME) this service is served under.")

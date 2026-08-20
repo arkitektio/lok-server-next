@@ -111,7 +111,7 @@ def test_update_mesh_toggles_dns_and_pushes_full_state(ionscale_repo):
     )
 
     org = factories.make_organization()
-    member = factories.make_membership(organization=org).user
+    member = org.owner  # mesh settings are owner/admin-only
     mesh = ensure_org_mesh(org)
     ionscale_repo.dns_configs.clear()
 
@@ -140,11 +140,11 @@ def test_update_mesh_https_requires_magic_dns(ionscale_repo):
     )
 
     org = factories.make_organization()
-    member = factories.make_membership(organization=org).user
+    member = org.owner  # mesh settings are owner/admin-only
     mesh = ensure_org_mesh(org)
     ionscale_repo.dns_configs.clear()
 
-    with pytest.raises(ValueError, match="MagicDNS"):
+    with pytest.raises(GraphQLError, match="MagicDNS"):
         update_ionscale_layer(
             _info_for(member),
             UpdateIonscaleLayerInput(
@@ -170,7 +170,7 @@ def test_update_mesh_dns_failure_propagates_and_rolls_back(ionscale_repo):
     )
 
     org = factories.make_organization()
-    member = factories.make_membership(organization=org).user
+    member = org.owner  # mesh settings are owner/admin-only
     mesh = ensure_org_mesh(org)
 
     def boom(tailnet, config):
@@ -238,7 +238,9 @@ async def test_update_mesh_dns_through_graphql_schema(ionscale_repo):
     from tests import factories
 
     def _setup():
-        membership = factories.make_membership()
+        # Mesh settings are owner/admin-only: act as the organization's owner.
+        organization = factories.make_organization()
+        membership = factories.make_membership(user=organization.owner, organization=organization)
         request_client = factories.make_client(membership=membership)
         mesh = ensure_org_mesh(membership.organization)
         ionscale_repo.dns_configs.clear()
@@ -338,7 +340,7 @@ def test_accept_mesh_device_code_mints_key_and_sets_name(ionscale_repo):
     )
 
     org = factories.make_organization()
-    member = factories.make_membership(organization=org).user
+    member = org.owner  # minting a mesh key is owner/admin-only
     ensure_org_mesh(org)
 
     dc = start_mesh_device_code(
@@ -348,7 +350,7 @@ def test_accept_mesh_device_code_mints_key_and_sets_name(ionscale_repo):
     # Human omits machine_name -> falls back to the requested one.
     accept_mesh_device_code(
         _info_for(member),
-        AcceptMeshDeviceCodeInput(device_code=str(dc.pk), organization=str(org.pk)),
+        AcceptMeshDeviceCodeInput(device_code=str(dc.pk), code=dc.code, organization=str(org.pk)),
     )
 
     dc.refresh_from_db()
@@ -367,7 +369,7 @@ def test_accept_mesh_device_code_human_overrides_name(ionscale_repo):
     )
 
     org = factories.make_organization()
-    member = factories.make_membership(organization=org).user
+    member = org.owner  # minting a mesh key is owner/admin-only
     ensure_org_mesh(org)
 
     dc = start_mesh_device_code(
@@ -376,7 +378,7 @@ def test_accept_mesh_device_code_human_overrides_name(ionscale_repo):
     accept_mesh_device_code(
         _info_for(member),
         AcceptMeshDeviceCodeInput(
-            device_code=str(dc.pk), organization=str(org.pk), machine_name="renamed-box"
+            device_code=str(dc.pk), code=dc.code, organization=str(org.pk), machine_name="renamed-box"
         ),
     )
 
@@ -403,7 +405,7 @@ def test_accept_mesh_device_code_rejects_non_member(ionscale_repo):
     with pytest.raises(GraphQLError):
         accept_mesh_device_code(
             _info_for(outsider),
-            AcceptMeshDeviceCodeInput(device_code=str(dc.pk), organization=str(org.pk)),
+            AcceptMeshDeviceCodeInput(device_code=str(dc.pk), code=dc.code, organization=str(org.pk)),
         )
     assert len(ionscale_repo.created_auth_keys) == 0
 
@@ -425,7 +427,7 @@ def test_mesh_challenge_view_poll_lifecycle(ionscale_repo):
     )
 
     org = factories.make_organization()
-    member = factories.make_membership(organization=org).user
+    member = org.owner  # minting a mesh key is owner/admin-only
     ensure_org_mesh(org)
     dc = start_mesh_device_code(
         base_models.MeshDeviceCodeStartRequest(requested_machine_name="gpu-01")
@@ -443,10 +445,10 @@ def test_mesh_challenge_view_poll_lifecycle(ionscale_repo):
     # Before authorization -> pending.
     assert _poll()["status"] == "pending"
 
-    # After a member accepts -> granted with the minted key.
+    # After the owner accepts -> granted with the minted key.
     accept_mesh_device_code(
         _info_for(member),
-        AcceptMeshDeviceCodeInput(device_code=str(dc.pk), organization=str(org.pk)),
+        AcceptMeshDeviceCodeInput(device_code=str(dc.pk), code=dc.code, organization=str(org.pk)),
     )
     granted = _poll()
     assert granted["status"] == "granted"
@@ -493,7 +495,9 @@ async def test_accept_mesh_device_code_through_graphql_schema(ionscale_repo):
     from tests.conftest import build_auth_context
 
     def _setup():
-        membership = factories.make_membership()
+        # Minting a mesh key is owner/admin-only: act as the organization's owner.
+        organization = factories.make_organization()
+        membership = factories.make_membership(user=organization.owner, organization=organization)
         request_client = factories.make_client(membership=membership)
         ensure_org_mesh(membership.organization)
         dc = start_mesh_device_code(
@@ -511,7 +515,7 @@ async def test_accept_mesh_device_code_through_graphql_schema(ionscale_repo):
         MESH_ACCEPT,
         context_value=ctx,
         variable_values={
-            "input": {"deviceCode": str(dc.pk), "organization": str(membership.organization.pk)}
+            "input": {"deviceCode": str(dc.pk), "code": dc.code, "organization": str(membership.organization.pk)}
         },
     )
 

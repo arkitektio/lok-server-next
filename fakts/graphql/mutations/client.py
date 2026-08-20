@@ -5,6 +5,7 @@ from kante.types import Info
 from fakts import enums, inputs, types
 from fakts.base_models import Manifest
 from fakts.services.clients import bind_client, create_public_client
+from karakter.authz import get_or_denied, get_organization, get_user
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +23,10 @@ def create_developmental_client(info: Info, input: inputs.DevelopmentClientInput
 
     from karakter.models import Membership
 
-    membership = Membership.objects.get(
-        user=info.context.request.user,
-        organization=info.context.request.organization,
+    membership = get_or_denied(
+        Membership.objects,
+        user=get_user(info),
+        organization=get_organization(info),
     )
     client = create_public_client(
         kind=enums.ClientKindVanilla.DEVELOPMENT.value,

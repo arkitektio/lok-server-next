@@ -29,18 +29,14 @@ from authapp.server import server, resource_protector
 from authlib.oauth2 import OAuth2Error
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
-from joserfc.jwk import RSAKey
+from authapp.token_generators import public_jwks
 
-
-# Generate a JWK representation from the private key. We expose the
-# public part (is_private=False) as the published JWK set.
-jwk = RSAKey.import_key(settings.PUBLIC_KEY)
-jwk_dict = jwk.as_dict(private=False, kid=settings.KEY_ID, use="sig")  # published JWKS — public key only
 
 @csrf_exempt
 def jwks(request: HttpRequest) -> JsonResponse:
-    """EXPOSE JWKS."""
-    return JsonResponse({"keys": [jwk_dict]})
+    """EXPOSE JWKS — the public half of the signing key only (see
+    ``authapp.token_generators.public_jwks``)."""
+    return JsonResponse(public_jwks())
 
 
 @csrf_exempt

@@ -116,7 +116,10 @@ async def test_aliases_layer_resolves_when_null():
     def setup():
         membership = factories.make_membership()
         request_client = factories.make_client(membership=membership)
-        instance = factories.make_service_instance()
+        # Service instances are tenant-scoped on this schema, so the instance
+        # must live in the caller's organization to be listed.
+        hub = factories.make_hub(organization=membership.organization)
+        instance = factories.make_service_instance(hub=hub)
         models.InstanceAlias.objects.create(instance=instance, host="example.com", kind="absolute")
         return build_auth_context(membership.user, membership.organization, request_client)
 

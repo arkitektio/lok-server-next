@@ -36,6 +36,17 @@ private_key = serialization.load_pem_private_key(settings.PRIVATE_KEY.encode("ut
 jwk = RSAKey.import_key(settings.PRIVATE_KEY)
 jwk_dict = jwk.as_dict(private=True, kid=settings.KEY_ID, use="sig")  # signing key — MUST include private material
 
+# The *public* half of the same key, as published at /o/jwks/ and used by every
+# in-process verifier (e.g. the bearer validator). This is the ONLY JWK that may
+# ever leave this module towards anything that is not the signer.
+public_jwk_dict = jwk.as_dict(private=False, kid=settings.KEY_ID, use="sig")
+assert not any(k in public_jwk_dict for k in ("d", "p", "q", "dp", "dq", "qi")), "public JWK leaked private members"
+
+
+def public_jwks() -> dict:
+    """The published JWK set ({"keys": [...]}) — public members only."""
+    return {"keys": [public_jwk_dict]}
+
 
 class MyJWTBearerTokenGenerator(JWTBearerTokenGenerator):
     """Custom JWT Bearer token generator that adds application claims.

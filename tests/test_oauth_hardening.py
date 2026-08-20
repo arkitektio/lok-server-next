@@ -77,7 +77,8 @@ def test_revoke_client_sessions_mutation(client):
     row = OAuth2Token.objects.get(access_token=token["access_token"])
     fakts_client = models.Client.objects.get(client_id=body["client_id"])
 
-    info = SimpleNamespace(context=SimpleNamespace(request=SimpleNamespace(user=fakts_client.membership.user)))
+    # Revoking a client's sessions is owner/admin-only: act as the organization's owner.
+    info = SimpleNamespace(context=SimpleNamespace(request=SimpleNamespace(user=fakts_client.organization.owner)))
     revoke_client_sessions(info, RevokeClientSessionsInput(client=str(fakts_client.id)))
 
     row.refresh_from_db()

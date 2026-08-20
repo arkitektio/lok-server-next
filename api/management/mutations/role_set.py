@@ -3,8 +3,9 @@ import strawberry
 from api.management import types
 from karakter import models
 import kante
+from django.db import IntegrityError
 from graphql import GraphQLError
-from api.management.authz import is_owner
+from api.management.authz import get_or_denied, is_owner
 
 
 @kante.input
@@ -30,10 +31,15 @@ def _roles_for_org(role_ids: list[strawberry.ID] | None, organization: models.Or
 
 def create_role_set(info: Info, input: CreateRoleSetInput) -> types.ManagementRoleSet:
     """Create a role set: a named bundle of roles that can be applied together."""
-    organization = models.Organization.objects.get(id=input.organization)
+    organization = get_or_denied(models.Organization.objects, id=input.organization)
     _assert_owner(info, organization)
 
-    role_set = models.RoleSet.objects.create(name=input.name, organization=organization)
+    if models.RoleSet.objects.filter(name=input.name, organization=organization).exists():
+        raise GraphQLError(f"A role set named '{input.name}' already exists in this organization.")
+    try:
+        role_set = models.RoleSet.objects.create(name=input.name, organization=organization)
+    except IntegrityError:
+        raise GraphQLError(f"A role set named '{input.name}' already exists in this organization.")
     role_set.roles.set(_roles_for_org(input.roles, organization))
     return role_set
 
@@ -49,12 +55,21 @@ class UpdateRoleSetInput:
 
 def update_role_set(info: Info, input: UpdateRoleSetInput) -> types.ManagementRoleSet:
     """Update a role set's name and/or the roles it bundles."""
-    role_set = models.RoleSet.objects.get(id=input.id)
+    role_set = get_or_denied(models.RoleSet.objects, id=input.id)
     _assert_owner(info, role_set.organization)
 
     if input.name is not None:
+        if (
+            models.RoleSet.objects.filter(name=input.name, organization=role_set.organization)
+            .exclude(pk=role_set.pk)
+            .exists()
+        ):
+            raise GraphQLError(f"A role set named '{input.name}' already exists in this organization.")
         role_set.name = input.name
-        role_set.save()
+        try:
+            role_set.save()
+        except IntegrityError:
+            raise GraphQLError(f"A role set named '{input.name}' already exists in this organization.")
     if input.roles is not None:
         role_set.roles.set(_roles_for_org(input.roles, role_set.organization))
     return role_set
@@ -69,7 +84,7 @@ class DeleteRoleSetInput:
 
 def delete_role_set(info: Info, input: DeleteRoleSetInput) -> strawberry.ID:
     """Delete a role set. The roles themselves are not affected."""
-    role_set = models.RoleSet.objects.get(id=input.id)
+    role_set = get_or_denied(models.RoleSet.objects, id=input.id)
     _assert_owner(info, role_set.organization)
     role_set.delete()
     return input.id

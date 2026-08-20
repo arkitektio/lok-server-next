@@ -4,14 +4,13 @@ from api.management import types
 from karakter import models
 from karakter.hashers import hash_device_id
 import kante
-from api.management.authz import DENIED, assert_member
+from api.management.authz import assert_member, get_or_denied
 from fakts import models as fakts_models
-from graphql import GraphQLError
 
 
 @kante.input
 class CreateDeviceInput:
-    """Input for creating a single-use magic invite link for an organization"""
+    """Input for registering a device (compute node) in an organization."""
 
     organization: strawberry.ID
     device_id: strawberry.ID
@@ -19,11 +18,8 @@ class CreateDeviceInput:
 
 
 def create_device(info: Info, input: CreateDeviceInput) -> types.ManagementDevice:
-    """ """
-    try:
-        organization = models.Organization.objects.get(id=input.organization)
-    except models.Organization.DoesNotExist:
-        raise GraphQLError(DENIED)
+    """Register (or rename) a device in an organization, keyed by its hashed device id."""
+    organization = get_or_denied(models.Organization.objects, id=input.organization)
 
     assert_member(info, organization)
 
@@ -34,19 +30,16 @@ def create_device(info: Info, input: CreateDeviceInput) -> types.ManagementDevic
 
 @kante.input
 class UpdateDeviceInput:
-    """Input for creating a single-use magic invite link for an organization"""
+    """Input for renaming a device."""
 
     id: strawberry.ID
     name: str
 
 
 def update_device(info: Info, input: UpdateDeviceInput) -> types.ManagementDevice:
-    """ """
+    """Rename a device."""
 
-    try:
-        device = fakts_models.Device.objects.get(id=input.id)
-    except fakts_models.Device.DoesNotExist:
-        raise GraphQLError(DENIED)
+    device = get_or_denied(fakts_models.Device.objects, id=input.id)
 
     assert_member(info, device.organization)
 
@@ -58,21 +51,14 @@ def update_device(info: Info, input: UpdateDeviceInput) -> types.ManagementDevic
 
 @kante.input
 class DeleteDeviceInput:
-    """Input for accepting an organization invite"""
+    """Input for deleting a device."""
 
     id: strawberry.ID
 
 
 def delete_device(info: Info, input: DeleteDeviceInput) -> strawberry.ID:
-    """
-    Accept an invite to join an organization.
-
-    Validates the invite token and adds the user to the organization.
-    """
-    try:
-        device = fakts_models.Device.objects.get(id=input.id)
-    except fakts_models.Device.DoesNotExist:
-        raise GraphQLError(DENIED)
+    """Delete a device, returning the deleted id."""
+    device = get_or_denied(fakts_models.Device.objects, id=input.id)
 
     assert_member(info, device.organization)
 

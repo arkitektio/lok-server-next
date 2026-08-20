@@ -180,7 +180,10 @@ def _mutation_setup():
     so editing one redirects that service's traffic). Previously this built the
     instance in an unrelated org, which only passed because there was no check.
     """
-    membership = factories.make_membership()
+    # Alias mutations are owner/admin-only (an alias is a routing entry), so the
+    # caller is the organization's owner.
+    organization = factories.make_organization()
+    membership = factories.make_membership(user=organization.owner, organization=organization)
     # auth resolves the OAuth2Client back to its backing fakts Client
     request_client = factories.make_client(membership=membership)
     hub = factories.make_hub(organization=membership.organization)

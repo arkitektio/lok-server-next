@@ -49,7 +49,7 @@ def create_service_instance(info: Info, input: inputs.CreateServiceInstanceInput
     """
     get_organization(info)
 
-    service = models.Service.objects.get(id=input.service)
+    service = get_scoped_or_denied(models.Service.objects, info, id=input.service)
 
     instance = models.ServiceInstance.objects.create(
         identifier=input.identifier,

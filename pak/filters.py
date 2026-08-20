@@ -8,7 +8,8 @@ from django.db.models import Q
 
 @strawberry_django.filter_type(models.StashItem)
 class StashItemFilter:
-    username: Optional[FilterLookup[str]] | None
+    # StashItem has no `username`; its searchable columns are `identifier` and `object`.
+    identifier: Optional[FilterLookup[str]] | None
 
     @strawberry_django.filter_field
     def ids(self, value: list[strawberry.ID], prefix: str) -> Q:
@@ -16,11 +17,11 @@ class StashItemFilter:
 
     @strawberry_django.filter_field
     def search(self, value: str, prefix: str) -> Q:
-        return Q(**{f"{prefix}username__contains": value})
+        return Q(**{f"{prefix}identifier__icontains": value}) | Q(**{f"{prefix}object__icontains": value})
 
     @strawberry_django.filter_field
     def stashes(self, value: list[strawberry.ID], prefix: str) -> Q:
-        return Q(**{f"{prefix}stashes__in": value})
+        return Q(**{f"{prefix}stash__in": value})
 
 
 @strawberry_django.filter_type(models.Stash, description="__doc__")

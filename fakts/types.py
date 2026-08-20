@@ -5,20 +5,11 @@ from karakter import types
 from fakts import models, scalars, filters, enums
 from authapp import types as atypes
 from kante.types import Info
-from graphql import GraphQLError
+from strawberry.scalars import JSON
 
-# Same wording as api.management.authz.DENIED, so a denial cannot be told apart
-# from a not-found and used as an existence oracle.
-DENIED = "Not found, or you are not authorized to access it."
-
-
-def build_prescoped_queryset(info, queryset, field="organization"):
-    if info.variable_values.get("filters", {}).get("scope") is None:
-        queryset = queryset.filter(**{field: info.context.request.organization})
-        return queryset
-
-    else:
-        raise Exception("Custom scopes not implemented yet")
+# `DENIED` is re-exported for `fakts.graphql.mutations.render`; the single source
+# of truth (and of the tenant-scoping helpers) is `karakter.authz`.
+from karakter.authz import DENIED, build_prescoped_queryset  # noqa: F401
 
 
 @strawberry.type(description="Temporary Credentials for a file upload that can be used by a Client (e.g. in a python datalayer)")
@@ -46,18 +37,21 @@ class Scope:
 @strawberry_django.type(
     models.Layer,
     ordering=filters.LayerOrdering,
-    description="A Service is a Webservice that a Client might want to access. It is not the configured instance of the service, but the service itself.",
+    description="A Layer is a network through which service instances can be reached (e.g. the public web, a tailnet, a VPN, or a docker network). Instance aliases are resolved relative to the layer they belong to.",
     pagination=True,
     filters=filters.LayerFilter,
 )
 class Layer:
     id: strawberry.ID
     name: str = strawberry.field(description="The name of the layer")
-    identifier: scalars.ServiceIdentifier = strawberry.field(description="The identifier of the service. This should be a globally unique string that identifies the service. We encourage you to use the reverse domain name notation. E.g. `com.example.myservice`")
-    logo: types.MediaStore | None = strawberry.field(description="The logo of the service. This should be a url to a logo that can be used to represent the service.")
-    description: str | None = strawberry.field(description="The description of the service. This should be a human readable description of the service.")
-    
-    
+    identifier: scalars.ServiceIdentifier = strawberry.field(description="The identifier of the layer. This should be a globally unique string that identifies the layer. We encourage you to use the reverse domain name notation. E.g. `com.example.mylayer`")
+    logo: types.MediaStore | None = strawberry.field(description="The logo of the layer. This should be a url to a logo that can be used to represent the layer.")
+    description: str | None = strawberry.field(description="The description of the layer. This should be a human readable description of the layer.")
+
+    @classmethod
+    def get_queryset(cls, queryset, info: Info, **kwargs):
+        return build_prescoped_queryset(info, queryset)
+
 
 @strawberry_django.type(
     models.Hub,
@@ -72,7 +66,10 @@ class Hub:
     identifier: scalars.ServiceIdentifier = strawberry.field(description="The identifier of the hub. This should be a globally unique string that identifies the hub. We encourage you to use the reverse domain name notation. E.g. `com.example.myhub`")
     description: str | None = strawberry.field(description="The description of the service. This should be a human readable description of the service.")
     name: str = strawberry.field(description="The name of the hub. This should be a human readable name of the hub.")
-    
+
+    @classmethod
+    def get_queryset(cls, queryset, info: Info, **kwargs):
+        return build_prescoped_queryset(info, queryset)
 
 
 @strawberry_django.type(
@@ -90,7 +87,11 @@ class Service:
     releases: list["ServiceRelease"] = strawberry_django.field(
         description="The releases of the service. A service release is a specific version of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."
     )
-    logo: types.MediaStore | None = strawberry.field(description="The logo of the app. This should be a url to a logo that can be used to represent the app.")
+    logo: types.MediaStore | None = strawberry.field(description="The logo of the service. This should be a url to a logo that can be used to represent the service.")
+
+    @classmethod
+    def get_queryset(cls, queryset, info: Info, **kwargs):
+        return build_prescoped_queryset(info, queryset)
 
 
 @strawberry_django.type(
@@ -107,7 +108,10 @@ class ServiceRelease:
     instances: list["ServiceInstance"] = strawberry_django.field(
         description="The instances of the service. A service instance is a configured instance of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."
     )
-    
+
+    @classmethod
+    def get_queryset(cls, queryset, info: Info, **kwargs):
+        return build_prescoped_queryset(info, queryset, field="service__organization")
 
 
 @strawberry_django.type(
@@ -136,6 +140,10 @@ class ServiceInstance:
         description="The aliases of the instance. An alias is a way to reach the instance. Clients can use these aliases to check if they can reach the instance. An alias can be an absolute alias (e.g. 'example.com') or a relative alias (e.g. 'example.com/path'). If the alias is relative, it will be relative to the layer's domain, port and path."
     )
 
+    @classmethod
+    def get_queryset(cls, queryset, info: Info, **kwargs):
+        return build_prescoped_queryset(info, queryset)
+
 
 @strawberry_django.type(
     models.InstanceAlias,
@@ -154,18 +162,26 @@ class InstanceAlias:
     challenge: str = strawberry.field(description="The challenge of the alias. This is used to verify that the alias is reachable. If set, the alias will be accessed via the challenge URL (e.g. 'example.com/.well-known/challenge'). If not set, the alias will be accessed via the instance's URL.")
     public: bool = strawberry.field(description="Is this alias publicly reachable? If true, the coordination server can also check the alias's health directly, enabling health checks from the kontrol interface.")
 
+    @classmethod
+    def get_queryset(cls, queryset, info: Info, **kwargs):
+        return build_prescoped_queryset(info, queryset, field="instance__organization")
+
 
 @strawberry_django.type(
     models.ServiceInstanceMapping,
     ordering=filters.ServiceInstanceMappingOrdering,
-    description="A ServiceInstance is a configured instance of a Service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information.",
+    description="A ServiceInstanceMapping binds one of a client's requirements (by key) to the ServiceInstance that fulfils it. The set of mappings of a client is its composed configuration.",
 )
 class ServiceInstanceMapping:
     id: strawberry.ID
-    instance: ServiceInstance = strawberry.field(description="The service that this instance belongs to.")
-    client: "Client" = strawberry.field(description="The client that this instance belongs to.")
-    key: str = strawberry.field(description="The key of the instance. This is a unique string that identifies the instance. It is used to identify the instance in the code and in the database.")
+    instance: ServiceInstance = strawberry.field(description="The service instance this requirement is mapped to.")
+    client: "Client" = strawberry.field(description="The client whose requirement this mapping fulfils.")
+    key: str = strawberry.field(description="The requirement key of the client that this mapping fulfils. Unique per client.")
     optional: bool = strawberry.field(description="Is this mapping optional? If a mapping is optional, you can configure the client without this mapping.")
+
+    @classmethod
+    def get_queryset(cls, queryset, info: Info, **kwargs):
+        return build_prescoped_queryset(info, queryset, field="instance__organization")
 
 
 @strawberry.type
@@ -191,6 +207,10 @@ class App:
 
     logo: types.MediaStore | None = strawberry.field(description="The logo of the app. This should be a url to a logo that can be used to represent the app.")
 
+    @classmethod
+    def get_queryset(cls, queryset, info: Info, **kwargs):
+        return build_prescoped_queryset(info, queryset)
+
 
 @strawberry_django.type(
     models.Release,
@@ -204,14 +224,40 @@ class Release:
     name: str = strawberry.field(description="The name of the release. This should be a string that identifies the release beyond the version number. E.g. `canary`.")
     logo: types.MediaStore | None = strawberry.field(description="The logo of the release. This should be a url to a logo that can be used to represent the release.")
     scopes: list[str] = strawberry.field(description="The scopes of the release. Scopes are used to limit the access of a client to a user's data. They represent app-level permissions.")
-    requirements: list[str] = strawberry.field(description="The requirements of the release. Requirements are used to limit the access of a client to a user's data. They represent app-level permissions.")
     clients: list["Client"] = strawberry.field(description="The clients of the release")
+
+    @strawberry_django.field(
+        description="The requirements of the release: the services (by key and service identifier) a client of this release needs composed against it. Each entry is a manifest `Requirement` object (`key`, `service`, `optional`, `description`).",
+    )
+    def requirements(self, info: Info) -> list[JSON]:
+        # Stored as a JSONField whose *default* is a dict but which every write
+        # path (fakts.services.clients.bind_client) fills with the manifest's
+        # list of requirement objects. Tolerate both shapes.
+        raw = self.requirements
+        if isinstance(raw, dict):
+            return [raw] if raw else []
+        return list(raw or [])
+
+    @classmethod
+    def get_queryset(cls, queryset, info: Info, **kwargs):
+        return build_prescoped_queryset(info, queryset, field="app__organization")
 
 
 @strawberry.type
 class PublicSource:
     kind: str = strawberry.field(description="The kind of the public source. E.g. 'github'")
     url: str = strawberry.field(description="The url of the public source")
+
+
+# Database `kind` value -> GraphQL enum. Every `ClientKindChoices` member must
+# appear here; unknown/legacy values fall back to DEVELOPMENT rather than None.
+_CLIENT_KINDS = {
+    enums.ClientKindChoices.WEBSITE.value: enums.ClientKind.WEBSITE,
+    enums.ClientKindChoices.DESKTOP.value: enums.ClientKind.DESKTOP,
+    enums.ClientKindChoices.DEVELOPMENT.value: enums.ClientKind.DEVELOPMENT,
+    enums.ClientKindChoices.HUB.value: enums.ClientKind.HUB,
+    enums.ClientKindChoices.RELYING_PARTY.value: enums.ClientKind.RELYING_PARTY,
+}
 
 
 @strawberry_django.type(
@@ -229,7 +275,7 @@ class Client:
     functional: bool = strawberry_django.field(description="Is this client functional? A functional client is a client that is able to authenticate users. If a client is not functional, it will not be able to authenticate users.")
     release: Release | None = strawberry_django.field(description="The release that this client belongs to. Null for clients that are not bound to an app release (hub identities, relying parties, pending registrations).")
     client_id: str = strawberry_django.field(description="The OAuth2 client id this client authenticates as.")
-    public: bool = strawberry_django.field(description="Is this client public? If a client is public ")
+    public: bool = strawberry_django.field(description="Is this client public? A public client cannot keep a secret (desktop apps, SPAs, hub identities) and authenticates without one, relying on PKCE / device-code flows instead.")
 
     @strawberry_django.field(
         description="The user this client acts for (derived from its membership).",
@@ -264,14 +310,9 @@ class Client:
 
 
 
-    @strawberry_django.field(description="The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information.")
+    @strawberry_django.field(description="What kind of principal this client is (its authentication strategy): DEVELOPMENT, WEBSITE, DESKTOP, HUB or RELYING_PARTY.")
     def kind(self, info: Info) -> enums.ClientKind:
-        if self.kind == "website":
-            return enums.ClientKind.WEBSITE
-        if self.kind == "desktop":
-            return enums.ClientKind.DESKTOP
-        if self.kind == "development":
-            return enums.ClientKind.DEVELOPMENT
+        return _CLIENT_KINDS.get(self.kind, enums.ClientKind.DEVELOPMENT)
 
     @strawberry_django.field(description="The operational role of the client. INTERFACE clients are human interfaces operated by a user in real time. AGENT clients are authorized once and then run unattended, receiving and processing tasks on the user's behalf.")
     def role(self, info: Info) -> enums.ClientRole:
@@ -281,20 +322,25 @@ class Client:
 
     @strawberry_django.field(description="The issue url of the client. This is the url where users can report issues and get more information about the client.")
     def issue_url(self, info: Info) -> str | None:
-        for source in self.public_sources:
-            if source.get("kind").lower() == "github":
-                return source.get("url") + "/issues/new"
+        for source in self.public_sources or []:
+            if not isinstance(source, dict):
+                continue
+            url = source.get("url")
+            if (source.get("kind") or "").lower() == "github" and url:
+                return f"{url.rstrip('/')}/issues/new"
 
         return None
 
     @strawberry_django.field(description="The public sources of the client. These are the public sources where users can find more information about the client.")
     def public_sources(self, info: Info) -> list[PublicSource]:
         sources = []
-        for source in self.public_sources:
+        for source in self.public_sources or []:
+            if not isinstance(source, dict):
+                continue
             sources.append(
                 PublicSource(
-                    kind=source.get("kind"),
-                    url=source.get("url"),
+                    kind=source.get("kind") or "",
+                    url=source.get("url") or "",
                 )
             )
         return sources
