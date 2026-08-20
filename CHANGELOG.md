@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.24 (2026-08-20)
+
+### Features
+
+- Promote fakts as a oauth2grant
+  ([`d31a353`](https://github.com/arkitektio/lok-server-next/commit/d31a353998093d2aa91b26a436658ef0b8183753))
+
+
 ## v1.0.0-rc.23 (2026-08-14)
 
 
