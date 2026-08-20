@@ -760,9 +760,12 @@ class Client(models.Model, ClientMixin):
 
     class Meta:
         constraints = [
+            # A client's identity is (release, membership, node, hub): the same app
+            # approved by the same person on the same device is a *different*
+            # client per hub. Matches the rotation key in ``bind_client``.
             models.UniqueConstraint(
-                fields=["release", "membership", "node"],
-                name="Only one client per release, membership and node",
+                fields=["release", "membership", "node", "hub"],
+                name="Only one client per release, membership, node and hub",
             )
         ]
 

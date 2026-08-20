@@ -380,6 +380,41 @@ def test_reapproval_rotates_identity(client):
 
 
 @pytest.mark.django_db
+def test_same_app_on_same_device_can_be_approved_into_two_hubs(client):
+    """A client's identity is (release, membership, node, hub): approving the
+    same app from the same device into a *second* hub of the organization must
+    create a second client, not trip the uniqueness constraint or rotate the
+    first one away."""
+    hub_a = factories.make_hub()
+    hub_b = factories.make_hub(organization=hub_a.organization)
+    user = factories.make_user()
+    factories.make_membership(user=user, organization=hub_a.organization)
+    manifest = {
+        "identifier": "com.example.multihub", "version": "1.0.0",
+        "scopes": [], "requirements": [], "node_id": "same-laptop",
+    }
+
+    first = _start(client, manifest=manifest)
+    validate_device_code(
+        models.DeviceCode.objects.get(secret=first["device_code"]),
+        user=user, organization=hub_a.organization, hub=hub_a,
+    )
+    assert _poll(client, first["device_code"], first["client_id"]).status_code == 200
+
+    second = _start(client, manifest=manifest)
+    validate_device_code(
+        models.DeviceCode.objects.get(secret=second["device_code"]),
+        user=user, organization=hub_a.organization, hub=hub_b,
+    )
+    assert _poll(client, second["device_code"], second["client_id"]).status_code == 200
+
+    a = models.Client.objects.get(client_id=first["client_id"])
+    b = models.Client.objects.get(client_id=second["client_id"])
+    assert (a.release_id, a.membership_id, a.node_id) == (b.release_id, b.membership_id, b.node_id)
+    assert {a.hub_id, b.hub_id} == {hub_a.id, hub_b.id}
+
+
+@pytest.mark.django_db
 def test_relying_party_rows_are_invisible_to_tenant_scoping(client):
     """Config-provisioned relying parties are global (no organization), so the
     org-scoped client listings never include them."""

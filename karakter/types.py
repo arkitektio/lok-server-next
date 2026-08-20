@@ -49,7 +49,7 @@ class Group:
 @strawberry_django.type(models.MediaStore)
 class MediaStore:
     id: strawberry.ID
-    path: str
+    path: str | None
     bucket: str
     key: str
 
@@ -299,8 +299,8 @@ System messages can use Rekuest Hooks as actions to allow the user to interact w
 )
 class SystemMessage:
     id: strawberry.ID
-    title: str
-    message: str
+    title: str | None
+    message: str | None
     action: str
     user: User
 
@@ -350,7 +350,6 @@ class Organization:
     slug: str
     description: str | None = strawberry.field(description="A short description of the organization")
     avatar: MediaStore | None = strawberry.field(description="The logo of the organization")
-    users: List[User] = strawberry.field(description="The users that are part of the organization")
     active_users: List[User] = strawberry.field(description="The users that are currently active in the organization")
     profile: "OrganizationProfile"
     memberships: List["Membership"] = strawberry_django.field(description="the memberships of people")
@@ -360,9 +359,13 @@ class Organization:
     def roles(self) -> List["Role"]:
         return self.roles.all()
 
+    @strawberry_django.field(description="The users that are part of the organization")
+    def users(self) -> List[User]:
+        return models.User.objects.filter(memberships__organization=self).distinct()
+
     @strawberry_django.field(description="The name of this organization")
     def name(self) -> str:
-        return self.name or self.slug
+        return self.name or self.slug or f"organization-{self.id}"
 
     @classmethod
     def get_queryset(cls, queryset, info: Info):
@@ -389,7 +392,7 @@ class Invite:
     declined_by: User | None
     responded_at: datetime.datetime | None
     roles: list["Role"]
-    created_membershipts: list["Membership"]
+    created_memberships: list["Membership"]
 
     @strawberry_django.field(description="Check if the invite is still valid and pending")
     def valid(self) -> bool:

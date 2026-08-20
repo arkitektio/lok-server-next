@@ -4,6 +4,7 @@ from django.conf import settings
 from django.db.models import Q
 from karakter.datalayer import get_current_datalayer
 import strawberry
+from django.contrib.auth import get_user_model
 import strawberry_django
 from kante.types import Info
 from karakter import enums, models, scalars
@@ -49,7 +50,7 @@ class ManagementGroup:
 @strawberry_django.type(models.MediaStore)
 class ManagementMediaStore:
     id: strawberry.ID
-    path: str
+    path: str | None
     bucket: str
     key: str
 
@@ -389,7 +390,6 @@ class ManagementScope:
     organization: "ManagementOrganization"
     creating_instance: Optional["ManagementServiceInstance"]
     is_builtin: bool = strawberry.field(description="If this scope is a built-in scope that cannot be deleted (admin)")
-    memberships: List["ManagementMembership"] = strawberry_django.field(description="The memberships that have this scope")
     used_by: List["ManagementServiceInstance"] = strawberry_django.field(description="The service instances that use this scope")
 
     @kante.django_field()
@@ -460,13 +460,16 @@ class ManagementOrganization:
     description: str | None = strawberry.field(description="A short description of the organization")
     brand_hue: Optional[float] = strawberry.field(description="The organization's default brand hue (0–360), if set. Members can override it per-membership.")
     require_device_auth: Optional[bool] = strawberry.field(description="Whether clients created in this organization must present a device node_id. None/False means device auth is not required.")
-    users: List[ManagementUser] = strawberry.field(description="The users that are part of the organization")
     active_users: List[ManagementUser] = strawberry.field(description="The users that are currently active in the organization")
     profile: Optional["ManagementOrganizationProfile"] = strawberry.field(description="The profile of the organization")
     memberships: List["ManagementMembership"] = strawberry_django.field(description="the memberships of people")
     invites: List["ManagementInvite"] = strawberry_django.field(description="the invites for this organization")
     clients: List["ManagementClient"] = strawberry_django.field(description="The clients that belong to this organization")
     service_instances: List["ManagementServiceInstance"] = strawberry_django.field(description="The service instances that belong to this organization")
+
+    @strawberry_django.field(description="The users that are part of the organization")
+    def users(self) -> List[ManagementUser]:
+        return get_user_model().objects.filter(memberships__organization=self).distinct()
 
     @strawberry_django.field(description="The roles that are available in the organization")
     def roles(self) -> List["ManagementRole"]:
@@ -1032,7 +1035,6 @@ class ManagementRelease:
 class ManagementDeviceGroup:
     id: strawberry.ID
     name: str = strawberry.field(description="The name of the device group.")
-    description: str | None = strawberry.field(description="The description of the device group.")
 
     @strawberry_django.field(description="The number of devices in this device group.")
     def devices(self, info: Info) -> list["ManagementDevice"]:
@@ -1133,7 +1135,7 @@ class ManagementReport:
 class ManagementClient:
     id: strawberry.ID
     functional: bool = strawberry_django.field(description="Is this client functional? A non-functional client cannot be used to authenticate users.")
-    release: ManagementRelease = strawberry_django.field(description="The release that this client belongs to.")
+    release: ManagementRelease | None = strawberry_django.field(description="The release that this client belongs to. Null for clients that are not bound to an app release: hub identities, relying parties, and registrations that are still awaiting approval.")
     kind: str = strawberry_django.field(description="The kind of the client. The kind defines the authentication flow that is used to authenticate users with this client.")
     role: str = strawberry_django.field(description="The operational role of the client: INTERFACE (a human interface operated by a user) vs AGENT (an autonomous client authorized once that then runs unattended, receiving tasks).")
     public: bool = strawberry_django.field(description="Is this client public? If a client is public ")
@@ -1145,7 +1147,7 @@ class ManagementClient:
     def user(self, info: Info) -> ManagementUser | None:
         return self.membership.user if self.membership_id else None
 
-    organization: ManagementOrganization = strawberry_django.field(description="The client")
+    organization: ManagementOrganization | None = strawberry_django.field(description="The organization this client is bound to. Null until a registration is approved, and for global relying-party clients.")
     logo: ManagementMediaStore | None = strawberry_django.field(description="The logo of the release. This should be a url to a logo that can be used to represent the release.")
     name: str = strawberry_django.field(description="The name of the client. This is a human readable name of the client.")
     mappings: list["ManagementServiceInstanceMapping"] = strawberry_django.field(description="The mappings of the client. A mapping is a mapping of a service to a service instance. This is used to configure the hub.")

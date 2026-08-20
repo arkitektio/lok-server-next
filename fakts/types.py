@@ -56,9 +56,6 @@ class Layer:
     identifier: scalars.ServiceIdentifier = strawberry.field(description="The identifier of the service. This should be a globally unique string that identifies the service. We encourage you to use the reverse domain name notation. E.g. `com.example.myservice`")
     logo: types.MediaStore | None = strawberry.field(description="The logo of the service. This should be a url to a logo that can be used to represent the service.")
     description: str | None = strawberry.field(description="The description of the service. This should be a human readable description of the service.")
-    instances: list["ServiceInstance"] = strawberry_django.field(
-        description="The instances of the service. A service instance is a configured instance of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."
-    )
     
     
 
@@ -107,7 +104,6 @@ class ServiceRelease:
     id: strawberry.ID
     version: str = strawberry.field(description="The version of the service. This should be a human readable version string.")
     service: Service = strawberry.field(description="The service that this release belongs to.")
-    description: str | None = strawberry.field(description="The description of the service. This should be a human readable description of the service.")
     instances: list["ServiceInstance"] = strawberry_django.field(
         description="The instances of the service. A service instance is a configured instance of a service. It will be configured by a configuration backend and will be used to send to the client as a configuration. It should never contain sensitive information."
     )
@@ -125,8 +121,12 @@ class ServiceInstance:
     id: strawberry.ID
     release: ServiceRelease = strawberry.field(description="The service release that this instance belongs to.")
     instance_id: strawberry.ID = strawberry.field(description="The instance id of the instance. This is a unique string that identifies the instance. It is used to identify the instance in the code and in the database.")  
-    name: str = strawberry.field(description="The name of the instance. This is a human readable name of the instance.")
     allowed_users: list[types.User] = strawberry_django.field(description="The users that are allowed to use this instance.")
+
+    @strawberry_django.field(description="A human readable name of the instance, derived from its service identifier and instance id.", select_related=["release__service"])
+    def name(self, info: Info) -> str:
+        return f"{self.release.service.identifier}:{self.instance_id}"
+
     denied_users: list[types.User] = strawberry_django.field(description="The users that are denied to use this instance.")
     allowed_groups: list[types.Group] = strawberry_django.field(description="The groups that are allowed to use this instance.")
     denied_groups: list[types.Group] = strawberry_django.field(description="The groups that are denied to use this instance.")
@@ -227,7 +227,7 @@ class PublicSource:
 class Client:
     id: strawberry.ID
     functional: bool = strawberry_django.field(description="Is this client functional? A functional client is a client that is able to authenticate users. If a client is not functional, it will not be able to authenticate users.")
-    release: Release = strawberry_django.field(description="The release that this client belongs to.")
+    release: Release | None = strawberry_django.field(description="The release that this client belongs to. Null for clients that are not bound to an app release (hub identities, relying parties, pending registrations).")
     client_id: str = strawberry_django.field(description="The OAuth2 client id this client authenticates as.")
     public: bool = strawberry_django.field(description="Is this client public? If a client is public ")
 
@@ -319,7 +319,6 @@ class Client:
 class DeviceGroup:
     id: strawberry.ID
     name: str = strawberry.field(description="The name of the device group.")
-    description: str | None = strawberry.field(description="The description of the device group.")
     devices: list["Device"] = strawberry_django.field(description="The devices that belong to this device group.")
 
     @classmethod

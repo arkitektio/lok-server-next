@@ -18,7 +18,6 @@ A stashed item
 class StashItem:
     id: strawberry.ID
     identifier: str
-    description: str | None
     object: str
     added_at: datetime.datetime
     updated_at: datetime.datetime
