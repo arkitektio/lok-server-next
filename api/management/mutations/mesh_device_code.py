@@ -4,6 +4,7 @@ from api.management import types
 from karakter import models
 from fakts import models as fakts_models
 from api.management.authz import assert_member
+from api.management.device_code_authz import resolve_declinable_device_code
 from fakts import logic
 import kante
 
@@ -52,11 +53,19 @@ class DeclineMeshDeviceCodeInput:
     """Input for declining a machine's mesh join request."""
 
     device_code: strawberry.ID
+    code: str | None = strawberry.field(
+        default=None,
+        description="The code the machine displayed. Proves the caller was actually "
+        "shown this join request; without it, a guessed id is enough to deny "
+        "someone else's. Optional only until clients are updated to send it.",
+    )
 
 
 def decline_mesh_device_code(info: Info, input: DeclineMeshDeviceCodeInput) -> types.ManagementMeshDeviceCode:
     """Decline a machine's request to join the mesh, marking the device code as denied."""
-    device_code = fakts_models.MeshDeviceCode.objects.get(id=input.device_code)
+    device_code = resolve_declinable_device_code(
+        fakts_models.MeshDeviceCode, device_code_id=input.device_code, code=input.code
+    )
     device_code.denied = True
     device_code.save()
 

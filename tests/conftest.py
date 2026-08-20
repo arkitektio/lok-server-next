@@ -15,6 +15,17 @@ from tests import factories  # noqa: F401
 
 
 @pytest.fixture(autouse=True)
+def _clear_cache():
+    """The OAuth throttle (authapp/throttle.py) counts per-IP requests in the
+    default LocMem cache, which persists for the whole test process — without
+    clearing it, the suite itself trips the rate limit."""
+    from django.core.cache import cache
+
+    cache.clear()
+    yield
+
+
+@pytest.fixture(autouse=True)
 def _restore_static_tokens():
     """Undo any per-test static tokens registered via ``build_auth_context``.
 
@@ -134,4 +145,4 @@ def authenticated_context(db, testing_org) -> HttpContext:
     # A fakts Client (with its backing OAuth2Client) so the auth extension can
     # resolve ``request.client`` from the token's ``client_id``.
     fakts_client = factories.make_client(membership=membership)
-    return build_auth_context(user, testing_org, fakts_client.oauth2_client)
+    return build_auth_context(user, testing_org, fakts_client)

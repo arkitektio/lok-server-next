@@ -14,21 +14,42 @@ class Layer(BaseModel):
 class WellKnownFakts(BaseModel):
     name: str = settings.DEPLOYMENT_NAME
     version: str
-    protocol_version: str = "1"
+    protocol_version: str = "2"
     description: str | None = None
-    claim: str
     base_url: str
     frontend_url: str
     configure: str | None = None
     """Absolute URL template for the device-code configure page. The literal
     `{code}` placeholder is substituted by the client with the device code.
     Supersedes deriving the configure link from the (deprecated) `frontend_url`."""
-    device_code_start: str | None = None
-    """Absolute URL of the device-code *start* endpoint — the client POSTs its
-    manifest here to begin a device-code flow and receive a `code`."""
-    challenge_url: str | None = None
-    """Absolute URL of the device-code *challenge* endpoint — the client polls it
-    with its `code` to learn whether the user has granted the request."""
+
+    # --- OAuth 2.0 authorization server metadata (RFC 8414 vocabulary). The
+    # same core is served at /.well-known/oauth-authorization-server and
+    # /.well-known/openid-configuration; it is inlined here so a fakts client
+    # needs exactly one discovery request. ---
+    issuer: str | None = None
+    """The OAuth issuer identifier — the `iss` of issued access tokens."""
+    device_authorization_endpoint: str | None = None
+    """Absolute URL of the app authorization endpoint (RFC 8628 device
+    authorization). Fakts extension: it also performs dynamic client
+    registration — the client POSTs its manifest and receives a fresh public
+    `client_id` together with the `device_code`, so no client identity needs to
+    exist in advance."""
+    token_endpoint: str | None = None
+    """Absolute URL of the OAuth2 token endpoint. The client polls it with
+    grant_type urn:ietf:params:oauth:grant-type:device_code (or exchanges a
+    redeem token via urn:fakts:grant-type:redeem) and receives the access token,
+    refresh token and rendered instances in one response. Refreshing there
+    re-renders the instances."""
+    jwks_uri: str | None = None
+    """Absolute URL of the JWKS used to verify issued access tokens."""
+    grant_types_supported: List[str] = Field(default_factory=list)
+    """Grant types the token endpoint accepts. Fakts clients use the device-code
+    URN (interactive) and urn:fakts:grant-type:redeem (headless: form fields
+    `redeem_token` + JSON `manifest`), then refresh_token for continuity."""
+    token_endpoint_auth_methods_supported: List[str] = Field(default_factory=list)
+    """Client authentication methods at the token endpoint. Fakts-provisioned
+    clients are public and authenticate with `none` (client_id only)."""
     mesh_coord_url: str | None = None
     """Public coordination URL of the ionscale mesh coordination server that clients
     should point their tailnet at. `None` when this deployment has no mesh configured."""
@@ -41,15 +62,16 @@ class WellKnownFakts(BaseModel):
     mesh_configure: str | None = None
     """Absolute URL template for the mesh configure page. The literal `{code}`
     placeholder is substituted by the machine with the mesh device code."""
-    hub_device_code_start: str | None = None
-    """Absolute URL of the *hub* device-code start endpoint — a client POSTs a
-    hub manifest here to begin provisioning a whole hub."""
-    hub_challenge_url: str | None = None
-    """Absolute URL of the *hub* device-code challenge endpoint — the client
-    polls it with its `challenge` code to receive the hub token once granted."""
+    hub_authorization_endpoint: str | None = None
+    """Absolute URL of the *hub* authorization endpoint — a hub server POSTs a
+    hub manifest here to dynamically register a public OAuth2 client and stage
+    a hub device code; it then polls `token_endpoint` with the device-code
+    grant and receives tokens + its rendered hub config in one response."""
     hub_claim: str | None = None
-    """Absolute URL of the *hub* claim endpoint — the holder of a hub
-    token POSTs it here to receive the rendered server configuration."""
+    """DEPRECATED. Absolute URL of the *hub* claim endpoint — the holder of a
+    hub token POSTs it here to receive the rendered server configuration. Only
+    the partner-webhook path still uses it; interactive hubs receive their
+    config through the token endpoint."""
     hub_configure: str | None = None
     """Absolute URL template for the hub configure page. The literal `{code}`
     placeholder is substituted by the client with the hub device code."""
@@ -183,16 +205,6 @@ class StagingAlias(BaseModel):
     """If the alias is publicly reachable, the coordination server can also check its health directly (enabling health checks from the kontrol interface)."""
 
 
-class ServiceDeviceCodeStartRequest(BaseModel):
-    """A DeviceCodeStartRequest is used to start the device code flow. It contains
-    the manifest of the client that wants to start the flow and the redirect uris
-    as well as the requested client kind."""
-
-    manifest: ServiceManifest
-    staging_aliases: List[StagingAlias] = Field(default_factory=list)
-    expiration_time_seconds: int = 300
-
-
 class MeshDeviceCodeStartRequest(BaseModel):
     """A MeshDeviceCodeStartRequest is used to start the mesh device-code flow. A machine
     that wants to join an organization's mesh POSTs this to request a pre-authorized key.
@@ -254,30 +266,11 @@ class HubStartRequest(BaseModel):
     expiration_time_seconds: int = 600
 
 
-class ReedeemTokenRequest(BaseModel):
-    """A RedeemTokenRequest is used to redeem a token for a development client. It only contains the token."""
-
-    token: str
-    manifest: Manifest
-    requested_client_role: enums.ClientRoleVanilla = enums.ClientRoleVanilla.INTERFACE
-    supported_layers: List[str] = Field(default_factory=lambda: ["web"])
-
-
 class DeviceCodeChallengeRequest(BaseModel):
     """A DeviceCodeChallengeRequest is used to start the device code flow. It only
     contains the device code."""
 
     code: str
-
-
-class ConfigurationRequest(BaseModel):
-    grant: enums.FaktsGrantKind
-    device_code: Optional[str] = None
-
-
-class ClaimRequest(BaseModel):
-    token: str
-    secure: bool = False
 
 
 class ServerClaimRequest(BaseModel):
@@ -291,14 +284,11 @@ class AliasReport(BaseModel):
 
 
 class ReportRequest(BaseModel):
-    token: str
+    """A client's self-report. The client is identified by its Bearer access
+    token (the JWT's `client_id` claim), not by a payload token."""
+
     alias_reports: Dict[str, AliasReport] = Field(default_factory=dict)
     functional: bool = True
-
-
-class RetrieveRequest(BaseModel):
-    manifest: Manifest
-    redirect_uris: list[str] = Field(default_factory=list)
 
 
 class LinkingRequest(BaseModel):
@@ -309,10 +299,10 @@ class LinkingRequest(BaseModel):
 
 
 class LinkingClient(BaseModel):
-    authorization_grant_type: str
-    client_type: str
+    """The client a config is rendered for. Public clients only — there is no
+    secret to ship; auth happens via the OAuth2 token endpoint."""
+
     client_id: str
-    client_secret: str
     name: str
 
 
@@ -329,73 +319,6 @@ class ServerLinkingContext(BaseModel):
     deployment_name: str = Field(default=settings.DEPLOYMENT_NAME)
     request: LinkingRequest
     secure: bool = False
-
-
-class ClientConfig(BaseModel):
-    kind: enums.ClientKindVanilla
-    role: enums.ClientRoleVanilla = enums.ClientRoleVanilla.INTERFACE
-    token: str
-    tenant: str
-
-    def get_tenant(self):
-        from django.contrib.auth import get_user_model
-
-        try:
-            return get_user_model().objects.get(username=self.tenant)
-        except get_user_model().DoesNotExist:
-            raise ValueError(f"Tenant {self.tenant} does not exist. Please create them first")
-
-
-class DevelopmentClientConfig(ClientConfig):
-    kind: Literal["development"]
-    user: str
-    organization: Optional[str] = None
-
-    def get_user(self):
-        from django.contrib.auth import get_user_model
-
-        try:
-            return get_user_model().objects.get(username=self.user)
-        except get_user_model().DoesNotExist:
-            raise ValueError(f"User {self.user} does not exist. Please create them first")
-
-    def get_organization(self):
-        from karakter.models import Organization
-
-        if not self.organization:
-            return None
-        try:
-            return Organization.objects.get(slug=self.organization)
-        except Organization.DoesNotExist:
-            raise ValueError(f"organization {self.organization} does not exist. Please create it first")
-
-
-class DesktopClientConfig(ClientConfig):
-    kind: Literal["desktop"]
-
-
-class WebsiteClientConfig(ClientConfig):
-    kind: Literal["website"]
-    tenant: str
-    redirect_uris: List[str]
-    public: bool = False
-
-
-ClientUnion = WebsiteClientConfig | DesktopClientConfig | DevelopmentClientConfig
-
-
-class AppConfig(Manifest):
-    clients: list[ClientUnion]
-
-
-class AuthClaim(BaseModel):
-    ionscale_auth_key: str | None = None
-    client_token: str
-    client_id: str
-    client_secret: str
-    scopes: List[str] = Field(default_factory=list)
-    token_url: str
-    report_url: str
 
 
 class Alias(BaseModel):
@@ -436,13 +359,14 @@ class SelfClaim(BaseModel):
     alias: Alias
 
 
-class ClaimAnswer(BaseModel):
-    """A ClaimAnswer is the answer to a claim request. It contains the
-    linking context that should be used to link the client to the server.
+class FaktsEnvelope(BaseModel):
+    """The fakts members appended to a successful OAuth2 token response for a
+    fakts client. Auth material (access_token, refresh_token, expires_in,
+    scope, client_id) lives in the standard token-response fields next to
+    these; there is no separate auth block anymore.
     """
 
     self: SelfClaim
-    auth: AuthClaim
     instances: Dict[str, InstanceClaim] = Field(default_factory=dict)
     statuses: Dict[str, str] = Field(default_factory=dict)
     """Per-requirement grant outcomes keyed by manifest requirement key.
@@ -467,12 +391,11 @@ class HubInstanceClaim(BaseModel):
 
 
 class HubClientClaim(BaseModel):
-    """InstancesClaim is a claim that contains the instances that are available
-    for the client. It is used to link the client to the server and to provide
-    the client with the necessary information to connect to the server.
-    """
+    """A client belonging to a hub, identified by its OAuth2 client_id. Hub
+    servers recognise the client by the `client_id` claim of its JWT — the old
+    opaque client token credential no longer exists."""
 
-    token: str | None = None
+    client_id: str | None = None
 
 
 class HubClaimAnswer(BaseModel):

@@ -31,7 +31,7 @@ def _two_org_setup():
     victim = factories.make_user()
     org_b = factories.make_organization(owner=victim)
 
-    context = build_auth_context(attacker, org_a, request_client.oauth2_client)
+    context = build_auth_context(attacker, org_a, request_client)
     return context, org_a, org_b, attacker, victim
 
 
@@ -188,11 +188,11 @@ def _invite_leak_setup():
     invite.roles.add(Role.objects.get(organization=org, identifier="admin"))
 
     request_client = factories.make_client(membership=guest_membership)
-    guest_context = build_auth_context(guest, org, request_client.oauth2_client)
+    guest_context = build_auth_context(guest, org, request_client)
 
     owner_membership = org.memberships.get(user=owner)
     owner_client = factories.make_client(membership=owner_membership)
-    owner_context = build_auth_context(owner, org, owner_client.oauth2_client)
+    owner_context = build_auth_context(owner, org, owner_client)
 
     return guest_context, owner_context, org, invite
 
@@ -253,7 +253,7 @@ def _org_with_admin_and_member():
 
     def ctx(membership):
         client = factories.make_client(membership=membership)
-        return build_auth_context(membership.user, org, client.oauth2_client)
+        return build_auth_context(membership.user, org, client)
 
     return {
         "org": org,

@@ -5,6 +5,11 @@ from karakter import types
 from fakts import models, scalars, filters, enums
 from authapp import types as atypes
 from kante.types import Info
+from graphql import GraphQLError
+
+# Same wording as api.management.authz.DENIED, so a denial cannot be told apart
+# from a not-found and used as an existence oracle.
+DENIED = "Not found, or you are not authorized to access it."
 
 
 def build_prescoped_queryset(info, queryset, field="organization"):
@@ -223,22 +228,29 @@ class Client:
     id: strawberry.ID
     functional: bool = strawberry_django.field(description="Is this client functional? A functional client is a client that is able to authenticate users. If a client is not functional, it will not be able to authenticate users.")
     release: Release = strawberry_django.field(description="The release that this client belongs to.")
-    tenant: types.User = strawberry_django.field(description="The user that manages this release.")
-    oauth2_client: atypes.Oauth2Client = strawberry_django.field(description="The real oauth2 client that is used to authenticate users with this client.")
+    client_id: str = strawberry_django.field(description="The OAuth2 client id this client authenticates as.")
     public: bool = strawberry_django.field(description="Is this client public? If a client is public ")
-    user: types.User | None = strawberry_django.field(description="If the client is a DEVELOPMENT client, which requires no further authentication, this is the user that is authenticated with the client.")
+
+    @strawberry_django.field(
+        description="The user this client acts for (derived from its membership).",
+        only=["membership"],
+        select_related=["membership__user"],
+    )
+    def user(self, info: Info) -> types.User | None:
+        return self.membership.user if self.membership_id else None
+
     logo: types.MediaStore | None = strawberry_django.field(description="The logo of the release. This should be a url to a logo that can be used to represent the release.")
     node: Optional["Device"] = strawberry_django.field(description="The node this runs on")
 
     @strawberry_django.field(
         description="A human-readable label for the client that folds in the app, version, "
         "operator and device — e.g. `com.example.app:v0.1.1 by Johannes on my-laptop`.",
-        select_related=["release__app", "user", "tenant", "node"],
+        select_related=["release__app", "membership__user", "node"],
     )
     def name(self, info: Info) -> str:
         release = self.release
         label = f"{release.app.identifier}:v{release.version}" if release else (self.name or "Unknown client")
-        person = self.user or self.tenant
+        person = self.membership.user if self.membership_id else None
         if person:
             full = f"{person.first_name or ''} {person.last_name or ''}".strip()
             label += f" by {full or person.username}"
@@ -267,11 +279,6 @@ class Client:
             return enums.ClientRole.AGENT
         return enums.ClientRole.INTERFACE
 
-    @strawberry.field(description="The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information.")
-    def token(self, info: Info) -> str:
-        # TODO: Implement only tenant should be able to see the token
-        return self.token
-
     @strawberry_django.field(description="The issue url of the client. This is the url where users can report issues and get more information about the client.")
     def issue_url(self, info: Info) -> str | None:
         for source in self.public_sources:
@@ -292,6 +299,15 @@ class Client:
             )
         return sources
 
+    @classmethod
+    def get_queryset(cls, queryset, info: Info, **kwargs):
+        """Restrict clients to the caller's active organization.
+
+        Client rows are tenant-private (instance mappings, manifests, health);
+        without this the root `clients` list returned every tenant's.
+        """
+        return build_prescoped_queryset(info, queryset)
+
 
 @strawberry_django.type(
     models.DeviceGroup,
@@ -306,8 +322,9 @@ class DeviceGroup:
     description: str | None = strawberry.field(description="The description of the device group.")
     devices: list["Device"] = strawberry_django.field(description="The devices that belong to this device group.")
 
-    def get_queryset(cls, info) -> models.DeviceGroup:
-        return models.DeviceGroup.objects.filter(organization=info.context.request.organization)
+    @classmethod
+    def get_queryset(cls, queryset, info: Info, **kwargs):
+        return build_prescoped_queryset(info, queryset)
 
 
 @strawberry_django.type(models.Device, filters=filters.DeviceFilter, pagination=True, ordering=filters.DeviceOrdering)
@@ -318,8 +335,9 @@ class Device:
     clients: list[Client]
     device_groups: list[DeviceGroup] = strawberry_django.field(description="The device groups that belong to this device.")
 
-    def get_queryset(cls, info) -> models.Device:
-        return models.Device.objects.filter(organization=info.context.request.organization)
+    @classmethod
+    def get_queryset(cls, queryset, info: Info, **kwargs):
+        return build_prescoped_queryset(info, queryset)
 
 
 @strawberry_django.type(models.RedeemToken, filters=filters.RedeemTokenFilter, pagination=True, ordering=filters.RedeemTokenOrdering)
@@ -329,5 +347,8 @@ class RedeemToken:
     client: Client | None = strawberry.field(description="The client that this redeem token belongs to.")
     user: types.User = strawberry.field(description="The user that this redeem token belongs to.")
 
-    def get_queryset(cls, info) -> models.RedeemToken:
-        return models.RedeemToken.objects.filter(user=info.context.request.user, hub__organization=info.context.request.organization)
+    @classmethod
+    def get_queryset(cls, queryset, info: Info, **kwargs):
+        return build_prescoped_queryset(info, queryset, field="hub__organization").filter(
+            user=info.context.request.user
+        )

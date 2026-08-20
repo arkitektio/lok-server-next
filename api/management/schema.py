@@ -14,7 +14,6 @@ from .datalayer import DatalayerExtension
 from .extensions import RequireAuthenticationExtension
 from .authz import get_scoped
 from allauth.socialaccount import models as smodels
-from authapp.models import OAuth2Client
 from strawberry.schema.config import StrawberryConfig
 from fakts.scalars import scalar_map as fakts_scalar_map
 from .scalars import scalar_map as management_scalar_map
@@ -47,7 +46,6 @@ class Query:
     scopes: list[types.ManagementScope] = kante.django_field()
     roles: list[types.ManagementRole] = kante.django_field()
     hubs: list[types.ManagementHub] = kante.django_field()
-    compositions: list[types.ManagementHub] = kante.django_field(deprecation_reason="Renamed to `hubs`. Use `hubs` instead.")
     management_layers: list[types.ManagementLayer] = kante.django_field()
     ionscale_auth_keys: list[types.ManagementIonscaleAuthKey] = kante.django_field()
 
@@ -104,15 +102,11 @@ class Query:
     def hub(self, info: Info, id: strawberry.ID) -> types.ManagementHub:
         return get_scoped(types.ManagementHub, fakts_models.Hub.objects.filter(id=id), info)
 
-    @kante.django_field(name="composition", deprecation_reason="Renamed to `hub`. Use `hub` instead.")
-    def composition(self, info: Info, id: strawberry.ID) -> types.ManagementHub:
-        return get_scoped(types.ManagementHub, fakts_models.Hub.objects.filter(id=id), info)
-
     @kante.django_field()
     def oauth2_client_by_client_id(self, info: Info, client_id: str) -> types.ManagementOAuth2Client:
         try:
-            return OAuth2Client.objects.get(client_id=client_id)
-        except OAuth2Client.DoesNotExist:
+            return fakts_models.Client.objects.get(client_id=client_id)
+        except fakts_models.Client.DoesNotExist:
             raise Exception(
                 f"OAuth2 client '{client_id}' is not registered. Add it to `openid_apps` "
                 f"in the lok config and restart — `ensureopenid` provisions it on boot."
@@ -184,7 +178,7 @@ class Query:
 
     @kante.django_field()
     def device_code_by_code(self, info: Info, device_code: str) -> types.ManagementDeviceCode:
-        return fakts_models.DeviceCode.objects.get(code=device_code)
+        return fakts_models.DeviceCode.objects.get(code=device_code, kind="app")
 
     @kante.django_field()
     def invite_by_code(self, info: Info, invite_code: str) -> types.ManagementInvite:
@@ -303,31 +297,15 @@ class Query:
 
     @kante.django_field()
     def device_code(self, info: Info, id: strawberry.ID) -> types.ManagementDeviceCode:
-        return fakts_models.DeviceCode.objects.get(id=id)
-
-    @kante.django_field()
-    def service_device_code(self, info: Info, id: strawberry.ID) -> types.ManagementServiceDeviceCode:
-        return fakts_models.ServiceDeviceCode.objects.get(id=id)
-
-    @kante.django_field()
-    def service_device_code_by_code(self, info: Info, code: str) -> types.ManagementServiceDeviceCode:
-        return fakts_models.ServiceDeviceCode.objects.get(code=code)
+        return fakts_models.DeviceCode.objects.get(id=id, kind="app")
 
     @kante.django_field()
     def hub_device_code(self, info: Info, id: strawberry.ID) -> types.ManagementHubDeviceCode:
-        return fakts_models.HubDeviceCode.objects.get(id=id)
+        return fakts_models.DeviceCode.objects.get(id=id, kind="hub")
 
     @kante.django_field()
     def hub_device_code_by_code(self, info: Info, code: str) -> types.ManagementHubDeviceCode:
-        return fakts_models.HubDeviceCode.objects.get(code=code)
-
-    @kante.django_field(name="compositionDeviceCode", deprecation_reason="Renamed to `hubDeviceCode`. Use `hubDeviceCode` instead.")
-    def composition_device_code(self, info: Info, id: strawberry.ID) -> types.ManagementHubDeviceCode:
-        return fakts_models.HubDeviceCode.objects.get(id=id)
-
-    @kante.django_field(name="compositionDeviceCodeByCode", deprecation_reason="Renamed to `hubDeviceCodeByCode`. Use `hubDeviceCodeByCode` instead.")
-    def composition_device_code_by_code(self, info: Info, code: str) -> types.ManagementHubDeviceCode:
-        return fakts_models.HubDeviceCode.objects.get(code=code)
+        return fakts_models.DeviceCode.objects.get(code=code, kind="hub")
 
     @kante.django_field()
     def mesh_device_code(self, info: Info, id: strawberry.ID) -> types.ManagementMeshDeviceCode:
@@ -412,16 +390,6 @@ class Mutation:
     decline_hub_device_code = strawberry_django.mutation(
         resolver=mutations.decline_hub_device_code,
     )
-    # Deprecated composition aliases (same resolvers; renamed to hub).
-    accept_composition_device_code = strawberry_django.mutation(
-        resolver=mutations.accept_hub_device_code,
-        deprecation_reason="Renamed to `acceptHubDeviceCode`. Use `acceptHubDeviceCode` instead.",
-    )
-    decline_composition_device_code = strawberry_django.mutation(
-        resolver=mutations.decline_hub_device_code,
-        deprecation_reason="Renamed to `declineHubDeviceCode`. Use `declineHubDeviceCode` instead.",
-    )
-
     # Mesh Device Code Mutations
     accept_mesh_device_code = strawberry_django.mutation(
         resolver=mutations.accept_mesh_device_code,
@@ -437,16 +405,6 @@ class Mutation:
     delete_hub = strawberry_django.mutation(
         resolver=mutations.delete_hub,
     )
-    # Deprecated composition aliases (same resolvers; renamed to hub).
-    update_composition = strawberry_django.mutation(
-        resolver=mutations.update_hub,
-        deprecation_reason="Renamed to `updateHub`. Use `updateHub` instead.",
-    )
-    delete_composition = strawberry_django.mutation(
-        resolver=mutations.delete_hub,
-        deprecation_reason="Renamed to `deleteHub`. Use `deleteHub` instead.",
-    )
-
     # Device Code Mutations
     accept_device_code = strawberry_django.mutation(
         resolver=mutations.accept_device_code,
@@ -454,21 +412,13 @@ class Mutation:
     decline_device_code = strawberry_django.mutation(
         resolver=mutations.decline_device_code,
     )
-    # Authorize Connect Mutations
-    accept_authorize_code = strawberry_django.mutation(
-        resolver=mutations.accept_authorize_code,
+    # Session revocation (the operator side of RFC 7009 /o/revoke/)
+    revoke_client_sessions = strawberry_django.mutation(
+        resolver=mutations.revoke_client_sessions,
     )
-    decline_authorize_code = strawberry_django.mutation(
-        resolver=mutations.decline_authorize_code,
+    revoke_organization_sessions = strawberry_django.mutation(
+        resolver=mutations.revoke_organization_sessions,
     )
-    # Service Device Code Mutations
-    accept_service_device_code = strawberry_django.mutation(
-        resolver=mutations.accept_service_device_code,
-    )
-    decline_service_device_code = strawberry_django.mutation(
-        resolver=mutations.decline_service_device_code,
-    )
-
     change_organization_owner = strawberry_django.mutation(
         resolver=mutations.change_organization_owner,
     )

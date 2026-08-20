@@ -27,12 +27,12 @@ def _owner_and_outsider():
     org.save()
 
     owner_client = factories.make_client(membership=owner_membership)
-    owner_context = build_auth_context(owner, org, owner_client.oauth2_client)
+    owner_context = build_auth_context(owner, org, owner_client)
 
     outsider_membership = factories.make_membership()
     outsider_client = factories.make_client(membership=outsider_membership)
     outsider_context = build_auth_context(
-        outsider_membership.user, outsider_membership.organization, outsider_client.oauth2_client
+        outsider_membership.user, outsider_membership.organization, outsider_client
     )
 
     return owner_context, outsider_context, org

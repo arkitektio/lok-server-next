@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 from fakts.models import KommunityPartner
-from authapp.models import OAuth2Client
+from fakts.models import Client
 from fakts.config_models import KommunityPartnerConfigModel  # <-- Your validated Pydantic schema
 from django.contrib.auth import get_user_model
 from django.conf import settings
@@ -28,17 +28,19 @@ class Command(BaseCommand):
             oauth_client = None
             if partner.oauth2:
                 try:
-                    oauth_client = OAuth2Client.objects.get(client_id=partner.oauth2.client_id)
+                    oauth_client = Client.objects.get(client_id=partner.oauth2.client_id)
                     oauth_client.client_secret = partner.oauth2.client_secret
                     oauth_client.redirect_uris = " ".join(partner.oauth2.redirect_uris)
                     oauth_client.scope = "openid profile email"
                     oauth_client.save()
                     self.stdout.write(self.style.SUCCESS(f"Updated OpenID client {oauth_client.client_id}"))
-                except OAuth2Client.DoesNotExist:
-                    oauth_client = OAuth2Client.objects.create(
+                except Client.DoesNotExist:
+                    oauth_client = Client.objects.create(
                         client_id=partner.oauth2.client_id,
                         client_secret=partner.oauth2.client_secret,
                         redirect_uris=" ".join(partner.oauth2.redirect_uris),
+                        token_endpoint_auth_method="client_secret_post",
+                        kind="relying_party",
                         scope="openid profile email",
                     )
                     self.stdout.write(self.style.SUCCESS(f"Created OpenID client {oauth_client.client_id}"))

@@ -86,7 +86,6 @@ class User:
     memberships: list["Membership"] = strawberry_django.field(description="The memberships of the user in organizations")
     avatar: str | None
     profile: "Profile"
-    managed_clients: strawberry.auto
     com_channels: list["ComChannel"] = strawberry_django.field(description="The communication channels that the user has")
 
     @classmethod
@@ -403,6 +402,22 @@ class Invite:
         from django.conf import settings
 
         return f"{settings.KONTROL_FRONTEND_URL}/invite/{self.token}"
+
+    @classmethod
+    def get_queryset(cls, queryset, info: Info, **kwargs):
+        """Restrict invites to the caller's active organization.
+
+        This type exposes `token` — and `invite_url`, which embeds it — and an
+        invite token is a bearer credential: whoever holds it can redeem it and
+        receive whatever roles the invite carries. Without this the root `invites`
+        list handed every tenant's pending tokens to any authenticated principal.
+
+        The management twin (`api.management.types.ManagementInvite`) narrows
+        further, to owner-or-admin. This one matches the rest of the main schema's
+        active-organization dialect; tightening it to owner-or-admin here would
+        also be defensible if the fleet does not need the broader read.
+        """
+        return build_prescoped_queryset(info, queryset, field="created_for")
 
 
 @strawberry.type

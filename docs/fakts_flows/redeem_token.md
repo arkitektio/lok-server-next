@@ -1,91 +1,52 @@
-# Redeem token
+# Redeem token — the headless fakts grant
 
-A **non-interactive** flow: an operator pre-issues a one-time `RedeemToken` (bound to
-a hub and an expiry), then a headless machine exchanges that token — plus its
-manifest — for a fully provisioned client, with **no human in the loop at redeem
-time**. The authorization happened once, up front, when the token was minted.
+Provisions a client **non-interactively** from a pre-shared one-time token
+(CI, headless installs). Same combined response as the
+[canonical device-code grant](./client_device_code.md) — access token, refresh
+token and rendered instances in one exchange — but with no human step at
+grant time: the authorization happened when a member minted the redeem token.
 
-- [When to use](#when-to-use)
-- [Why](#why)
-- [Protocol](#protocol)
-- [Sendable params](#sendable-params)
-- [Manifest change rules](#manifest-change-rules)
-- [Responses](#responses)
-- [Code path](#code-path)
+## 1. Minting a redeem token (human, kontrol)
 
-## When to use
+`createRedeemToken` (management GraphQL) takes a `hub` and an optional
+`expiresInDays`. The hub is required and **carries the organization** — the
+minting user must be a member, and every client redeemed from the token lands
+in that hub's organization, bound to the minting user's membership there.
 
-- You are provisioning a client **without an interactive browser step** — CI, image
-  bake, autoscaled workers, kiosk installs.
-- You can distribute a secret token to the machine ahead of time (env var, secret
-  mount).
-- You want repeatable installs: the same token + same manifest yields the same
-  client.
+## 2. Redeeming: `POST /o/token/`
 
-Use a [device-code flow](./client_device_code.md) when a human *is* present to
-approve; use [retrieve](./retrieve.md) when the app is public and needs no token.
+Standard OAuth2 form encoding, custom grant type:
 
-## Why
+```
+grant_type=urn:fakts:grant-type:redeem
+redeem_token=…
+manifest={"identifier": "com.example.app", "version": "1.0.0", "scopes": [], "requirements": []}
+requested_client_role=agent        (optional, default interface)
+```
 
-Device-code needs a human at configure time, which is exactly what headless
-automation lacks. The redeem token moves the human decision **earlier**: a user
-creates the token once (choosing the hub and lifetime), and every machine
-that holds it can non-interactively obtain a client. Redeem is idempotent for an
-unchanged manifest, so re-running an installer returns the existing client's token
-instead of proliferating clients.
+`manifest` is the JSON-serialized [`Manifest`](./README.md#manifest). There is
+no client authentication — the redeem token *is* the credential; the fakts
+client and its public OAuth2 client are provisioned (or reused) during the
+exchange.
 
-## Protocol
+On success the response is the same combined token response as the device-code
+grant (`access_token`, `refresh_token`, `expires_in`, `scope`, plus
+`client_id`, `self`, `instances`, `statuses`). Failures are standard OAuth
+errors: HTTP 400 with `error=invalid_grant` (unknown/expired token, or a
+changed manifest without `allow_reredeem` — see below) or
+`error=invalid_request` (missing/malformed fields).
 
-1. **Mint** (out of band, by a human) — create a `RedeemToken` via the management
-   GraphQL. `createRedeemToken(input: {hub, expiresInDays})` takes the
-   hub (the caller must be a member of its org) and an optional lifetime in
-   days. (`allow_reredeem` is a field on the token model but is **not** exposed by
-   this mutation today — it defaults to `false`.)
-2. **Redeem** — the machine `POST /f/redeem/` with `{token, manifest}` ⇒
-   `{status: granted, token}` (the client token). Claim it as usual (see
-   [claim](./claim.md)).
+## 3. Re-redeem semantics
 
-## Endpoints
+- Redeeming again with the **same manifest** returns the same client (a fresh
+  token pair each time).
+- A **changed manifest** is rejected unless the token was created with
+  `allow_reredeem` — then the client is re-validated against the new manifest.
+- An **expired** token is deleted on first use after expiry.
 
-| Step | Method | Path | URL name |
-|---|---|---|---|
-| Redeem | POST | `/f/redeem/` | `fakts:redeem` |
+## 4. After the grant
 
-## Sendable params
-
-### `ReedeemTokenRequest`
-`POST /f/redeem/`
-
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `token` | str | — (required) | The pre-issued redeem token. |
-| `manifest` | [`Manifest`](./README.md#manifest) | — (required) | The client to provision. |
-| `requested_client_role` | enum | `"interface"` | Operational role: `interface` \| `agent`. |
-| `supported_layers` | str[] | `["web"]` | Requested network layers. **Note:** accepted but not currently consumed by the redeem path. |
-
-## Manifest change rules
-
-A redeem token remembers the hash of the manifest it was first redeemed with:
-
-- **Same manifest** → returns the **same** client token (idempotent re-install).
-- **Changed manifest** → rejected with an error mentioning `allow_reredeem`, unless
-  the token has `allow_reredeem=true` set on it.
-- **Legacy tokens** (redeemed before hash tracking) have a null hash and are
-  grandfathered: a changed manifest is accepted once and the hash backfilled.
-
-## Responses
-
-| Endpoint | Success | Non-success |
-|---|---|---|
-| `/f/redeem/` | `{status: granted, token}` | `{status: error, message}` — e.g. `"Invalid redeem token"`, expired, or manifest-changed-without-`allow_reredeem`. |
-
-## Code path
-
-- REST: `RedeemView` (`fakts/views.py`).
-- Service: `redeem_token`, `validate_redeem_token` (`fakts/services/clients.py`);
-  errors `RedeemTokenExpired`, `RedeemTokenManifestChanged`.
-- Model: `RedeemToken` (`fakts/models.py`), fields `token`, `hub`,
-  `manifest_hash`, `allow_reredeem`, `expires_at`, `client`.
-- GraphQL (minting): `create_redeem_token`
-  (`api/management/mutations/redeem_token.py`), `ManagementRedeemToken` type.
-- Frontend (minting): `src/components/CreateRedeemTokenDialog.tsx`.
+Identical to the device-code grant: refresh with
+`grant_type=refresh_token` + `refresh_token` + `client_id` (rotating, 30-day
+window, envelope re-rendered on every refresh), authenticate everywhere with
+the Bearer JWT.

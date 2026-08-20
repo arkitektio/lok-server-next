@@ -37,7 +37,7 @@ async def test_client_name_is_comprehensive_label():
 
     result = await schema.execute(
         CLIENTS_QUERY,
-        context_value=build_auth_context(user, organization, client.oauth2_client),
+        context_value=build_auth_context(user, organization, client),
     )
 
     assert result.errors is None, result.errors
@@ -63,7 +63,7 @@ async def test_client_name_omits_device_when_absent():
 
     result = await schema.execute(
         CLIENTS_QUERY,
-        context_value=build_auth_context(user, organization, client.oauth2_client),
+        context_value=build_auth_context(user, organization, client),
     )
 
     assert result.errors is None, result.errors

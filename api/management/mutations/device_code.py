@@ -7,6 +7,7 @@ from api.management.authz import DENIED, assert_member
 from graphql import GraphQLError
 from fakts import logic
 import kante
+from api.management.device_code_authz import resolve_declinable_device_code
 
 
 @kante.input
@@ -30,7 +31,7 @@ def accept_device_code(info: Info, input: AcceptDeviceCodeInput) -> types.Manage
     """
     user = info.context.request.user
     try:
-        device_code = fakts_models.DeviceCode.objects.get(id=input.device_code)
+        device_code = fakts_models.DeviceCode.objects.get(id=input.device_code, kind="app")
         hub = fakts_models.Hub.objects.get(id=input.hub)
     except (fakts_models.DeviceCode.DoesNotExist, fakts_models.Hub.DoesNotExist):
         raise GraphQLError(DENIED)
@@ -55,9 +56,15 @@ def accept_device_code(info: Info, input: AcceptDeviceCodeInput) -> types.Manage
 
 @kante.input
 class DeclineDeviceCodeInput:
-    """Input for declining an organization invite"""
+    """Input for declining a pending device code."""
 
     device_code: strawberry.ID
+    code: str | None = strawberry.field(
+        default=None,
+        description="The code the device displayed. Proves the caller was actually "
+        "shown this enrolment; without it, a guessed id is enough to deny "
+        "someone else's. Optional only until clients are updated to send it.",
+    )
 
 
 def decline_device_code(info: Info, input: DeclineDeviceCodeInput) -> types.ManagementDeviceCode:
@@ -66,10 +73,9 @@ def decline_device_code(info: Info, input: DeclineDeviceCodeInput) -> types.Mana
 
     Marks the invite as declined.
     """
-    try:
-        device_code = fakts_models.DeviceCode.objects.get(id=input.device_code)
-    except fakts_models.DeviceCode.DoesNotExist:
-        raise GraphQLError(DENIED)
+    device_code = resolve_declinable_device_code(
+        fakts_models.DeviceCode, device_code_id=input.device_code, code=input.code
+    )
 
     device_code.denied = True
     device_code.save()

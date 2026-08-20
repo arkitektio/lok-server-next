@@ -3,86 +3,134 @@
 **Fakts** is how a piece of software (a CLI, a worker, a desktop app, a server, a
 machine) obtains its configuration and credentials from lok *without* shipping any
 secrets in advance. The software knows only the deployment's base URL; everything
-else — client id/secret, tokens, service endpoints, mesh keys — is negotiated at
-runtime through one of the **fakts flows** documented here.
+else — its OAuth client identity, tokens, service endpoints, mesh keys — is
+negotiated at runtime through one of the **fakts flows** documented here.
 
-Every flow is a small JSON-over-HTTP protocol served under `/f/` (see
-`fakts/urls.py`, mounted at `f/` by `lok_server/urls.py`), plus a discovery
-document at `/.well-known/fakts`. The interactive flows additionally have a
-human-facing side in the SPA (kontrol) where a logged-in user authorizes the
-request.
+The client flow is **one canonical, org-scoped OAuth grant**: `/o/app-authorization/`
+dynamically registers a *public* OAuth2 client and stages a device code; a human
+approves it in kontrol (choosing a hub, and thereby an organization); the device
+then polls the standard OAuth2 token endpoint (`/o/token/`) and receives the
+**access token, refresh token and rendered service instances in one response**.
+Continuity is the rotated refresh-token chain — there are no long-lived opaque
+client tokens and no client secrets on devices.
 
-- [1. The shared shape: discover → start → challenge → claim](#1-the-shared-shape)
+The **hub flow rides the same grant** (`/o/hub-authorization/` → accept →
+token endpoint → tokens + hub config in one response). Only the mesh flow (which
+mints tailnet pre-auth keys, not OAuth tokens) keeps the JSON choreography under
+`/f/`; discovery lives at `/.well-known/fakts` and speaks RFC 8414 vocabulary.
+The standard `/o/authorize/` endpoint (PKCE required for public clients) serves
+browser-based relying parties, and `/o/revoke/` (RFC 7009) revokes sessions.
+
+- [1. The canonical client grant](#1-the-canonical-client-grant)
 - [2. Which flow, when](#2-which-flow-when)
-- [3. The response envelope](#3-the-response-envelope)
+- [3. Response shapes](#3-response-shapes)
 - [4. Two param surfaces: machine vs. authorizer](#4-two-param-surfaces)
 - [5. Shared request models](#5-shared-request-models)
 - [6. Per-flow references](#6-per-flow-references)
 
 ---
 
-## 1. The shared shape
-
-The four **device-code flows** (client, service, hub, mesh) all follow the
-same OAuth-device-grant-style choreography:
+## 1. The canonical client grant
 
 ```
-  machine                         lok                         human (kontrol)
+  device                          lok                          human (kontrol)
     │  GET /.well-known/fakts      │                                │
-    │─────────────────────────────▶  discovery: all endpoint URLs   │
+    │─────────────────────────────▶  discovery: endpoint URLs       │
     │                              │                                │
-    │  POST /f/{x}start/  (manifest)                                │
-    │─────────────────────────────▶  stage a device code            │
-    │◀───────────────────────────── {code, challenge}               │
+    │  POST /o/app-authorization/  │  dynamic client registration   │
+    │    (manifest)                │                                │
+    │─────────────────────────────▶  + stage a device code          │
+    │◀───────────────────────────── {client_id, device_code,        │
+    │                              │  verification_uri_complete,    │
+    │                              │  token_endpoint, interval, …}  │
     │                              │                                │
-    │        (show `code` to a human, who opens the configure URL)  │
-    │                              │   ◀── opens /{x}configure/{code}│
-    │                              │   ── authorizes (GraphQL accept)│
-    │  POST /f/{x}challenge/ (poll)│                                │
-    │─────────────────────────────▶  pending … then granted         │
-    │◀───────────────────────────── {token | key | …}               │
+    │     (show the code / open verification_uri_complete)          │
+    │                              │  ◀── opens /configure/{code}   │
+    │                              │  ── acceptDeviceCode(hub, …)   │
+    │                              │      org = hub.organization    │
     │                              │                                │
-    │  POST /f/claim/  (token)     │   (client flow only)           │
-    │─────────────────────────────▶  rendered configuration         │
+    │  POST /o/token/              │                                │
+    │    grant_type=urn:ietf:params:oauth:grant-type:device_code    │
+    │    device_code=… client_id=… │                                │
+    │─────────────────────────────▶  400 authorization_pending …    │
+    │◀───────────────────────────── 200 {access_token,              │
+    │                              │     refresh_token, expires_in, │
+    │                              │     scope, client_id,          │
+    │                              │     self, instances, statuses} │
+    │                              │                                │
+    │  POST /o/token/  grant_type=refresh_token (hourly)            │
+    │─────────────────────────────▶  new token pair (rotated)       │
+    │◀───────────────────────────── + freshly re-rendered instances │
 ```
 
-The two **non-interactive flows** skip the human step: **retrieve** returns a
-public app's token directly, and **redeem** exchanges a pre-issued token for a
-client. **claim** and **report** are shared steps used after a credential exists.
+Key properties:
+
+- **Dynamically registered public clients.** `/o/app-authorization/` mints an
+  `OAuth2Client` with no secret (`token_endpoint_auth_method=none`). The
+  client's ongoing identity is its `client_id` plus the rotated refresh chain;
+  losing the chain means a human re-approves.
+- **Org-scoped by construction.** Approval binds the client to the approving
+  user's membership in the chosen hub's organization; every issued token's
+  subject *is* that membership, and the JWT carries `active_org`.
+- **One response.** Tokens and the rendered instances arrive together; every
+  refresh re-renders the instances (aliases are host-aware), so config drift
+  propagates without re-approval.
+- **Re-approval rotates identity.** Accepting the same app again re-points the
+  fakts client at the new registration and deletes the old OAuth client,
+  severing the previous installation's refresh chain.
+- **Ongoing authentication is the JWT.** `/f/report/` (and services, via JWKS)
+  authenticate the client by its Bearer access token's `client_id` claim.
 
 ## 2. Which flow, when
 
 | Flow | Use it to… | Human authorizes? | Credential you get back |
 |---|---|---|---|
-| [Client device code](./client_device_code.md) | register **one app/client** (a CLI, worker, desktop app) against a user's org | ✅ yes | a `Client` token → `/f/claim/` → full config |
-| [Service device code](./service_device_code.md) | register **one service instance** (a long-running backend that others depend on) | ✅ yes | a `ServiceInstance` token |
-| [Hub device code](./hub_device_code.md) | stand up a **whole hub** — many instances + clients (+ optional mesh key) in one authorization | ✅ yes | a `Hub` token → `/f/claimhub/` |
+| [Client device code](./client_device_code.md) | register **one app/client** (a CLI, worker, desktop app) against a user's org | ✅ yes | access + refresh tokens + instances, in one token response |
+| [Hub device code](./hub_device_code.md) | stand up a **whole hub** — many instances + clients (+ optional mesh key) in one authorization | ✅ yes | access + refresh tokens + the full hub config, in one token response |
 | [Mesh device code](./mesh_device_code.md) | let a **machine join the org's mesh** (tailnet) with a configurable machine name | ✅ yes | a single-use ionscale **pre-auth key** + coord URL + machine name |
-| [Redeem token](./redeem_token.md) | provision a client **non-interactively** from a pre-shared one-time token (CI, headless installs) | ❌ no | a `Client` token |
-| [Retrieve](./retrieve.md) | fetch the token of an app that has a **public** client — no auth at all | ❌ no | a public `Client` token |
+| [Redeem token](./redeem_token.md) | provision a client **non-interactively** from a pre-shared one-time token (CI, headless installs) | ❌ no | same combined token response, via `urn:fakts:grant-type:redeem` |
 
-Shared steps (not flows on their own): [discovery](./discovery.md) is the entry
-point every flow starts from; [claim](./claim.md) turns a token into a rendered
-configuration; [report](./report.md) is client-health telemetry.
+Removed flows: **retrieve** (unauthenticated public-app token handout) is gone —
+website-kind apps use the standard authorization-code + PKCE flow via
+`/o/authorize/` and receive their instances in the token response; **claim**,
+the client/hub **challenge** polls, and the whole **service-instance flow**
+(unused) are gone — subsumed by the token endpoint or deleted. `/f/claimhub/`
+survives only (deprecated) for the partner-webhook path.
 
-## 3. The response envelope
+Shared steps: [discovery](./discovery.md) is the entry point every flow starts
+from; [report](./report.md) is client-health telemetry (Bearer-authenticated).
 
-Every `/f/` endpoint returns a JSON object whose `status` field is the protocol
-signal. Clients branch on it and never on the HTTP status code (endpoints return
-`200` even for `error`). The `_poll_device_code` helper and the start/claim views
-in `fakts/views.py` produce these:
+## 3. Response shapes
 
-| `status` | Meaning | Other fields |
-|---|---|---|
-| `granted` | success | `code` / `challenge` (start) · `token` (challenge, retrieve, redeem) · `config` (claim) · `ionscale_auth_key`, `ionscale_coord_url`, `machine_name` (mesh challenge) |
-| `pending` | the human has not authorized yet — keep polling | `message` |
-| `denied` | the human declined; the device code is deleted | `message` |
-| `expired` | no answer before `expires_at`; the device code is deleted | `message` |
-| `error` | malformed request or unknown code/token | `error` or `message` |
-| `reported` | report accepted (report endpoint only) | `message` |
+**The authorization endpoints** (`/o/app-authorization/`, `/o/hub-authorization/`)
+and the **`/f/` endpoints** (mesh flow, report) return a JSON object whose
+`status` field is the protocol signal (`granted` / `pending` / `denied` /
+`expired` / `error` / `reported`), always with HTTP 200 — clients branch on the
+body. Anonymous endpoints are rate limited (HTTP 429 `slow_down`).
 
-Clients should poll the challenge endpoint on a fixed interval and stop on any of
-`granted` / `denied` / `expired` / `error`.
+**The token endpoint** (`/o/token/`) speaks standard OAuth2: HTTP 200 with a
+token response on success, HTTP 400 with `{"error": …}` otherwise. While the
+human has not decided yet the poll returns `error=authorization_pending`
+(`slow_down` when polling faster than `interval`); a declined code returns
+`access_denied`; an expired one `expired_token`. On success the response carries
+the standard members (`access_token` RS256 JWT, `refresh_token`, `token_type`,
+`expires_in`, `scope`) **plus** the fakts envelope:
+
+| Member | Description |
+|---|---|
+| `client_id` | The public OAuth2 client id (also needed for refresh). |
+| `self` | `{deployment_name, alias}` — how to reach this lok deployment. |
+| `instances` | `{requirement_key → {service, identifier, aliases[], challenge_key?}}` — the rendered service instances. |
+| `statuses` | `{requirement_key → "granted" \| "denied" \| "unavailable"}`. |
+
+`device_code` is a **full-entropy secret** distinct from the short human
+`user_code` (which is what the configure URL carries), and it is **single-use**:
+burned on the first successful token response. Refresh with
+`grant_type=refresh_token`, `refresh_token`, `client_id` (no secret); the
+refresh token rotates on every use, carries an absolute chain cap (180 days
+since the original authorization on top of the 30-day sliding window), and the
+envelope is re-rendered onto every refresh response. Sessions can be revoked at
+`/o/revoke/` (RFC 7009) or org-wide via the management API.
 
 ## 4. Two param surfaces
 
@@ -90,16 +138,16 @@ For the interactive flows, "sendable params" live on **two different wires**, an
 each flow page documents both:
 
 - **What the machine sends** — snake_case JSON to the REST endpoints under `/f/`
-  (`requested_client_kind`, `expiration_time_seconds`, `requested_machine_name`, …).
-  These are the pydantic request models in `fakts/base_models.py`.
+  (`requested_client_kind`, `expiration_time_seconds`, `requested_machine_name`, …) —
+  the app authorization endpoint lives at `/o/app-authorization/` — and
+  form-encoded OAuth2 params to `/o/token/`.
+  The REST bodies are the pydantic request models in `fakts/base_models.py`.
 - **What the authorizer sends** — camelCase GraphQL inputs to the management schema
   (`acceptXDeviceCode` / `declineXDeviceCode`), issued by the logged-in user in
-  kontrol. This is where the **organization**, and choices like the final machine
-  name or `allowIonscale`, are actually set. These are the `@kante.input` classes
-  in `api/management/mutations/`.
-
-Field names differ by wire: the REST models are snake_case; the GraphQL inputs are
-camelCase (e.g. REST `requested_machine_name` vs. GraphQL `machineName`).
+  kontrol. This is where the **organization** (via the hub), and choices like the
+  final machine name or `allowIonscale`, are actually set. These are the
+  `@kante.input` classes in `api/management/mutations/`. Declining requires the
+  `code` itself as proof of possession.
 
 ## 5. Shared request models
 
@@ -108,17 +156,16 @@ link back rather than repeat them.
 
 ### `Manifest`
 Describes a client/app. Used by [client device code](./client_device_code.md),
-[redeem](./redeem_token.md), [retrieve](./retrieve.md), and inside a hub's
-`clients`.
+[redeem](./redeem_token.md), and inside a hub's `clients`.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `identifier` | str | — (required) | Unique app identifier (reverse-domain, e.g. `com.example.app`). |
+| `identifier` | str | — (required) | Unique app identifier (reverse-domain, e.g. `com.example.app`). Org-scoped: the same identifier in two organizations is two registrations. |
 | `version` | str | — (required) | App version. |
 | `title` | str? | `null` | Human display name for the App/Release. |
 | `description` | str? | `null` | Human description. |
 | `logo` | str? | `null` | URL to a logo; downloaded and validated at start. |
-| `scopes` | str[] | `[]` | Requested scopes. |
+| `scopes` | str[] | `[]` | Requested scopes (must exist as org scopes; granted scopes land in the token's `scope`). |
 | `requirements` | [`Requirement`](#requirement)[] | `[]` | Services the client needs to run. |
 | `node_id` | str? | `null` | Stable id of the node the client runs on (creates/links a `Device`). |
 | `authors` | str[] | `[]` | Maintainers. |
@@ -143,9 +190,7 @@ Describes a client/app. Used by [client device code](./client_device_code.md),
 | `url` | str | — (required) | Source URL. |
 
 ### `ServiceManifest`
-Describes a service instance. Used by
-[service device code](./service_device_code.md) and inside a hub's
-`instances`.
+Describes a service instance. Used inside a hub's `instances`.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
@@ -179,17 +224,14 @@ of the service flow and the `aliases` of a hub instance.
 
 ## 6. Per-flow references
 
-- [Client device code](./client_device_code.md)
-- [Service device code](./service_device_code.md)
+- [Client device code (the canonical grant)](./client_device_code.md)
 - [Hub device code](./hub_device_code.md)
 - [Mesh device code](./mesh_device_code.md)
 - [Redeem token](./redeem_token.md)
-- [Retrieve](./retrieve.md)
 - [Discovery (`/.well-known/fakts`)](./discovery.md)
-- [Claim](./claim.md)
 - [Report](./report.md)
 
 > Out of scope: `/.well-known/fakts-challenge` (`lok_server/urls.py`) is a
-> placeholder view with no implemented protocol, and `/lok/o/*` OIDC endpoints are
-> the standard OpenID flow — see [openid_clients](../openid_clients/README.md), not
-> here.
+> placeholder view with no implemented protocol, and the remaining `/lok/o/*`
+> OIDC endpoints are the standard OpenID flow — see
+> [openid_clients](../openid_clients/README.md), not here.

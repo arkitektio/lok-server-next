@@ -1,9 +1,9 @@
-"""Client lifecycle: creating development clients and redeeming tokens.
+"""Client lifecycle on the unified Client model.
 
-This module owns the creation of fakts ``Client`` (+ underlying ``OAuth2Client``)
-records. It depends on :mod:`fakts.services.rendering` for ``auto_compose`` and on
-:mod:`fakts.services.tokens`; it does *not* import device-code logic, which breaks
-the historical ``logic`` <-> ``builders`` import cycle.
+Registration (``create_public_client``) mints an unbound public client row;
+approval (``bind_client``) fills the same row in place — membership,
+organization, release/hub, instance mappings, and the real scope string.
+Depends on :mod:`fakts.services.rendering` for ``auto_compose``.
 """
 
 import hashlib
@@ -13,13 +13,22 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from authapp.models import generate_client_id, generate_client_secret
 from fakts import base_models, enums, models
 from fakts.base_models import Manifest
+from fakts.models import generate_client_id
 from fakts.services.rendering import auto_compose
-from fakts.services.tokens import create_api_token
 from karakter import models as karakter_models
 from karakter.hashers import hash_device_id
+
+# Every fakts client is a *public* OAuth2 client: it holds no secret, exchanges
+# its device code (or redeem token) once, and from then on its identity is the
+# rotated refresh-token chain. authorization_code is included so website-kind
+# clients (with registered redirect URIs and PKCE) can use the standard code flow.
+FAKTS_CLIENT_GRANT_TYPES = "urn:ietf:params:oauth:grant-type:device_code urn:fakts:grant-type:redeem refresh_token authorization_code"
+
+# OIDC base scopes every fakts client may request on top of its granted
+# organization scopes.
+BASE_OIDC_SCOPES = ["openid", "profile", "email"]
 
 
 class DeviceAuthRequired(Exception):
@@ -43,73 +52,62 @@ def hash_manifest(manifest: Manifest) -> str:
     ).hexdigest()
 
 
-@transaction.atomic
-def create_development_client(
-    release: models.Release,
-    config: base_models.DevelopmentClientConfig,
-    manifest: base_models.Manifest,
-    node: models.Device | None = None,
-    hub: models.Hub | None = None,
+def create_public_client(
+    kind: str = enums.ClientKindVanilla.DEVELOPMENT.value,
+    role: str = enums.ClientRoleVanilla.INTERFACE.value,
+    redirect_uris: list[str] | None = None,
+    public: bool = False,
 ) -> models.Client:
-    tenant = config.get_tenant()
-    user = config.get_user()
-    organization = config.get_organization()
+    """Dynamic client registration: mint an *unbound* public client row.
 
-    try:
-        client = models.Client.objects.get(user=user, release=release, organization=organization, node=node, kind=enums.ClientKindVanilla.DEVELOPMENT.value)
-        if client.token != config.token:
-            client.token = config.token
-        client.tenant = tenant
-        client.node = node
-        client.manifest = manifest.model_dump()
-        client.membership = karakter_models.Membership.objects.get(user=user, organization=organization)
-        client.hub = hub
-        client.role = config.role.value if hasattr(config.role, "value") else config.role
-        client.public_sources = [t.model_dump() for t in manifest.public_sources] if manifest.public_sources else []
-        client.save()
+    The row carries only identity and the requested attributes; it cannot get a
+    token until :func:`bind_client` attaches a membership at approval.
+    """
+    return models.Client.objects.create(
+        client_id=generate_client_id(),
+        client_secret="",
+        token_endpoint_auth_method="none",
+        grant_types=FAKTS_CLIENT_GRANT_TYPES,
+        scope="",
+        kind=kind,
+        role=role if isinstance(role, str) else role.value,
+        redirect_uris=" ".join(redirect_uris) if redirect_uris else "",
+        public=public,
+    )
 
-        return client
 
-    except models.Client.DoesNotExist:
-        client_secret = generate_client_secret()
-        client_id = generate_client_id()
-
-        oauth2_client = models.OAuth2Client.objects.create(
-            client_id=client_id,
-            client_secret=client_secret,
-        )
-
-        return models.Client.objects.create(
-            release=release,
-            user=user,
-            tenant=user,
-            membership=karakter_models.Membership.objects.get(user=user, organization=organization),
-            node=node,
-            token=config.token,
-            kind=enums.ClientKindVanilla.DEVELOPMENT.value,
-            role=config.role.value if hasattr(config.role, "value") else config.role,
-            oauth2_client=oauth2_client,
-            redirect_uris="",
-            public=False,
-            hub=hub,
-            manifest=manifest.model_dump(),
-            logo=release.logo,
-            organization=organization,
-            public_sources=[t.model_dump() for t in manifest.public_sources] if manifest.public_sources else [],
-        )
+def finalize_client_scope(client: models.Client) -> str:
+    """Write the client's real requestable scope: the granted organization
+    scopes (``Client.scopes`` M2M) on top of the OIDC base scopes. This is the
+    scope unification point — issued JWTs carry these instead of silently
+    falling back to the OIDC defaults."""
+    scope = " ".join(BASE_OIDC_SCOPES + sorted(client.scopes.values_list("identifier", flat=True)))
+    client.scope = scope
+    client.save(update_fields=["scope"])
+    return scope
 
 
 @transaction.atomic
-def create_client(
+def bind_client(
+    client: models.Client,
     manifest: base_models.Manifest,
-    config: base_models.ClientConfig,
-    user: models.AbstractUser,
-    organization: models.Organization,
+    membership: karakter_models.Membership,
     hub: models.Hub | None = None,
     declined_requirements: list[str] | None = None,
     device_name: str | None = None,
 ) -> models.Client:
+    """Approve a registered client: bind it to a membership and fill in the
+    app side (org-scoped App/Release, node, instance mappings, scopes) in place.
+
+    Re-approval rotates identity: any *other* bound client for the same
+    (release identity, membership, node, hub) is deleted — the old client_id
+    and its refresh chain die, and this row (with its fresh client_id from
+    registration) takes over.
+    """
     from fakts.utils import download_logo
+
+    organization = membership.organization
+    user = membership.user
 
     try:
         logo = download_logo(manifest.logo) if manifest.logo else None
@@ -118,15 +116,17 @@ def create_client(
 
     display_name = manifest.title or manifest.identifier
 
+    # Apps are org-scoped: the same identifier registered in two organizations
+    # is two rows, so one tenant's manifest can never mutate another's catalog.
     app, _ = models.App.objects.get_or_create(
         identifier=manifest.identifier,
+        organization=organization,
         defaults={"name": display_name},
     )
     dirty = False
     if logo:
         app.logo = logo
         dirty = True
-    # Backfill/refresh the app name once a manifest actually carries a title.
     if manifest.title and app.name != manifest.title:
         app.name = manifest.title
         dirty = True
@@ -159,15 +159,34 @@ def create_client(
     else:
         node = None
 
-    if config.kind == enums.ClientKindVanilla.DEVELOPMENT.value:
-        client = create_development_client(release, config, manifest, node=node, hub=hub)
-    else:
-        raise ValueError(f"Client kind {config.kind} not supported yet")
+    # Identity rotation on re-approval: the previous installation's client (and
+    # with it its refresh chain and report history) is deleted.
+    models.Client.objects.filter(
+        release=release,
+        membership=membership,
+        node=node,
+        hub=hub,
+        kind=client.kind,
+    ).exclude(pk=client.pk).delete()
+
+    client.membership = membership
+    client.organization = organization
+    client.release = release
+    client.hub = hub
+    client.node = node
+    client.name = display_name
+    client.manifest = manifest.model_dump()
+    client.logo = logo or release.logo
+    client.public_sources = [t.model_dump() for t in manifest.public_sources] if manifest.public_sources else []
+    client.save()
 
     client = auto_compose(client, manifest, user, organization, device=node, declined_requirements=declined_requirements)
 
+    client.scopes.clear()
     for scope in manifest.scopes or []:
         client.scopes.add(karakter_models.Scope.objects.get(identifier=scope, organization=organization))
+
+    finalize_client_scope(client)
 
     return client
 
@@ -178,6 +197,7 @@ def validate_redeem_token(redeem_token: models.RedeemToken, manifest: Manifest, 
     hub = redeem_token.hub
     organization = redeem_token.hub.organization
     user = redeem_token.user
+    membership = karakter_models.Membership.objects.get(user=user, organization=organization)
 
     if node_id:
         node, _ = models.Device.objects.get_or_create(organization=organization, node_id=hash_device_id(node_id, organization))
@@ -186,34 +206,26 @@ def validate_redeem_token(redeem_token: models.RedeemToken, manifest: Manifest, 
 
     client = models.Client.objects.filter(
         release__app__identifier=manifest.identifier,
+        release__app__organization=organization,
         release__version=manifest.version,
         kind="development",
         node=node,
-        tenant=user,
-        organization=organization,
+        membership=membership,
         hub=hub,
-        redirect_uris="",
     ).first()
 
     if not client:
-        token = create_api_token()
-
-        config = base_models.DevelopmentClientConfig(
+        client = create_public_client(
             kind=enums.ClientKindVanilla.DEVELOPMENT.value,
             role=role.value if hasattr(role, "value") else role,
-            token=token,
-            user=user.username,
-            organization=organization.slug,
-            tenant=user.username,
         )
 
-        client = create_client(
-            manifest=manifest,
-            config=config,
-            user=user,
-            organization=organization,
-            hub=hub,
-        )
+    bind_client(
+        client,
+        manifest,
+        membership,
+        hub=hub,
+    )
 
     redeem_token.client = client
     redeem_token.save()
@@ -263,8 +275,11 @@ def redeem_token(token: str, manifest: Manifest, role: enums.ClientRoleVanilla =
 
 
 @transaction.atomic
-def report_client(claim: base_models.ReportRequest) -> models.Client:
+def report_client(client: models.Client, claim: base_models.ReportRequest) -> models.Client:
     """Record a client's self-report (functional flag + per-requirement alias reports).
+
+    The client is resolved by the caller from its Bearer access token (the
+    JWT's `client_id` claim) — the old opaque client token no longer exists.
 
     Also snapshots the report into a ``Report`` row, updates the client's
     ``last_healthy_report`` pointer when the client reports healthy, and prunes
@@ -272,7 +287,7 @@ def report_client(claim: base_models.ReportRequest) -> models.Client:
     (the last-healthy report is always kept, even if it falls outside that window).
     """
     # Lock the client row so concurrent reports don't race the prune / pointer update.
-    client = models.Client.objects.select_for_update().get(token=claim.token)
+    client = models.Client.objects.select_for_update().get(pk=client.pk)
     client.functional = claim.functional
     client.save()
 

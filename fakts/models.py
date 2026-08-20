@@ -1,3 +1,4 @@
+import secrets as _secrets
 from django.db import models
 from typing import Dict, Any
 from django.contrib.auth import get_user_model
@@ -7,12 +8,29 @@ from django_choices_field import TextChoicesField
 from typing import List
 import uuid
 from typing import Optional
+from authlib.oauth2.rfc6749 import ClientMixin
+from authlib.oauth2.rfc6749.errors import InvalidClientError
 from fakts import fields, enums
 from django.db.models import Q  # noqa: F401  (re-exported as fakts.models.Q)
 from django.contrib.auth.models import AbstractUser, Group  # noqa: F401  (AbstractUser re-exported as fakts.models.AbstractUser)
 from karakter.models import MediaStore, Organization
-from authapp.models import OAuth2Client
 from fakts import base_models, errors
+
+
+def generate_client_id() -> str:
+    """Generate a unique OAuth2 client id."""
+    return str(uuid.uuid4())
+
+
+def generate_client_secret() -> str:
+    """Generate a confidential client secret (relying parties only — fakts
+    clients are public and carry none)."""
+    return _secrets.token_urlsafe(32)
+
+
+def generate_device_secret() -> str:
+    """Generate a staged authorization's full-entropy polling secret."""
+    return _secrets.token_urlsafe(32)
 
 
 class KommunityPartner(models.Model):
@@ -27,7 +45,7 @@ class KommunityPartner(models.Model):
     license_agreement = models.TextField(null=True, blank=True, help_text="Optional license agreement text shown before connecting this partner.")
     pre_authorize_hook = models.CharField(max_length=1000, null=True, blank=True, help_text="Optional hook called after creating a partner hub. The response must explicitly approve the hub.")
     pre_authorize_token = models.CharField(max_length=1000, null=True, blank=True, help_text="Optional bearer token sent to the pre-authorize hook.")
-    oauth_client = models.ForeignKey(OAuth2Client, on_delete=models.CASCADE, null=True)
+    oauth_client = models.ForeignKey("Client", on_delete=models.CASCADE, null=True, related_name="kommunity_partners")
     partner_kind = models.CharField(
         max_length=50,
         choices=[(e.value, e.name) for e in enums.PartnerKind],
@@ -157,8 +175,22 @@ class IonscaleAuthKey(models.Model):
 class Service(models.Model):
     name = models.CharField(max_length=1000)
     identifier = fields.IdentifierField()
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="services",
+        help_text="The organization this service registration belongs to.",
+    )
     logo = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
     description = models.TextField(default="No description available", null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "identifier"],
+                name="Only one service identifier per organization",
+            )
+        ]
 
     def __str__(self):
         return f"{self.identifier}"
@@ -388,6 +420,20 @@ class Hub(models.Model):
         on_delete=models.CASCADE,
         related_name="created_hubs",
     )
+    client = models.OneToOneField(
+        "Client",
+        on_delete=models.SET_NULL,
+        related_name="hub_identity",
+        null=True,
+        blank=True,
+        help_text="The hub server's identity (a public unified Client, bound at hub device-code "
+        "accept). Hub servers poll the token endpoint as this client and receive their config "
+        "in the token response envelope. Null for hubs provisioned outside the device-code "
+        "flow (e.g. partner auto-configuration), which still use `token` + /f/claimhub/. "
+        "Distinct from `Client.hub` — the hub an *app* client composes against.",
+    )
+    # Deprecated: only the partner-webhook /f/claimhub/ path still uses this.
+    # Interactive hubs authenticate via their client identity instead.
     token = models.CharField(max_length=1000, default=uuid.uuid4)
     auth_key = models.ForeignKey(
         IonscaleAuthKey,
@@ -410,66 +456,94 @@ class Hub(models.Model):
 
 
 class DeviceCode(models.Model):
+    """A staged authorization on the canonical grant (RFC 8628 shaped), for
+    apps and hubs alike.
+
+    ``/o/app-authorization/`` / ``/o/hub-authorization/`` create it together
+    with the dynamically registered *public* unified ``Client`` — the staged
+    row IS the client, unbound until a human accepts in kontrol (which binds
+    membership/organization and, for apps, release/hub/mappings; for hubs,
+    creates the ``Hub`` and links ``Hub.client``). The device then exchanges
+    ``secret`` at ``/o/token/`` (device-code grant) for tokens + its rendered
+    config in one response, which burns the code.
+
+    ``code`` is the short human user code (configure URL, decline proof);
+    ``secret`` the full-entropy polling secret. Approval marker: the client's
+    ``membership`` is set.
+    """
+
     created_at = models.DateTimeField(auto_now_add=True)
+    kind = TextChoicesField(
+        choices_enum=enums.DeviceCodeKindChoices,
+        default=enums.DeviceCodeKindChoices.APP.value,
+        help_text="What accepting this code produces: an app client or a whole hub.",
+    )
     code = models.CharField(max_length=100, unique=True)
-    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, null=True)
-    client = models.ForeignKey("Client", on_delete=models.CASCADE, null=True)
-    staging_kind = TextChoicesField(
-        choices_enum=enums.ClientKindChoices,
-        default=enums.ClientKindChoices.DEVELOPMENT.value,
-        help_text="The kind of staging client",
+    secret = models.CharField(
+        max_length=100,
+        unique=True,
+        default=generate_device_secret,
+        help_text="The full-entropy device_code polled at the token endpoint. Distinct from "
+        "`code`, the short human-transcribable user code shown in the configure URL — a "
+        "shoulder-surfed user code must not be a polling secret.",
     )
-    staging_role = TextChoicesField(
-        choices_enum=enums.ClientRoleChoices,
-        default=enums.ClientRoleChoices.INTERFACE.value,
-        help_text="The operational role of the staging client (INTERFACE vs AGENT)",
+    client = models.OneToOneField(
+        "Client",
+        on_delete=models.CASCADE,
+        related_name="device_code",
+        help_text="The unified client dynamically registered at start — the staged row itself. "
+        "Approval binds it in place; the code is burned at token issuance.",
     )
-    staging_manifest = models.JSONField(default=dict)
-    staging_logo = models.CharField(max_length=1000, null=True)
-    staging_public = models.BooleanField(default=False)
-    staging_redirect_uris = models.JSONField(default=list)
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="device_codes",
+        help_text="The organization the code was accepted into. Null while pending.",
+    )
+    granted_scope = models.TextField(
+        default="",
+        help_text="Space-separated scope granted at accept; becomes the token request's scope.",
+    )
+    interval = models.IntegerField(default=5, help_text="Minimum polling interval in seconds (RFC 8628).")
+    last_polled_at = models.DateTimeField(null=True, blank=True)
+    staging_manifest = models.JSONField(default=dict, help_text="The app Manifest or HubManifest staged at start.")
     expires_at = models.DateTimeField()
     denied = models.BooleanField(default=False)
-    supported_layers = models.ManyToManyField(Layer, related_name="staging_device_codes")
 
     @property
     def manifest_as_model(self) -> base_models.Manifest:
         return base_models.Manifest(**self.staging_manifest)
 
-
-class ServiceDeviceCode(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True)
-    code = models.CharField(max_length=100, unique=True)
-    challenge_code = models.CharField(max_length=100, unique=True)
-    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, null=True)
-    instance = models.ForeignKey(ServiceInstance, on_delete=models.CASCADE, null=True)
-    staging_manifest = models.JSONField(default=dict)
-    staging_aliases = models.JSONField(default=list)
-    expires_at = models.DateTimeField()
-    denied = models.BooleanField(default=False)
-
     @property
-    def manifest_as_model(self) -> base_models.ServiceManifest:
-        return base_models.ServiceManifest(**self.staging_manifest)
+    def hub_manifest_as_model(self) -> base_models.HubManifest:
+        return base_models.HubManifest(**self.staging_manifest)
 
-    @property
-    def aliases_as_models(self) -> List[base_models.StagingAlias]:
-        return [base_models.StagingAlias(**alias) for alias in self.staging_aliases]
+    # --- authlib DeviceCredentialMixin contract (rfc8628) ---
 
+    def get_client_id(self) -> str | None:
+        return self.client.client_id if self.client_id else None
 
-class HubDeviceCode(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True)
-    code = models.CharField(max_length=100, unique=True)
-    challenge_code = models.CharField(max_length=100, unique=True)
-    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, null=True)
-    hub = models.ForeignKey(Hub, on_delete=models.CASCADE, null=True)
-    manifest = models.JSONField(default=dict)
-    expires_at = models.DateTimeField()
-    denied = models.BooleanField(default=False)
+    def get_scope(self) -> str:
+        return self.granted_scope
 
-    @property
-    def manifest_as_model(self) -> base_models.HubManifest:
-        return base_models.HubManifest(**self.manifest)
+    def get_user_code(self) -> str:
+        return self.code
+
+    def get_expires_in(self) -> int:
+        return int((self.expires_at - self.created_at).total_seconds())
+
+    def is_expired(self) -> bool:
+        from django.utils import timezone
+
+        return timezone.now() > self.expires_at
+
+    def get_nonce(self) -> None:
+        return None
+
+    def get_auth_time(self) -> None:
+        return None
 
 
 class MeshDeviceCode(models.Model):
@@ -507,7 +581,21 @@ class MeshDeviceCode(models.Model):
 class App(models.Model):
     name = models.CharField(max_length=1000)
     identifier = fields.IdentifierField()
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="apps",
+        help_text="The organization this app registration belongs to — the same identifier in two organizations is two registrations.",
+    )
     logo = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "identifier"],
+                name="Only one app identifier per organization",
+            )
+        ]
 
     def __str__(self):
         return f"{self.identifier}"
@@ -523,11 +611,8 @@ class Release(models.Model):
     scopes = models.JSONField(default=list)
     requirements = models.JSONField(default=dict)
 
-    def is_latest(self):
-        return self.app.releases.filter(is_latest=True).count() == 1
-
-    def is_dev(self):
-        return "dev" in self.version
+    # NOTE: no is_latest()/is_dev() methods here — defining methods with the
+    # same names as the fields above silently shadowed the field descriptors.
 
     class Meta:
         constraints = [
@@ -572,44 +657,95 @@ class Device(models.Model):
         ]
 
 
-class Client(models.Model):
-    hub = models.ForeignKey(Hub, on_delete=models.CASCADE, related_name="clients", null=True)
+class Client(models.Model, ClientMixin):
+    """The one client model: every OAuth2 principal is a row here.
+
+    Kinds of rows and their lifecycle:
+
+    - **App clients** (`development`/`website`/`desktop`): the row is created by
+      dynamic registration at ``/o/app-authorization/`` with identity fields
+      only; human approval *binds* it (membership, organization, release, hub,
+      mappings, scope). ``membership`` null == not yet approved.
+    - **Hub identities** (`hub`): same lifecycle via ``/o/hub-authorization/``;
+      the created ``Hub`` links back via ``Hub.client`` (reverse:
+      ``client.hub_identity``).
+    - **Relying parties** (`relying_party`): confidential OIDC clients
+      provisioned from config by ``ensureopenid``; global (no organization).
+
+    Implements authlib's ``ClientMixin`` directly — there is no separate
+    OAuth2 client table anymore.
+    """
+
+    # --- OAuth2 identity -------------------------------------------------
+    client_id = models.CharField(max_length=48, unique=True, default=generate_client_id)
+    client_secret = models.CharField(
+        max_length=120,
+        blank=True,
+        default="",
+        help_text="Empty for public clients (every fakts-provisioned client). Only relying parties are confidential.",
+    )
+    redirect_uris = models.TextField(blank=True, default="")
+    scope = models.TextField(
+        blank=True,
+        default="",
+        help_text="Space-separated scope this client may request; written at accept from the granted org scopes.",
+    )
+    token_endpoint_auth_method = models.CharField(max_length=48, default="none")
+    grant_types = models.TextField(default="")
+    response_types = models.TextField(blank=True, default="")
+    id_token_signed_response_alg = models.CharField(max_length=48, default="RS256")
+    membership = models.ForeignKey(
+        "karakter.Membership",
+        on_delete=models.CASCADE,
+        related_name="clients",
+        null=True,
+        blank=True,
+        help_text="The (user, organization) this client acts for. Null means not yet approved (staged) or a global relying party.",
+    )
+    membership_is_subject = models.BooleanField(
+        default=False,
+        help_text="Use the membership id as the OIDC `sub` claim instead of the user id. "
+        "See authapp.oidc_claims.resolve_sub.",
+    )
+    email_template = models.CharField(
+        max_length=500,
+        null=True,
+        blank=True,
+        help_text="Template for the OIDC `email` claim rendered from membership variables "
+        "(e.g. '{username}@corp.example'). When blank, the user's own email is used. "
+        "See authapp.oidc_claims.resolve_email.",
+    )
+
+    # --- App/deployment side ---------------------------------------------
+    hub = models.ForeignKey(Hub, on_delete=models.CASCADE, related_name="clients", null=True, blank=True)
     functional = models.BooleanField(default=True)
     name = models.CharField(max_length=1000, default="No name")
-    release = models.ForeignKey(Release, on_delete=models.CASCADE, related_name="clients", null=True)
-    oauth2_client = models.OneToOneField(OAuth2Client, on_delete=models.CASCADE, related_name="client")
+    release = models.ForeignKey(Release, on_delete=models.CASCADE, related_name="clients", null=True, blank=True)
     kind = TextChoicesField(
         choices_enum=enums.ClientKindChoices,
         default=enums.ClientKindChoices.DEVELOPMENT.value,
-        help_text="The kind of transformation",
+        help_text="What kind of principal this client is.",
     )
     role = TextChoicesField(
         choices_enum=enums.ClientRoleChoices,
         default=enums.ClientRoleChoices.INTERFACE.value,
         help_text="Operational role: human INTERFACE vs autonomous task-receiving AGENT.",
     )
-    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="clients")
     organization = models.ForeignKey(
         Organization,
         on_delete=models.CASCADE,
         related_name="clients",
-    )
-    membership = models.ForeignKey(
-        "karakter.Membership",
-        on_delete=models.CASCADE,
-        related_name="clients",
         null=True,
+        blank=True,
+        help_text="Denormalized from membership (carries constraints and tenant scoping). Null for staged rows and global relying parties.",
     )
-    redirect_uris = models.CharField(max_length=1000, default=" ")
     public = models.BooleanField(default=False)
-    token = models.CharField(default=uuid.uuid4, unique=True, max_length=10000)
-    node = models.ForeignKey(Device, null=True, related_name="clients", on_delete=models.SET_NULL)
+    node = models.ForeignKey(Device, null=True, blank=True, related_name="clients", on_delete=models.SET_NULL)
     public_sources = models.JSONField(default=list)
-    tenant = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="managed_clients")
     created_at = models.DateTimeField(auto_now_add=True)
-    requirements_hash = models.CharField(max_length=1000, unique=False)
+    requirements_hash = models.CharField(max_length=1000, unique=False, blank=True, default="")
     statuses = models.JSONField(default=dict, help_text="Per-requirement grant outcomes: {'key': 'granted'|'denied'|'unavailable'}.")
-    logo = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True)
+    logo = models.ForeignKey(MediaStore, on_delete=models.CASCADE, null=True, blank=True)
     last_reported_at = models.DateTimeField(auto_now=True)
     last_healthy_report = models.ForeignKey(
         "Report",
@@ -625,13 +761,79 @@ class Client(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["release", "user", "organization", "node"],
-                name="Only one per release, user and organization",
+                fields=["release", "membership", "node"],
+                name="Only one client per release, membership and node",
             )
         ]
 
     def __str__(self) -> str:
-        return f"{self.kind} Client for {self.release}"
+        return f"{self.kind} Client {self.client_id}"
+
+    # --- Derived identity -------------------------------------------------
+
+    @property
+    def user(self):
+        """The acting user, derived from the membership (there is no user FK)."""
+        return self.membership.user if self.membership_id else None
+
+    def resolve_membership(self):
+        """The membership every issued token is scoped to. No fallback hops —
+        an unbound client simply cannot get a token."""
+        if self.membership_id:
+            return self.membership
+        raise InvalidClientError(description="Client is not attached to an organization membership.")
+
+    @property
+    def user_id(self):
+        """authlib's save_token stores this as the token's subject (a Membership pk)."""
+        return self.resolve_membership().id
+
+    # --- authlib ClientMixin ----------------------------------------------
+
+    def get_client_id(self):
+        return self.client_id
+
+    def get_default_redirect_uri(self):
+        return self.redirect_uris.split()[0] if self.redirect_uris.split() else None
+
+    def get_allowed_scope(self, scope):
+        if not scope:
+            return ""
+        allowed = set(self.scope.split())
+        return " ".join([s for s in scope.split() if s in allowed])
+
+    def check_redirect_uri(self, redirect_uri):
+        """Exact-match against the registered, space-joined list. A substring
+        test would match a registered URI appearing anywhere in an attacker's
+        URL (e.g. as a query parameter)."""
+        if not redirect_uri:
+            return False
+        return redirect_uri in self.redirect_uris.split()
+
+    def check_client_secret(self, client_secret):
+        """Constant-time comparison — `==` short-circuits at the first
+        differing byte and leaks the secret's prefix through timing."""
+        if not client_secret:
+            return False
+        return _secrets.compare_digest(str(self.client_secret), str(client_secret))
+
+    def check_endpoint_auth_method(self, method, endpoint):
+        """`none` is accepted at the token/revocation endpoints only for
+        clients explicitly registered public (every fakts client); confidential
+        relying parties use the secret methods."""
+        if endpoint in ("token", "revocation"):
+            if method == "none":
+                return self.token_endpoint_auth_method == "none"
+            return method in ("client_secret_basic", "client_secret_post")
+
+        return self.token_endpoint_auth_method == method
+
+    def check_response_type(self, response_type):
+        allowed = self.response_types.split() or ["code"]
+        return response_type in allowed
+
+    def check_grant_type(self, grant_type):
+        return grant_type in self.grant_types.split()
 
 
 class ServiceInstanceMapping(models.Model):

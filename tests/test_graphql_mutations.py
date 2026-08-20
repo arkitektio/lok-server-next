@@ -10,7 +10,7 @@ from tests.conftest import build_auth_context
 
 def _context(user, organization, client):
     # ``client`` is a fakts Client; authenticate through its backing OAuth2Client.
-    return build_auth_context(user, organization, client.oauth2_client)
+    return build_auth_context(user, organization, client)
 
 
 def _setup():

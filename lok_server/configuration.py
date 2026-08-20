@@ -7,6 +7,7 @@ then the YAML file (the mount's ``config.yaml`` by default; override with
 with a ``ValidationError`` if they are not supplied via config or environment.
 """
 
+import hashlib
 import os
 from typing import Any, Dict, List, Literal, Optional
 
@@ -397,6 +398,53 @@ class Settings(BaseSettings):
     kommunity_partners: List[Dict[str, Any]] = Field(default_factory=list, description="Pre-authorized kommunity partner apps.")
     system_messages: List[Dict[str, Any]] = Field(default_factory=list, description="System messages shown to users.")
     openid_apps: List[OpenIDAppSettings] = Field(default_factory=list, description="OIDC/OAuth2 clients provisioned on boot. Provided per deployment.")
+
+    @model_validator(mode="after")
+    def _refuse_committed_key_material_in_production(self) -> "Settings":
+        """Refuse to boot on the key material committed to this repository.
+
+        The repo's `config.yaml` is the *default* config source (see
+        `_DEFAULT_CONFIG`), and it is tracked in git despite being listed in
+        `.gitignore`, so it also ships inside the Docker image. It contains a real
+        RSA private key and a real `SECRET_KEY`, not placeholders. A deployment
+        that forgets to mount its own config therefore signs OIDC id_tokens with a
+        key anyone can read out of the repository — which is total: an attacker
+        can mint a valid token for any user.
+
+        `SECRET_KEY` matters beyond signing too: `karakter.hashers.hash_device_id`
+        uses it as the HMAC pepper for device-id pseudonymisation.
+
+        Compared by digest rather than by embedding the secrets again here. This
+        is a boot-time guard only in production (`debug=False`), so local
+        development against the shipped config keeps working.
+        """
+        if self.django.debug:
+            return self
+
+        compromised = {
+            "c01028cb2381fe78d0fbba311f380e3a5af3c7a03e231b5578dfc2a6fe46a14d": "private_key",
+            "56846ede21a4ab7340e217152f784522843bef23c10f834703ed00b6a7a038b6": "django.secret_key",
+        }
+
+        offenders = [
+            name
+            for value, name in (
+                (self.private_key, "private_key"),
+                (self.django.secret_key, "django.secret_key"),
+            )
+            if compromised.get(hashlib.sha256(value.strip().encode()).hexdigest()) == name
+        ]
+
+        if offenders:
+            raise ValueError(
+                "Refusing to start with key material from the repository's committed "
+                f"config.yaml ({', '.join(offenders)}). These values are public — anyone "
+                "with the repo can forge tokens. Generate fresh values and supply them "
+                "via your deployment config or environment (PRIVATE_KEY, DJANGO__SECRET_KEY). "
+                "Set django.debug=true to bypass this for local development."
+            )
+
+        return self
 
     @model_validator(mode="after")
     def _mandatory_verification_needs_smtp(self) -> "Settings":

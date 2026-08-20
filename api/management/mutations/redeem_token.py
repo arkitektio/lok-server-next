@@ -25,9 +25,11 @@ def create_redeem_token(info: Info, input: CreateRedeemTokenInput) -> types.Mana
     if input.expires_in_days:
         expires_at = timezone.now() + timedelta(days=input.expires_in_days)
 
+    # Org scoping rides on the hub: RedeemToken has no organization column, the
+    # hub (required) carries it. (An `organization=` kwarg was passed here
+    # before, which TypeError'd on every call since the model has no such field.)
     return fakts_models.RedeemToken.objects.create(
         user=info.context.request.user,
-        organization=hub.organization,
         hub=hub,
         expires_at=expires_at,
     )

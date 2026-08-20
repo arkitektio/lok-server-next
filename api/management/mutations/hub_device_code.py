@@ -9,6 +9,7 @@ from graphql import GraphQLError
 from fakts import logic, builders, base_models, enums
 from fakts.services import aliases as alias_services
 import kante
+from api.management.device_code_authz import resolve_declinable_device_code
 
 
 @kante.input
@@ -30,18 +31,19 @@ def accept_hub_device_code(info: Info, input: AcceptHubDeviceCodeInput) -> types
     """
     user = info.context.request.user
     try:
-        device_code = fakts_models.HubDeviceCode.objects.get(id=input.device_code)
+        device_code = fakts_models.DeviceCode.objects.get(id=input.device_code, kind="hub")
         organization = models.Organization.objects.get(id=input.organization)
-    except (fakts_models.HubDeviceCode.DoesNotExist, models.Organization.DoesNotExist):
+    except (fakts_models.DeviceCode.DoesNotExist, models.Organization.DoesNotExist):
         raise GraphQLError(DENIED)
 
     # Creates a hub (plus service instances and auth keys) inside `organization`.
     assert_member(info, organization)
 
-    manifest = device_code.manifest_as_model
+    manifest = device_code.hub_manifest_as_model
 
     hub = fakts_models.Hub.objects.create(
         name=manifest.identifier,
+        identifier=manifest.identifier,
         description=manifest.description or "",
         organization=organization,
         creator=user,
@@ -66,7 +68,7 @@ def accept_hub_device_code(info: Info, input: AcceptHubDeviceCodeInput) -> types
 
         if not instance:
             token = logic.create_api_token()
-            service, _ = fakts_models.Service.objects.get_or_create(identifier=service_manifest.identifier, defaults={"description": service_manifest.description or ""})
+            service, _ = fakts_models.Service.objects.get_or_create(identifier=service_manifest.identifier, organization=organization, defaults={"description": service_manifest.description or ""})
             release, _ = fakts_models.ServiceRelease.objects.get_or_create(
                 service=service,
                 version=service_manifest.version,
@@ -108,33 +110,40 @@ def accept_hub_device_code(info: Info, input: AcceptHubDeviceCodeInput) -> types
         for alias in servicer.aliases:
             alias_services.upsert_instance_alias(instance, alias)
 
+    accepting_user = info.context.request.user
+    membership = models.Membership.objects.get(user=accepting_user, organization=organization)
+
     for clr in manifest.clients:
-        user = info.context.request.user
         client_manifest = clr.manifest
 
-        config = base_models.DevelopmentClientConfig(
+        client = builders.create_public_client(
             kind=enums.ClientKindVanilla.DEVELOPMENT.value,
-            token=token,
-            user=user.username,
-            organization=organization.slug,
-            tenant=user.username,
         )
-
-        client = builders.create_client(
-            organization=organization,
-            user=user,
-            config=config,
-            manifest=client_manifest,
+        builders.bind_client(
+            client,
+            client_manifest,
+            membership,
             hub=hub,
         )
-        
-        
+
     if input.allow_ionscale and manifest.request_auth_key:
         hub.auth_key = logic.create_hub_auth_key(user=info.context.request.user, hub=hub)
         hub.save()
-        
-        
-    device_code.hub = hub
+
+    # Bind the staged (registered-at-start) client to the hub and the approving
+    # user's membership: the hub server polls the token endpoint as this client
+    # and receives its config in the token response envelope.
+    staged = device_code.client
+    staged.membership = membership
+    staged.organization = organization
+    staged.scope = "openid"
+    staged.name = manifest.identifier
+    staged.save()
+    hub.client = staged
+    hub.save(update_fields=["client"])
+
+    device_code.organization = organization
+    device_code.granted_scope = "openid"
     device_code.save()
 
     return hub
@@ -142,9 +151,15 @@ def accept_hub_device_code(info: Info, input: AcceptHubDeviceCodeInput) -> types
 
 @kante.input
 class DeclineHubDeviceCodeInput:
-    """Input for declining an organization invite"""
+    """Input for declining a pending device code."""
 
     device_code: strawberry.ID
+    code: str | None = strawberry.field(
+        default=None,
+        description="The code the device displayed. Proves the caller was actually "
+        "shown this enrolment; without it, a guessed id is enough to deny "
+        "someone else's. Optional only until clients are updated to send it.",
+    )
 
 
 def decline_hub_device_code(info: Info, input: DeclineHubDeviceCodeInput) -> types.ManagementHubDeviceCode:
@@ -153,10 +168,9 @@ def decline_hub_device_code(info: Info, input: DeclineHubDeviceCodeInput) -> typ
 
     Marks the invite as declined.
     """
-    try:
-        device_code = fakts_models.HubDeviceCode.objects.get(id=input.device_code)
-    except fakts_models.HubDeviceCode.DoesNotExist:
-        raise GraphQLError(DENIED)
+    device_code = resolve_declinable_device_code(
+        fakts_models.DeviceCode, device_code_id=input.device_code, code=input.code
+    )
 
     device_code.denied = True
     device_code.save()

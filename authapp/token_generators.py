@@ -57,9 +57,13 @@ class MyJWTBearerTokenGenerator(JWTBearerTokenGenerator):
         """
         return {"keys": [jwk_dict]}
 
-    def _get_fakts_client(self, client: Any) -> Any | None:
+    def _get_app_client(self, client: Any) -> Any | None:
+        """The client itself when it is a bound app client (has a release)."""
+        return client if getattr(client, "release_id", None) else None
+
+    def _get_hub(self, client: Any) -> Any | None:
         try:
-            return client.client
+            return client.hub_identity
         except ObjectDoesNotExist:
             return None
 
@@ -97,7 +101,8 @@ class MyJWTBearerTokenGenerator(JWTBearerTokenGenerator):
             # fall back to the client's configured scope
             scope = client.scope
 
-        fakts_client = self._get_fakts_client(client)
+        fakts_client = self._get_app_client(client)
+        hub = self._get_hub(client)
 
         # TODO: Implement correct scoping rules; for now expose roles and
         # some basic user identifiers used by resource servers.
@@ -112,12 +117,27 @@ class MyJWTBearerTokenGenerator(JWTBearerTokenGenerator):
             "client_release": fakts_client.release.version if fakts_client and fakts_client.release else None,
             "client_device": fakts_client.node.node_id if fakts_client and fakts_client.node else None,
             "client_role": fakts_client.role if fakts_client else None,
+            "hub": hub.identifier if hub else None,
         }
 
     def get_audiences(self, client: Any, user: Any, scope: Optional[str]) -> str | list[str]:
         """Return the audience claim(s) for the token.
 
-        The audience identifies intended recipients of the token. Return
-        a list if there are multiple audiences.
+        For a fakts client the audiences are the service identifiers of its
+        granted instance mappings — the resource servers this token was actually
+        composed for — plus ``lok`` itself (lok consumes its own tokens, e.g. at
+        ``/f/report/``). For non-fakts clients (plain OIDC relying parties) the
+        audience is the client itself, per RFC 9068 practice.
         """
-        return ["rekuest"]
+        fakts_client = self._get_app_client(client)
+        if fakts_client is not None:
+            services = sorted(
+                {
+                    mapping.instance.release.service.identifier
+                    for mapping in fakts_client.mappings.select_related("instance__release__service").all()
+                }
+            )
+            return ["lok", *services]
+        if self._get_hub(client) is not None:
+            return ["lok"]
+        return [client.client_id]

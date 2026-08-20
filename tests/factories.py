@@ -16,8 +16,8 @@ from uuid import uuid4
 from django.utils import timezone
 
 from karakter.models import Organization, User, Membership
-from authapp.models import OAuth2Client, generate_client_id, generate_client_secret
 from fakts import models as fmodels
+from fakts.models import generate_client_id, generate_client_secret
 from fakts.enums import ClientKindChoices, ClientRoleChoices
 
 _seq = itertools.count(1)
@@ -50,18 +50,25 @@ def make_membership(user: User | None = None, organization: Organization | None 
     return membership
 
 
-def make_oauth2_client(membership: Membership | None = None, **kw) -> OAuth2Client:
+def make_oauth2_client(membership: Membership | None = None, **kw) -> fmodels.Client:
+    """An identity-only unified Client (what OAuth2Client used to be) — used
+    for relying-party-style rows and as the identity half of make_client."""
     if membership is None:
         membership = make_membership()
     kw.setdefault("client_id", generate_client_id())
     kw.setdefault("client_secret", generate_client_secret())
-    return OAuth2Client.objects.create(membership=membership, **kw)
+    kw.setdefault("token_endpoint_auth_method", "client_secret_post")
+    kw.setdefault("grant_types", "authorization_code refresh_token client_credentials urn:ietf:params:oauth:grant-type:device_code urn:fakts:grant-type:redeem")
+    kw.setdefault("scope", "openid profile email")
+    kw.setdefault("organization", membership.organization)
+    return fmodels.Client.objects.create(membership=membership, **kw)
 
 
-def make_app(**kw) -> fmodels.App:
+def make_app(organization: Organization | None = None, **kw) -> fmodels.App:
     n = _n()
     kw.setdefault("name", f"App {n}")
     kw.setdefault("identifier", f"com.example.app{n}")
+    kw.setdefault("organization", organization or make_organization())
     return fmodels.App.objects.create(**kw)
 
 
@@ -74,19 +81,31 @@ def make_release(app: fmodels.App | None = None, **kw) -> fmodels.Release:
 
 
 def make_client(membership: Membership | None = None, release: fmodels.Release | None = None, **kw) -> fmodels.Client:
+    """A bound unified client (identity + app side in one row)."""
     if membership is None:
         membership = make_membership()
     if release is None:
         release = make_release()
-    kw.setdefault("user", membership.user)
-    kw.setdefault("tenant", membership.user)
+    # Accept and ignore the pre-unification override shape where the identity
+    # was a separate row: tests that built one pass it through `oauth2_client`.
+    identity = kw.pop("oauth2_client", None)
+    if identity is not None:
+        identity.release = release
+        identity.membership = membership
+        identity.organization = kw.pop("organization", membership.organization)
+        identity.kind = kw.pop("kind", ClientKindChoices.DEVELOPMENT.value)
+        identity.role = kw.pop("role", ClientRoleChoices.INTERFACE.value)
+        for key, value in kw.items():
+            setattr(identity, key, value)
+        identity.save()
+        return identity
     kw.setdefault("organization", membership.organization)
-    kw.setdefault("oauth2_client", make_oauth2_client(membership=membership))
     kw.setdefault("kind", ClientKindChoices.DEVELOPMENT.value)
     kw.setdefault("role", ClientRoleChoices.INTERFACE.value)
-    # the model default is a UUID object; production tokens are strings, so make
-    # the in-memory instance hold a string too (avoids UUID-not-JSON-serializable).
-    kw.setdefault("token", str(uuid4()))
+    kw.setdefault("client_id", generate_client_id())
+    kw.setdefault("token_endpoint_auth_method", "none")
+    kw.setdefault("grant_types", "urn:ietf:params:oauth:grant-type:device_code urn:fakts:grant-type:redeem refresh_token authorization_code")
+    kw.setdefault("scope", "openid profile email")
     return fmodels.Client.objects.create(release=release, membership=membership, **kw)
 
 
@@ -100,10 +119,11 @@ def make_hub(organization: Organization | None = None, **kw) -> fmodels.Hub:
     return fmodels.Hub.objects.create(organization=organization, **kw)
 
 
-def make_service(**kw) -> fmodels.Service:
+def make_service(organization: Organization | None = None, **kw) -> fmodels.Service:
     n = _n()
     kw.setdefault("name", f"Service {n}")
     kw.setdefault("identifier", f"com.example.service{n}")
+    kw.setdefault("organization", organization or make_organization())
     return fmodels.Service.objects.create(**kw)
 
 
@@ -128,13 +148,19 @@ def make_service_instance(hub: fmodels.Hub | None = None, release: fmodels.Servi
 
 def make_device_code(**kw) -> fmodels.DeviceCode:
     kw.setdefault("code", f"device-code-{_n()}")
+    kw.setdefault("secret", f"device-secret-{_n()}-{uuid4().hex}")
     kw.setdefault(
         "staging_manifest",
         {"identifier": "com.example.app", "version": "1.0.0", "scopes": [], "requirements": []},
     )
-    kw.setdefault("staging_kind", ClientKindChoices.DEVELOPMENT.value)
-    kw.setdefault("staging_role", ClientRoleChoices.INTERFACE.value)
     kw.setdefault("expires_at", timezone.now() + timedelta(seconds=300))
+    if "client" not in kw:
+        # An unbound staged client, as /o/app-authorization/ would register.
+        kw["client"] = fmodels.Client.objects.create(
+            client_id=generate_client_id(),
+            token_endpoint_auth_method="none",
+            grant_types="urn:ietf:params:oauth:grant-type:device_code refresh_token",
+        )
     return fmodels.DeviceCode.objects.create(**kw)
 
 

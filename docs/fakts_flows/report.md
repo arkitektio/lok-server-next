@@ -17,8 +17,9 @@ which alias resolutions are failing.
 ## When to use
 
 Periodically from a running client, and especially after it verifies its aliases.
-The `report_url` to post to is handed to the client in its [claim](./claim.md) auth
-block, so a client reports to wherever the server told it to.
+The endpoint is `/f/report/` on the deployment's fakts base URL, authenticated
+with the client's Bearer access token (obtained through the
+[canonical grant](./client_device_code.md)).
 
 ## Why
 
@@ -31,11 +32,12 @@ N reports per client (`CLIENT_REPORT_RETENTION`) so the signal stays current.
 ## Sendable params
 
 ### `ReportRequest`
-`POST /f/report/`
+`POST /f/report/` with header `Authorization: Bearer <access_token>` — the
+reporting client is identified by the JWT's `client_id` claim, not by a payload
+token.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `token` | str | — (required) | The client token identifying who is reporting. |
 | `alias_reports` | map<str, [`AliasReport`](#aliasreport)> | `{}` | Per-alias reachability results, keyed by alias id. |
 | `functional` | bool | `true` | Whether the client considers itself functional overall. |
 
@@ -50,11 +52,11 @@ N reports per client (`CLIENT_REPORT_RETENTION`) so the signal stays current.
 
 | Endpoint | Success | Non-success |
 |---|---|---|
-| `/f/report/` | `{status: reported, message}` | `{status: error, message}` — e.g. `"No Client found for this token"`. |
+| `/f/report/` | `{status: reported, message}` | HTTP 401 with `{status: error, message}` for a missing/invalid/expired Bearer token or unknown client; `{status: error, message}` otherwise. |
 
 ## Code path
 
-- REST: `ReportView` (`fakts/views.py`).
+- REST: `ReportView` (`fakts/views.py`); Bearer verification in `authapp/bearer.py`.
 - Service: `report_client` (`fakts/services/clients.py`); retention
   `CLIENT_REPORT_RETENTION` (`lok_server/settings.py`).
 - Models: `ReportRequest`, `AliasReport` (`fakts/base_models.py`).

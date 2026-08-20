@@ -85,7 +85,7 @@ def test_config_rejects_invalid_email_template():
 @pytest.mark.django_db
 def test_ensureopenid_provisions_new_fields(settings):
     from django.core.management import call_command
-    from authapp.models import OAuth2Client
+    from fakts.models import Client as OAuth2Client
 
     settings.ENSURED_OPENID_APPS = [
         {

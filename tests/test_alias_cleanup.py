@@ -118,7 +118,7 @@ async def test_aliases_layer_resolves_when_null():
         request_client = factories.make_client(membership=membership)
         instance = factories.make_service_instance()
         models.InstanceAlias.objects.create(instance=instance, host="example.com", kind="absolute")
-        return build_auth_context(membership.user, membership.organization, request_client.oauth2_client)
+        return build_auth_context(membership.user, membership.organization, request_client)
 
     context = await sync_to_async(setup)()
     result = await lok_schema.execute(ALIASES_WITH_LAYER, context_value=context)
@@ -169,16 +169,14 @@ def test_report_client_updates_usage_in_place():
     instance = factories.make_service_instance()
     alias = models.InstanceAlias.objects.create(instance=instance, host="example.com", kind="absolute")
 
-    clients.report_client(base_models.ReportRequest(
-        token=client.token,
+    clients.report_client(client, base_models.ReportRequest(
         alias_reports={"db": base_models.AliasReport(alias_id=str(alias.id), valid=True)},
     ))
     usage = models.UsedAlias.objects.get(client=client, key="db")
     first_ts = usage.used_at
     assert usage.valid is True
 
-    clients.report_client(base_models.ReportRequest(
-        token=client.token,
+    clients.report_client(client, base_models.ReportRequest(
         alias_reports={"db": base_models.AliasReport(alias_id=str(alias.id), valid=False, reason="unreachable")},
     ))
     usage.refresh_from_db()

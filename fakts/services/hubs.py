@@ -5,7 +5,7 @@ kommunity partners for an organization.
 """
 
 import logging
-from uuid import NAMESPACE_DNS, uuid5
+import secrets
 
 import requests
 from django.db import transaction
@@ -111,27 +111,36 @@ def create_hub_from_manifest(
     manifest: HubManifest,
     organization: karakter_models.Organization,
 ) -> models.Hub:
-    """Create or update a hub (and its instances/roles/scopes/aliases) from a manifest."""
-    token = str(uuid5(NAMESPACE_DNS, f"{manifest.identifier}:{organization.slug}"))
+    """Create or update a hub (and its instances/roles/scopes/aliases) from a manifest.
 
+    The hub token is a full-entropy random secret. It was previously
+    ``uuid5(NAMESPACE_DNS, f"{identifier}:{org_slug}")`` — *derivable* by anyone
+    who knew the hub name and org slug, and /f/claimhub/ hands out instance
+    private keys against it.
+    """
     hub, created = models.Hub.objects.update_or_create(
         identifier=manifest.identifier,
         organization=organization,
         defaults={
-            "token": token,
             "name": manifest.identifier or "Unnamed Hub",
             "description": manifest.description or "Auto-configured hub",
             "organization": organization,
             "creator": organization.owner,
         },
     )
+    if created:
+        # Only on create — rotating on every re-configure would break running
+        # hub servers. (Existing derivable uuid5 tokens are rotated once by
+        # migration.)
+        hub.token = secrets.token_urlsafe(32)
+        hub.save(update_fields=["token"])
 
     logger.info(f"{'Created' if created else 'Updated'} hub '{hub.name}' for org '{organization.slug}'")
 
     for instance_request in manifest.instances:
         service_manifest = instance_request.manifest
 
-        service, _ = models.Service.objects.get_or_create(identifier=service_manifest.identifier, defaults={"name": service_manifest.identifier})
+        service, _ = models.Service.objects.get_or_create(identifier=service_manifest.identifier, organization=organization, defaults={"name": service_manifest.identifier})
 
         release, _ = models.ServiceRelease.objects.get_or_create(service=service, version=service_manifest.version)
 

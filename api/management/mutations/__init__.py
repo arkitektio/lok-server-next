@@ -22,9 +22,9 @@ from .device_code import (
     accept_device_code,
     decline_device_code,
 )
-from .authorize_code import (
-    accept_authorize_code,
-    decline_authorize_code,
+from .revoke import (
+    revoke_client_sessions,
+    revoke_organization_sessions,
 )
 from .alias import (
     create_alias,
@@ -41,10 +41,6 @@ from .role_set import (
     create_role_set,
     update_role_set,
     delete_role_set,
-)
-from .service_device_code import (
-    accept_service_device_code,
-    decline_service_device_code,
 )
 from .upload import request_media_upload
 from .profile import create_profile, update_profile, delete_profile

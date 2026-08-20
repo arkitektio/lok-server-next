@@ -37,11 +37,28 @@ def test_get_extra_claims_defaults_role_to_interface():
 
 
 @pytest.mark.django_db
-def test_get_audiences_is_rekuest():
+def test_get_audiences_for_non_fakts_client_is_the_client():
+    """Plain OIDC relying parties get themselves as the audience (RFC 9068)."""
     membership = factories.make_membership()
     oauth2 = factories.make_oauth2_client(membership=membership)
 
-    assert _generator().get_audiences(oauth2, membership, None) == ["rekuest"]
+    assert _generator().get_audiences(oauth2, membership, None) == [oauth2.client_id]
+
+
+@pytest.mark.django_db
+def test_get_audiences_for_fakts_client_lists_mapped_services():
+    """A fakts client's audiences are the services it was composed with, plus lok."""
+    membership = factories.make_membership()
+    oauth2 = factories.make_oauth2_client(membership=membership)
+    fakts_client = factories.make_client(membership=membership, oauth2_client=oauth2)
+
+    from fakts import models as fmodels
+
+    instance = factories.make_service_instance()
+    fmodels.ServiceInstanceMapping.objects.create(client=fakts_client, instance=instance, key="db")
+
+    audiences = _generator().get_audiences(oauth2, membership, None)
+    assert audiences == ["lok", instance.release.service.identifier]
 
 
 def test_get_jwks_exposes_signing_key():

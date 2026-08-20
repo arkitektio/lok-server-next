@@ -76,8 +76,10 @@ def sync_ionscale_layers_on_membership_delete(sender, instance, **kwargs):
 
 @receiver(pre_delete, sender=Organization)
 def delete_oauth_clients_for_organization(sender, instance, **kwargs):
-    from authapp.models import OAuth2Client
+    from fakts.models import Client
 
-    OAuth2Client.objects.filter(
-        Q(membership__organization=instance) | Q(client__organization=instance)
+    # The unified Client cascades from both its membership and organization
+    # FKs; this catches rows bound only one way (defensive).
+    Client.objects.filter(
+        Q(membership__organization=instance) | Q(organization=instance)
     ).distinct().delete()

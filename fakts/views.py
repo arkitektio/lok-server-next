@@ -9,6 +9,8 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import View
 
+from authapp.bearer import InvalidBearerToken, decode_bearer_token
+from authapp.throttle import AUTHORIZATION_LIMIT_PER_MINUTE, is_throttled, throttled_response
 from fakts import base_models, models
 from fakts.services import clients, device_codes, rendering
 
@@ -53,24 +55,6 @@ def _absolute_configure_url(template: str, base_url: str) -> str:
     return "https://" + template
 
 
-def _poll_device_code(device_code, result_attr):
-    """Shared polling response for the device-code challenge endpoints."""
-    if timezone.now() > device_code.expires_at:
-        device_code.delete()
-        return _status("expired", "The user has not given an answer in enough time")
-
-    if device_code.denied:
-        device_code.delete()
-        return _status("denied", "The user has denied the request")
-
-    # the related object is only set once the user has verified the challenge
-    result = getattr(device_code, result_attr)
-    if result:
-        return JsonResponse({"status": "granted", "token": result.token})
-
-    return _status("pending", "User  has not verfied the challenge")
-
-
 @method_decorator(csrf_exempt, name="dispatch")
 class WellKnownFakts(View):
     """Well Known fakts Viewset (only allows get). Sends back the well known
@@ -79,6 +63,8 @@ class WellKnownFakts(View):
     name and version of the Fakts Protocol."""
 
     def get(self, request, format=None):
+        from authapp.server import GRANT_TYPES_SUPPORTED, TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED
+
         # The deployment's base domain — also the base a root-relative configure_url
         # resolves against. (frontend_url is kept for back-compat but is deprecated in
         # favour of the explicit, always-absolute `configure` endpoint below.)
@@ -88,18 +74,20 @@ class WellKnownFakts(View):
                 name=settings.DEPLOYMENT_NAME,
                 version=settings.FAKTS_PROTOCOL_VERSION,
                 description=settings.DEPLOYMENT_DESCRIPTION,
-                claim=request.build_absolute_uri(reverse("fakts:claim")),
                 base_url=request.build_absolute_uri(reverse("fakts:index")),
                 frontend_url=base_domain,
                 configure=_absolute_configure_url(settings.DEPLOYMENT_CONFIGURE_URL, base_domain),
-                device_code_start=request.build_absolute_uri(reverse("fakts:start")),
-                challenge_url=request.build_absolute_uri(reverse("fakts:challenge")),
+                issuer=settings.OIDC_ISSUER,
+                device_authorization_endpoint=request.build_absolute_uri(reverse("app_authorization")),
+                token_endpoint=request.build_absolute_uri(reverse("token")),
+                jwks_uri=request.build_absolute_uri(reverse("jwks")),
+                grant_types_supported=GRANT_TYPES_SUPPORTED,
+                token_endpoint_auth_methods_supported=TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED,
                 mesh_coord_url=settings.IONSCALE_COORD_URL,
                 mesh_device_code_start=request.build_absolute_uri(reverse("fakts:meshstart")),
                 mesh_challenge_url=request.build_absolute_uri(reverse("fakts:meshchallenge")),
                 mesh_configure=_absolute_configure_url(settings.DEPLOYMENT_MESH_CONFIGURE_URL, base_domain),
-                hub_device_code_start=request.build_absolute_uri(reverse("fakts:hubstart")),
-                hub_challenge_url=request.build_absolute_uri(reverse("fakts:hubchallenge")),
+                hub_authorization_endpoint=request.build_absolute_uri(reverse("hub_authorization")),
                 hub_claim=request.build_absolute_uri(reverse("fakts:hubclaim")),
                 hub_configure=_absolute_configure_url(settings.DEPLOYMENT_HUB_CONFIGURE_URL, base_domain),
             ).model_dump()
@@ -107,10 +95,19 @@ class WellKnownFakts(View):
 
 
 @method_decorator(csrf_exempt, name="dispatch")
-class StartChallengeView(View):
-    """An endpoint that is challenged in the course of a device code flow."""
+class AppAuthorizationView(View):
+    """The app authorization endpoint — the canonical grant's front door,
+    served at /o/app-authorization/ next to the token endpoint.
+
+    RFC 8628 device authorization doubling as dynamic client registration: the
+    manifest in the request mints a public OAuth2 client, and the app then
+    polls the OAuth2 token endpoint with
+    grant_type=urn:ietf:params:oauth:grant-type:device_code as that client."""
 
     def post(self, request, *args, **kwargs):
+        if is_throttled(request, "authorization", AUTHORIZATION_LIMIT_PER_MINUTE):
+            return throttled_response()
+
         start_grant, err = _parse(request, base_models.DeviceCodeStartRequest)
         if err:
             return err
@@ -120,31 +117,45 @@ class StartChallengeView(View):
         except device_codes.LogoDownloadError:
             return JsonResponse({"status": "error", "error": "Error downloading logo"})
 
-        return JsonResponse({"status": "granted", "code": device_code.code})
+        # Opportunistically reap expired, never-approved codes so their orphan
+        # dynamically-registered OAuth2 clients don't accumulate.
+        device_codes.purge_expired_device_codes()
+
+        base_domain = request.build_absolute_uri(reverse("mainhome")).replace(f"/{settings.MY_SCRIPT_NAME}", "")
+        configure_template = _absolute_configure_url(settings.DEPLOYMENT_CONFIGURE_URL, base_domain)
+
+        return JsonResponse(
+            {
+                "status": "granted",
+                # `device_code` is the full-entropy polling secret; `user_code`
+                # is the short human-transcribable code the configure URL carries.
+                "device_code": device_code.secret,
+                "user_code": device_code.code,
+                "client_id": device_code.client.client_id,
+                "token_endpoint": request.build_absolute_uri(reverse("token")),
+                "verification_uri": configure_template,
+                "verification_uri_complete": configure_template.replace("{code}", device_code.code),
+                "expires_in": device_code.get_expires_in(),
+                "interval": device_code.interval,
+            }
+        )
 
 
 @method_decorator(csrf_exempt, name="dispatch")
-class ServiceStartChallengeView(View):
-    """An endpoint that is challenged in the course of a device code flow."""
+class HubAuthorizationView(View):
+    """The hub authorization endpoint — the canonical grant's front door for
+    whole-hub provisioning, served at /o/hub-authorization/.
+
+    Same shape as app authorization: the hub manifest dynamically registers a
+    public OAuth2 client alongside the staged code; a human accepts in kontrol
+    (creating the hub inside an organization); the hub server then polls the
+    token endpoint with the device-code grant and receives tokens + its
+    rendered hub config in one response."""
 
     def post(self, request, *args, **kwargs):
-        start_grant, err = _parse(request, base_models.ServiceDeviceCodeStartRequest)
-        if err:
-            return err
+        if is_throttled(request, "authorization", AUTHORIZATION_LIMIT_PER_MINUTE):
+            return throttled_response()
 
-        try:
-            device_code = device_codes.start_service_device_code(start_grant)
-        except device_codes.LogoDownloadError:
-            return JsonResponse({"status": "error", "error": "Error downloading logo"})
-
-        return JsonResponse({"status": "granted", "code": device_code.code, "challenge": device_code.challenge_code})
-
-
-@method_decorator(csrf_exempt, name="dispatch")
-class HubStartChallengeView(View):
-    """An endpoint that is challenged in the course of a device code flow."""
-
-    def post(self, request, *args, **kwargs):
         start_grant, err = _parse(request, base_models.HubStartRequest)
         if err:
             return err
@@ -154,58 +165,24 @@ class HubStartChallengeView(View):
         except device_codes.LogoDownloadError:
             return JsonResponse({"status": "error", "error": "Error downloading logo"})
 
-        return JsonResponse({"status": "granted", "code": device_code.code, "challenge": device_code.challenge_code})
+        device_codes.purge_expired_device_codes()
 
+        base_domain = request.build_absolute_uri(reverse("mainhome")).replace(f"/{settings.MY_SCRIPT_NAME}", "")
+        configure_template = _absolute_configure_url(settings.DEPLOYMENT_HUB_CONFIGURE_URL, base_domain)
 
-@method_decorator(csrf_exempt, name="dispatch")
-class HubChallengeView(View):
-    """An endpoint that is challenged in the course of a device code flow."""
-
-    def post(self, request, *args, **kwargs):
-        challenge, err = _parse(request, base_models.DeviceCodeChallengeRequest)
-        if err:
-            return err
-
-        try:
-            device_code = models.HubDeviceCode.objects.get(challenge_code=challenge.code)
-        except models.HubDeviceCode.DoesNotExist:
-            return JsonResponse({"status": "error", "error": "Challenge does not exist"})
-
-        return _poll_device_code(device_code, "hub")
-
-
-@method_decorator(csrf_exempt, name="dispatch")
-class ServiceChallengeView(View):
-    """An endpoint that is challenged in the course of a device code flow."""
-
-    def post(self, request, *args, **kwargs):
-        challenge, err = _parse(request, base_models.DeviceCodeChallengeRequest)
-        if err:
-            return err
-
-        try:
-            device_code = models.ServiceDeviceCode.objects.get(challenge_code=challenge.code)
-        except models.ServiceDeviceCode.DoesNotExist:
-            return JsonResponse({"status": "error", "error": "Challenge does not exist"})
-
-        return _poll_device_code(device_code, "instance")
-
-
-@method_decorator(csrf_exempt, name="dispatch")
-class ChallengeView(View):
-    """An endpoint that is challenged in the course of a device code flow."""
-
-    def post(self, request, *args, **kwargs):
-        challenge, err = _parse(request, base_models.DeviceCodeChallengeRequest)
-        if err:
-            return err
-
-        try:
-            device_code = models.DeviceCode.objects.get(code=challenge.code)
-        except models.DeviceCode.DoesNotExist:
-            return JsonResponse({"status": "error", "error": "Challenge does not exist"})
-
-        return _poll_device_code(device_code, "client")
+        return JsonResponse(
+            {
+                "status": "granted",
+                "device_code": device_code.secret,
+                "user_code": device_code.code,
+                "client_id": device_code.client.client_id,
+                "token_endpoint": request.build_absolute_uri(reverse("token")),
+                "verification_uri": configure_template,
+                "verification_uri_complete": configure_template.replace("{code}", device_code.code),
+                "expires_in": device_code.get_expires_in(),
+                "interval": device_code.interval,
+            }
+        )
 
 
 @method_decorator(csrf_exempt, name="dispatch")
@@ -226,10 +203,9 @@ class MeshStartChallengeView(View):
 class MeshChallengeView(View):
     """Poll endpoint for the mesh device-code flow.
 
-    Unlike the client/service/hub challenge views this does not reuse
-    ``_poll_device_code``: the minted result is an ``IonscaleAuthKey`` (which exposes
-    ``.key``, not ``.token``) and the machine needs the coordination URL and the
-    authorized machine name in addition to the key.
+    The mesh flow stays outside the OAuth token endpoint: the minted result is
+    an ``IonscaleAuthKey`` (a tailnet pre-auth key, not an OAuth token) and the
+    machine needs the coordination URL and the authorized machine name.
     """
 
     def post(self, request, *args, **kwargs):
@@ -265,86 +241,6 @@ class MeshChallengeView(View):
 
 
 @method_decorator(csrf_exempt, name="dispatch")
-class RetrieveView(View):
-    """
-    Implements an endpoint that returns the faktsclaim for a given identifier and version
-    if the app was already configured and the app is marked as PUBLIC. While any app can
-    request a faktsclaim for any other app, redirect uris are set to predifined values
-    and the app will not be able to use the faktsclaim to get a configuration.
-    """
-
-    def post(self, request, *args, **kwargs):
-        retrieve, err = _parse(request, base_models.RetrieveRequest)
-        if err:
-            return err
-
-        try:
-            app = models.App.objects.get(identifier=retrieve.manifest.identifier)
-            release = models.Release.objects.get(app=app, version=retrieve.manifest.version)
-        except models.Release.DoesNotExist:
-            return _status("error", f"Release does not exist {retrieve.manifest.identifier}:{retrieve.manifest.version}")
-        except models.App.DoesNotExist:
-            return _status("error", f"App does not exist {retrieve.manifest.identifier}")
-
-        client = release.clients.filter(public=True).first()
-        if not client:
-            return _status("error", "There is no client for this app that is public. Please use a different grant")
-
-        return JsonResponse({"status": "granted", "token": client.token})
-
-
-@method_decorator(csrf_exempt, name="dispatch")
-class RedeemView(View):
-    """
-    Implements an endpoint that redeems a pre-issued token into a client token.
-    """
-
-    def post(self, request, *args, **kwargs):
-        redeem_request, err = _parse(request, base_models.ReedeemTokenRequest)
-        if err:
-            return err
-
-        try:
-            client = clients.redeem_token(
-                redeem_request.token,
-                redeem_request.manifest,
-                role=redeem_request.requested_client_role,
-            )
-        except models.RedeemToken.DoesNotExist:
-            return _status("error", "Invalid redeem token")
-        except clients.RedeemTokenExpired:
-            return _status("error", "Redeem token expired")
-        except clients.RedeemTokenManifestChanged as e:
-            return _status("error", str(e))
-        except Exception as e:
-            logger.error(e, exc_info=True)
-            return _status("error", str(e))
-
-        return JsonResponse({"status": "granted", "token": client.token})
-
-
-@method_decorator(csrf_exempt, name="dispatch")
-class ClaimView(View):
-    """Retrieve a faktsclaim given a client token generated by the platform."""
-
-    def post(self, request, *args, **kwargs):
-        claim, err = _parse(request, base_models.ClaimRequest, error_key="message")
-        if err:
-            return err
-
-        try:
-            client = models.Client.objects.get(token=claim.token)
-            context = rendering.create_linking_context(request, client, claim)
-            config = rendering.render_hub(client, context)
-            return JsonResponse({"status": "granted", "config": config})
-        except models.Client.DoesNotExist:
-            return _status("error", "No Client found for this token")
-        except Exception as e:
-            logger.error(e, exc_info=True)
-            return _status("error", "Error creating configuration")
-
-
-@method_decorator(csrf_exempt, name="dispatch")
 class ClaimHubView(View):
     """Retrieve a hub faktsclaim given a hub token."""
 
@@ -367,18 +263,27 @@ class ClaimHubView(View):
 
 @method_decorator(csrf_exempt, name="dispatch")
 class ReportView(View):
-    """Record a client's self-report (functional flag + alias reports)."""
+    """Record a client's self-report (functional flag + alias reports).
+
+    Authenticated with the client's Bearer access token — the JWT's `client_id`
+    claim identifies the reporting client."""
 
     def post(self, request, *args, **kwargs):
+        try:
+            claims = decode_bearer_token(request)
+        except InvalidBearerToken as e:
+            return JsonResponse({"status": "error", "message": str(e)}, status=401)
+
         claim, err = _parse(request, base_models.ReportRequest, error_key="message")
         if err:
             return err
 
         try:
-            clients.report_client(claim)
+            client = models.Client.objects.get(client_id=claims.get("client_id"))
+            clients.report_client(client, claim)
             return _status("reported", "Report processed successfully")
         except models.Client.DoesNotExist:
-            return _status("error", "No Client found for this token")
+            return JsonResponse({"status": "error", "message": "No client found for this token"}, status=401)
         except Exception as e:
             logger.error(e, exc_info=True)
-            return _status("error", "Error creating configuration")
+            return _status("error", "Error processing report")

@@ -17,27 +17,18 @@ def _manifest(identifier="com.example.app", version="1.0.0", requirements=None):
 
 
 @pytest.mark.django_db
-def test_create_client_creates_development_client_with_role():
+def test_bind_client_creates_development_client_with_role():
     membership = factories.make_membership()
-    user = membership.user
-    organization = membership.organization
 
-    config = base_models.DevelopmentClientConfig(
-        kind=enums.ClientKindVanilla.DEVELOPMENT.value,
-        role=enums.ClientRoleVanilla.AGENT.value,
-        token="tok-123",
-        user=user.username,
-        organization=organization.slug,
-        tenant=user.username,
-    )
-
-    client = clients.create_client(_manifest(), config, user=user, organization=organization)
+    client = clients.create_public_client(role=enums.ClientRoleVanilla.AGENT.value)
+    client = clients.bind_client(client, _manifest(), membership)
 
     assert client.kind == "development"
     assert client.role == "agent"
-    assert client.token == "tok-123"
     assert client.release.app.identifier == "com.example.app"
-    assert client.oauth2_client.client_id
+    assert client.client_id
+    assert client.membership == membership
+    assert client.organization == membership.organization
 
 
 @pytest.mark.django_db
@@ -48,17 +39,8 @@ def test_create_client_rejects_missing_node_id_when_org_requires_device_auth():
     organization.require_device_auth = True
     organization.save()
 
-    config = base_models.DevelopmentClientConfig(
-        kind=enums.ClientKindVanilla.DEVELOPMENT.value,
-        role=enums.ClientRoleVanilla.AGENT.value,
-        token="tok-123",
-        user=user.username,
-        organization=organization.slug,
-        tenant=user.username,
-    )
-
     with pytest.raises(clients.DeviceAuthRequired):
-        clients.create_client(_manifest(), config, user=user, organization=organization)
+        clients.bind_client(clients.create_public_client(), _manifest(), membership)
 
 
 @pytest.mark.django_db
@@ -76,16 +58,8 @@ def test_create_client_allows_node_id_when_org_requires_device_auth():
         requirements=[],
         node_id="node-123",
     )
-    config = base_models.DevelopmentClientConfig(
-        kind=enums.ClientKindVanilla.DEVELOPMENT.value,
-        role=enums.ClientRoleVanilla.AGENT.value,
-        token="tok-123",
-        user=user.username,
-        organization=organization.slug,
-        tenant=user.username,
-    )
 
-    client = clients.create_client(manifest, config, user=user, organization=organization)
+    client = clients.bind_client(clients.create_public_client(), manifest, membership)
 
     assert client.node is not None
 

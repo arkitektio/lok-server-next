@@ -20,17 +20,28 @@ class AliasKindChoices(TextChoices):
 
 
 class ClientKindChoices(TextChoices):
-    """Event Type for the Event Operator"""
+    """What kind of principal a (unified) Client row is."""
 
     WEBSITE = "website", "WEBSITE (Value represent WEBSITE)"
     DEVELOPMENT = "development", "DEVELOPMENT (Value represent DEVELOPMENT)"
     DESKTOP = "desktop", "DESKTOP (Value represent DESKTOP Aüü)"
+    HUB = "hub", "HUB (a hub server's identity)"
+    RELYING_PARTY = "relying_party", "RELYING_PARTY (a config-provisioned OIDC relying party)"
 
 
 class ClientKindVanilla(str, Enum):
     WEBSITE = "website"
     DEVELOPMENT = "development"
     DESKTOP = "desktop"
+    HUB = "hub"
+    RELYING_PARTY = "relying_party"
+
+
+class DeviceCodeKindChoices(TextChoices):
+    """What a staged device-code authorization produces on accept."""
+
+    APP = "app", "APP (an app/client registration)"
+    HUB = "hub", "HUB (a whole-hub provisioning)"
 
 
 class ClientRoleChoices(TextChoices):
@@ -88,20 +99,6 @@ class ClientKind(str, Enum):
 class InstancePermissionKind(str, Enum):
     ALLOW = "allow"
     DENY = "deny"
-
-
-class FaktsGrantKindChoices(TextChoices):
-    """Event Type for the Event Operator"""
-
-    RETRIEVE = "retrieve", "RETRIEVE (Value represent RETRIEVE)"
-    DEVICE_CODE = "device_code", "DEVICE_CODE (Value represent DEVICE_CODE)"
-
-
-@strawberry.enum
-class FaktsGrantKind(str, Enum):
-    RETRIEVE = "retrieve"
-    DEVICE_CODE = "device_code"
-
 
 
 @strawberry.enum

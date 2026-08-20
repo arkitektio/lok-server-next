@@ -243,7 +243,7 @@ async def test_update_mesh_dns_through_graphql_schema(ionscale_repo):
         mesh = ensure_org_mesh(membership.organization)
         ionscale_repo.dns_configs.clear()
         ctx = build_auth_context(
-            membership.user, membership.organization, request_client.oauth2_client
+            membership.user, membership.organization, request_client
         )
         # The management schema has no auth strawberry-extension; production sets
         # request.user at the view layer, so we set it directly here.
@@ -500,7 +500,7 @@ async def test_accept_mesh_device_code_through_graphql_schema(ionscale_repo):
             base_models.MeshDeviceCodeStartRequest(requested_machine_name="gpu-01")
         )
         ctx = build_auth_context(
-            membership.user, membership.organization, request_client.oauth2_client
+            membership.user, membership.organization, request_client
         )
         ctx.request._user = membership.user
         return membership, dc, ctx
@@ -560,7 +560,7 @@ def _machine_ctx(ionscale_repo):
     request_client = factories.make_client(membership=membership)
     mesh = ensure_org_mesh(membership.organization)
     ctx = build_auth_context(
-        membership.user, membership.organization, request_client.oauth2_client
+        membership.user, membership.organization, request_client
     )
     # Management schema has no auth extension; production sets request.user at the
     # view layer, so set it directly here.
@@ -694,7 +694,7 @@ async def test_machine_detail_magic_dns_name(ionscale_repo):
         mesh.magic_dns_enabled = enabled
         mesh.save()
         from tests.conftest import build_auth_context
-        ctx = build_auth_context(membership.user, membership.organization, request_client.oauth2_client)
+        ctx = build_auth_context(membership.user, membership.organization, request_client)
         ctx.request._user = membership.user
         ionscale_repo.machines_by_tailnet[mesh.tailnet_name] = [Machine(id="m1", name="gpu-01", connected=True)]
         return mesh, ctx
@@ -724,7 +724,7 @@ async def test_machine_detail_magic_dns_name_null_when_disabled(ionscale_repo):
         mesh.magic_dns_enabled = False
         mesh.save()
         from tests.conftest import build_auth_context
-        ctx = build_auth_context(membership.user, membership.organization, request_client.oauth2_client)
+        ctx = build_auth_context(membership.user, membership.organization, request_client)
         ctx.request._user = membership.user
         ionscale_repo.machines_by_tailnet[mesh.tailnet_name] = [Machine(id="m1", name="gpu-01", connected=True)]
         return mesh, ctx

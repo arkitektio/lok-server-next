@@ -1,8 +1,8 @@
 """Per-client OIDC claim shaping (``sub`` and ``email``).
 
 Two aspects of the claims lok issues to an OpenID relying party are
-configurable **per client** (see ``OAuth2Client.membership_is_subject`` and
-``OAuth2Client.email_template``, provisioned from the ``openid_apps`` config):
+configurable **per client** (see ``Client.membership_is_subject`` and
+``Client.email_template``, provisioned from the ``openid_apps`` config):
 
 - **Subject** — by default the ``sub`` claim is the *user* id, so the same
   human is the same subject across every organization they belong to. A client

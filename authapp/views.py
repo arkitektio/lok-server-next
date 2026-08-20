@@ -46,7 +46,7 @@ def jwks(request: HttpRequest) -> JsonResponse:
 @csrf_exempt
 @resource_protector("profile")
 def user_info(request: HttpRequest) -> JsonResponse:
-    from authapp.models import OAuth2Client
+    from fakts.models import Client
     from authapp.oidc_claims import resolve_email, resolve_sub
 
     membership = request.oauth_token.user  # type: ignore
@@ -55,10 +55,10 @@ def user_info(request: HttpRequest) -> JsonResponse:
     # `sub` here MUST match the id_token's `sub` for the same client (OIDC Core
     # §5.3.2), so it is resolved identically to grants.OpenIDCode.
     try:
-        client = OAuth2Client.objects.get(client_id=request.oauth_token.client_id)  # type: ignore
+        client = Client.objects.get(client_id=request.oauth_token.client_id)  # type: ignore
         membership_is_subject = client.membership_is_subject
         email_template = client.email_template
-    except OAuth2Client.DoesNotExist:
+    except Client.DoesNotExist:
         membership_is_subject = False
         email_template = None
 
@@ -76,29 +76,114 @@ def user_info(request: HttpRequest) -> JsonResponse:
     )
 
 
-# use ``server.create_token_response`` to handle token endpoint
-@csrf_exempt
-def open_id_configuration(request: HttpRequest) -> JsonResponse:
-    """OpenID Configuration."""
-    issuer = settings.OIDC_ISSUER
-    # construct metadata
-    metadata = {
-        "issuer": issuer,
-        "authorization_endpoint": "https://" + request.get_host() + "/authorize",
+def _authorization_server_metadata(request: HttpRequest) -> dict:
+    """The RFC 8414 authorization-server metadata core, shared by
+    /.well-known/oauth-authorization-server and /.well-known/openid-configuration
+    (which adds its OIDC-specific fields on top). /.well-known/fakts inlines the
+    same core so fakts clients need a single discovery request."""
+    from authapp.server import GRANT_TYPES_SUPPORTED, TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED
+
+    return {
+        "issuer": settings.OIDC_ISSUER,
+        "authorization_endpoint": request.build_absolute_uri(reverse("authorize")),
         "token_endpoint": request.build_absolute_uri(reverse("token")),
         "jwks_uri": request.build_absolute_uri(reverse("jwks")),
-        "userinfo_endpoint": request.build_absolute_uri(reverse("user_info")),
         "response_types_supported": ["code"],
-        "subject_types_supported": ["public"],
-        "id_token_signing_alg_values_supported": ["RS256"],
         "scopes_supported": ["openid", "profile", "email"],
-        "token_endpoint_auth_methods_supported": [
-            "client_secret_basic",
-            "client_secret_post",
-        ],
-        "grant_types_supported": ["authorization_code", "client_credentials", "refresh_token"],
+        "token_endpoint_auth_methods_supported": TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED,
+        "grant_types_supported": GRANT_TYPES_SUPPORTED,
+        "code_challenge_methods_supported": ["S256"],
+        "revocation_endpoint": request.build_absolute_uri(reverse("revoke")),
+        "revocation_endpoint_auth_methods_supported": TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED,
+        # RFC 8628 device authorization endpoint, named "app authorization"
+        # here. Non-standard in one respect: it also performs dynamic client
+        # registration (the manifest in the request mints a public client
+        # alongside the device code).
+        "device_authorization_endpoint": request.build_absolute_uri(reverse("app_authorization")),
     }
+
+
+@csrf_exempt
+def oauth_authorization_server(request: HttpRequest) -> JsonResponse:
+    """OAuth 2.0 Authorization Server Metadata (RFC 8414)."""
+    return JsonResponse(_authorization_server_metadata(request))
+
+
+@csrf_exempt
+def open_id_configuration(request: HttpRequest) -> JsonResponse:
+    """OpenID Configuration: the RFC 8414 core plus the OIDC-specific fields."""
+    metadata = _authorization_server_metadata(request)
+    metadata.update(
+        {
+            "userinfo_endpoint": request.build_absolute_uri(reverse("user_info")),
+            "subject_types_supported": ["public"],
+            "id_token_signing_alg_values_supported": ["RS256"],
+        }
+    )
     return JsonResponse(metadata)
+
+
+@require_http_methods(["GET", "POST"])
+def authorize(request: HttpRequest) -> HttpResponse:
+    """The OAuth2/OIDC authorization endpoint.
+
+    ``GET`` (the entry point relying parties redirect the browser to): when a
+    session exists, validate the request via authlib and forward to the kontrol
+    consent page (which renders the client, scopes and an organization picker);
+    without a session, forward too — the SPA gates on login and returns here.
+
+    ``POST`` (the consent decision, session-authenticated and CSRF-protected —
+    the kontrol page submits a real form so the browser follows the resulting
+    302 to the relying party): carries the original authorize parameters plus
+    ``organization`` (slug) and ``allow``. The granted subject is the user's
+    *membership* in that organization, so every code — like every token — is
+    org-scoped at the database level.
+    """
+    from karakter.models import Membership
+
+    if request.method == "GET":
+        if request.user.is_authenticated:
+            # Fail fast on an invalid request (unknown client, bad redirect_uri,
+            # missing PKCE for a public client) before bouncing the user to the
+            # consent UI.
+            try:
+                server.get_consent_grant(request=request, end_user=None)
+            except OAuth2Error as error:
+                return server.handle_response(*error())
+        query = request.GET.urlencode()
+        return redirect(f"{settings.KONTROL_FRONTEND_URL}/authorize?{query}")
+
+    if not request.user.is_authenticated:
+        return JsonResponse({"error": "login_required"}, status=401)
+
+    if request.POST.get("allow") != "true":
+        # Denied: authlib produces the standard access_denied redirect.
+        return server.create_authorization_response(request, grant_user=None)
+
+    organization = request.POST.get("organization")
+    try:
+        membership = Membership.objects.get(user=request.user, organization__slug=organization)
+    except Membership.DoesNotExist:
+        return JsonResponse(
+            {"error": "invalid_request", "error_description": "You are not a member of the selected organization."},
+            status=400,
+        )
+
+    return server.create_authorization_response(request, grant_user=membership)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def revoke_token(request: HttpRequest) -> HttpResponse:
+    """RFC 7009 token revocation endpoint (POST only).
+
+    Sets ``OAuth2Token.revoked``, which severs the refresh chain immediately;
+    the short-lived JWT access token ages out on its own.
+    """
+    try:
+        return server.create_endpoint_response("revocation", request)
+    except OAuth2Error as error:
+        return server.handle_response(*error())
 
 
 @csrf_exempt
@@ -122,8 +207,11 @@ def issue_token(request: HttpRequest) -> HttpResponse | tuple:
     Returns:
         HttpResponse produced by the AuthorizationServer token handler.
     """
-    print(request)
-    print(request.POST)
+    from authapp.throttle import TOKEN_LIMIT_PER_MINUTE, is_throttled, throttled_response
+
+    if is_throttled(request, "token", TOKEN_LIMIT_PER_MINUTE):
+        return throttled_response()
+
     try:
         return server.create_token_response(request)
     except OAuth2Error as error:

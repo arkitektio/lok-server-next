@@ -392,3 +392,22 @@ SOCIALACCOUNT_PROVIDERS = {
     provider: cfg.model_dump(exclude_none=True)
     for provider, cfg in conf.socialaccount_providers.items()
 }
+
+
+# --- OAuth transport guard -----------------------------------------------------
+# authlib refuses token-endpoint traffic over plain HTTP unless
+# AUTHLIB_INSECURE_TRANSPORT is set. This deployment terminates TLS at the
+# gateway (Caddy), so lok itself legitimately sees plain HTTP and the variable
+# is required — but that also means Django cannot tell secure from insecure
+# clients on its own. Surface it loudly rather than silently: the clean fix is
+# forwarding X-Forwarded-Proto from the gateway and setting
+# SECURE_PROXY_SSL_HEADER here, after which the variable can be dropped.
+import logging as _logging
+import os as _os
+
+if not DEBUG and _os.environ.get("AUTHLIB_INSECURE_TRANSPORT"):
+    _logging.getLogger(__name__).warning(
+        "AUTHLIB_INSECURE_TRANSPORT is set with DEBUG off: OAuth endpoints accept "
+        "plain-HTTP requests. This is only safe when TLS terminates at a gateway "
+        "in front of lok and lok is not reachable directly."
+    )

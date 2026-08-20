@@ -2,7 +2,6 @@ from typing import cast
 from authentikate.strawberry.extension import AuthentikateExtension, UserModel, JWTToken
 from karakter.models import User, Organization, Membership
 from fakts.models import Client
-from authapp.models import OAuth2Client
 
 
 async def expand_user_from_token(token: str):
@@ -36,7 +35,7 @@ class AuthAppExtension(AuthentikateExtension):
     async def aexpand_client_from_token(self, token: JWTToken) -> "Client":
         """Expand a client from the provided JWT token"""
 
-        return cast("Client", await OAuth2Client.objects.prefetch_related("client").aget(client_id=token.client_id)).client
+        return cast("Client", await Client.objects.aget(client_id=token.client_id))
 
     async def aexpand_organization_from_token(self, token: JWTToken) -> "Organization":
         """Expand an organization from the provided JWT token"""

@@ -185,7 +185,7 @@ def _mutation_setup():
     request_client = factories.make_client(membership=membership)
     hub = factories.make_hub(organization=membership.organization)
     instance = factories.make_service_instance(hub=hub)
-    context = build_auth_context(membership.user, membership.organization, request_client.oauth2_client)
+    context = build_auth_context(membership.user, membership.organization, request_client)
     return context, instance
 
 

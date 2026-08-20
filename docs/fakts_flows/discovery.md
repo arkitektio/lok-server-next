@@ -16,7 +16,7 @@ single source of truth.
 
 ## When to use
 
-Always, first — before start/retrieve/redeem. A client should treat the URLs it
+Always, first — before starting any flow. A client should treat the URLs it
 returns as authoritative rather than hard-coding `/f/...` paths, so a deployment can
 relocate endpoints or sit behind a gateway without breaking clients.
 
@@ -39,27 +39,34 @@ image works across dev/staging/prod without reconfiguration.
 |---|---|---|
 | `name` | str | Deployment name. |
 | `version` | str | Fakts protocol version of this deployment. |
-| `protocol_version` | str | Protocol version marker (`"1"`). |
+| `protocol_version` | str | Protocol version marker (`"2"`). |
 | `description` | str? | Deployment description. |
-| `claim` | str | Absolute URL of the [claim](./claim.md) endpoint. |
 | `base_url` | str | Absolute base of the fakts endpoints (`/f/`). |
 | `frontend_url` | str | Deployment base domain. *Deprecated* — prefer `configure`. |
 | `configure` | str? | Absolute [client-configure](./client_device_code.md) page template; the literal `{code}` is substituted by the client. |
-| `device_code_start` | str? | Absolute URL of the client [start](./client_device_code.md) endpoint. |
-| `challenge_url` | str? | Absolute URL of the client [challenge](./client_device_code.md) endpoint. |
+| `issuer` | str? | OAuth issuer identifier — the `iss` of issued access tokens. |
+| `device_authorization_endpoint` | str? | Absolute URL of the [app authorization](./client_device_code.md) endpoint (`/o/app-authorization/`) — RFC 8628 device authorization + dynamic client registration. |
+| `token_endpoint` | str? | Absolute URL of the OAuth2 token endpoint — the client polls it with the device-code grant (or exchanges a [redeem token](./redeem_token.md)) and refreshes there. |
+| `jwks_uri` | str? | Absolute URL of the JWKS used to verify issued access tokens. |
+| `grant_types_supported` | str[] | Grant types the token endpoint accepts, including `urn:ietf:params:oauth:grant-type:device_code` and `urn:fakts:grant-type:redeem`. |
+| `token_endpoint_auth_methods_supported` | str[] | Client auth methods; fakts clients are public and use `none`. |
 | `mesh_coord_url` | str? | Public ionscale [mesh](./mesh_device_code.md) coordination URL, or `null` when no mesh is configured. |
 | `mesh_device_code_start` | str? | Absolute URL of the [mesh start](./mesh_device_code.md) endpoint. |
 | `mesh_challenge_url` | str? | Absolute URL of the [mesh challenge](./mesh_device_code.md) endpoint. |
 | `mesh_configure` | str? | Absolute [mesh-configure](./mesh_device_code.md) page template; `{code}` is substituted by the machine. |
-| `hub_device_code_start` | str? | Absolute URL of the [hub start](./hub_device_code.md) endpoint. |
-| `hub_challenge_url` | str? | Absolute URL of the [hub challenge](./hub_device_code.md) endpoint. |
-| `hub_claim` | str? | Absolute URL of the [hub claim](./claim.md#hub-claim) endpoint. |
+| `hub_authorization_endpoint` | str? | Absolute URL of the [hub authorization](./hub_device_code.md) endpoint (`/o/hub-authorization/`). |
+| `hub_claim` | str? | *Deprecated.* Absolute URL of the hub claim endpoint (`/f/claimhub/`) — only the partner-webhook path still uses it. |
 | `hub_configure` | str? | Absolute [hub-configure](./hub_device_code.md) page template; `{code}` is substituted by the client. |
 
-> The document advertises the *client*, *mesh*, and *hub* device-code
-> endpoints explicitly. The *service* endpoints (`/f/servicestart/`,
-> `/f/servicechallenge/`) are not yet advertised here — they follow the fixed
-> `/f/service*` naming under `base_url`.
+> The same RFC 8414 core (plus `authorization_endpoint` and
+> `revocation_endpoint`) is also served at the standard
+> `/.well-known/oauth-authorization-server` and, with OIDC extras, at
+> `/.well-known/openid-configuration`; it is inlined here so a fakts client
+> needs a single discovery request.
+
+> The document advertises the *client*, *mesh*, and *hub* flows explicitly.
+> The service-instance flow no longer exists — instances are provisioned
+> through the hub flow or the management API.
 
 ## Code path
 
