@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.26 (2026-08-20)
+
+### Bug Fixes
+
+- Removed boken
+  ([`308f1b4`](https://github.com/arkitektio/lok-server-next/commit/308f1b473efa053ab397f615f0dfab4718447553))
+
+
 ## v1.0.0-rc.25 (2026-08-20)
 
 ### Bug Fixes
