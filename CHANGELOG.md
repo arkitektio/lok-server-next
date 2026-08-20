@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.25 (2026-08-20)
+
+### Bug Fixes
+
+- Oauth insecure
+  ([`1198bbd`](https://github.com/arkitektio/lok-server-next/commit/1198bbd083fb4907305a076d78d6050b843f4e86))
+
+
 ## v1.0.0-rc.24 (2026-08-20)
 
 ### Features
