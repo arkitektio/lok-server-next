@@ -1162,11 +1162,6 @@ class ManagementClient:
 
         return ManagementStagingManifest.from_pydantic(base_models.Manifest(**self.manifest))
 
-    @strawberry_django.field(description="The configuration of the client. This is the configuration that will be sent to the client. It should never contain sensitive information.")
-    def token(self, info: Info) -> str:
-        # TODO: Implement only tenant should be able to see the token
-        return self.token
-
     @strawberry_django.field(description="The issue url of the client. This is the url where users can report issues and get more information about the client.")
     def issue_url(self, info: Info) -> str | None:
         for source in self.public_sources:
