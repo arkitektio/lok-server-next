@@ -1,9 +1,15 @@
 # CHANGELOG
 
 
+## v1.0.0-rc.27 (2026-08-20)
+
+
 ## v1.0.0-rc.26 (2026-08-20)
 
 ### Bug Fixes
+
+- Client unique per hub
+  ([`4fa27af`](https://github.com/arkitektio/lok-server-next/commit/4fa27af73db374b630f047cdc97d0d725b741fd6))
 
 - Removed boken
   ([`308f1b4`](https://github.com/arkitektio/lok-server-next/commit/308f1b473efa053ab397f615f0dfab4718447553))
