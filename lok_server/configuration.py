@@ -40,6 +40,16 @@ class DjangoSettings(BaseModel):
     hosts: List[str] = Field(default_factory=lambda: ["*"], description="ALLOWED_HOSTS entries.")
     use_x_forwarded_host: bool = Field(default=True, description="Trust the X-Forwarded-Host header behind a reverse proxy.")
     secure_proxy_ssl_header: bool = Field(default=True, description="Trust X-Forwarded-Proto to detect HTTPS behind a reverse proxy (SECURE_PROXY_SSL_HEADER). Disable when not behind a TLS-terminating proxy.")
+    allow_insecure_transport: bool = Field(
+        default=False,
+        description=(
+            "Let OAuth2/OIDC endpoints (token, authorize, discovery) accept plain-HTTP "
+            "requests. authlib otherwise rejects non-https, non-localhost URLs with "
+            "InsecureTransportError. Enable for deployments that deliberately run lok "
+            "without TLS, or behind a proxy that does not forward X-Forwarded-Proto. "
+            "Equivalent to exporting AUTHLIB_INSECURE_TRANSPORT=1."
+        ),
+    )
     admin: AdminSettings = Field(description="Superuser provisioned on first boot.")
     csrf_trusted_origins: List[str] = Field(default_factory=lambda: ["http://localhost", "https://localhost"], description="CSRF_TRUSTED_ORIGINS for unsafe (POST) requests.")
     force_script_name: str = Field(default="", description="URL path prefix (FORCE_SCRIPT_NAME) this service is served under.")

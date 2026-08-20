@@ -222,3 +222,14 @@ def test_privacy_guards_rejects_unknown_policy():
     """An unrecognized policy value is caught at load time (typed Literal)."""
     with pytest.raises(ValidationError):
         Settings(privacy_guards="loose")
+
+
+def test_allow_insecure_transport_defaults_false():
+    """OAuth endpoints demand https unless a deployment opts out explicitly."""
+    assert Settings().django.allow_insecure_transport is False
+
+
+def test_allow_insecure_transport_env_override(monkeypatch):
+    """The opt-out is a typed config key, overridable via DJANGO__ALLOW_INSECURE_TRANSPORT."""
+    monkeypatch.setenv("DJANGO__ALLOW_INSECURE_TRANSPORT", "true")
+    assert Settings().django.allow_insecure_transport is True

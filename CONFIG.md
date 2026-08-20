@@ -109,6 +109,7 @@ Secret fields are flagged with 🔒. "Required" means there is no default.
 | `hosts` | `DJANGO__HOSTS` | list[str] | `["*"]` | `ALLOWED_HOSTS` entries. |
 | `use_x_forwarded_host` | `DJANGO__USE_X_FORWARDED_HOST` | bool | `true` | Trust the `X-Forwarded-Host` header behind a reverse proxy. |
 | `secure_proxy_ssl_header` | `DJANGO__SECURE_PROXY_SSL_HEADER` | bool | `true` | Trust `X-Forwarded-Proto` to detect HTTPS behind a reverse proxy (`SECURE_PROXY_SSL_HEADER`). Disable when not behind a TLS-terminating proxy. |
+| `allow_insecure_transport` | `DJANGO__ALLOW_INSECURE_TRANSPORT` | bool | `false` | Let OAuth2/OIDC endpoints accept plain-HTTP requests (sets authlib's `AUTHLIB_INSECURE_TRANSPORT`). Enable when lok deliberately runs without TLS, or behind a proxy that doesn't forward `X-Forwarded-Proto`. |
 | `admin` | `DJANGO__ADMIN__*` | object | **required** | Superuser provisioned on first boot (see below). |
 | `csrf_trusted_origins` | `DJANGO__CSRF_TRUSTED_ORIGINS` | list[str] | `["http://localhost", "https://localhost"]` | `CSRF_TRUSTED_ORIGINS` for unsafe (POST) requests. |
 | `force_script_name` | `DJANGO__FORCE_SCRIPT_NAME` | str | `""` | URL path prefix this service is served under (`FORCE_SCRIPT_NAME`). |

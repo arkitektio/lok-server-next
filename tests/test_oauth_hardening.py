@@ -165,3 +165,43 @@ def test_authorization_endpoint_throttles_past_the_limit(client, monkeypatch):
     third = client.post(reverse("app_authorization"), data=json.dumps(payload), content_type="application/json")
     assert third.status_code == 429
     assert third.json()["error"] == "slow_down"
+
+
+# --- plain-HTTP opt-out ------------------------------------------------------
+#
+# authlib's transport check reads AUTHLIB_INSECURE_TRANSPORT at call time;
+# settings.py sets that variable from `django.allow_insecure_transport`. These
+# tests exercise the env half directly so they don't depend on settings import
+# order, and pin both the secure default and the opt-out.
+
+
+def _poll_plain_http(client, device_code, client_id):
+    from tests.test_fakts_flows import DEVICE_CODE_GRANT
+
+    return client.post(
+        reverse("token"),
+        data={"grant_type": DEVICE_CODE_GRANT, "device_code": device_code, "client_id": client_id},
+        secure=False,
+    )
+
+
+@pytest.mark.django_db
+def test_token_endpoint_rejects_plain_http_by_default(client, monkeypatch):
+    monkeypatch.delenv("AUTHLIB_INSECURE_TRANSPORT", raising=False)
+    body = _start(client)
+    _accept(models.DeviceCode.objects.get(secret=body["device_code"]))
+    resp = _poll_plain_http(client, body["device_code"], body["client_id"])
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "insecure_transport"
+
+
+@pytest.mark.django_db
+def test_token_endpoint_accepts_plain_http_when_opted_out(client, monkeypatch):
+    """What `django.allow_insecure_transport: true` turns on for lok servers
+    deliberately running without TLS."""
+    monkeypatch.setenv("AUTHLIB_INSECURE_TRANSPORT", "1")
+    body = _start(client)
+    _accept(models.DeviceCode.objects.get(secret=body["device_code"]))
+    resp = _poll_plain_http(client, body["device_code"], body["client_id"])
+    assert resp.status_code == 200, resp.content
+    assert "access_token" in resp.json()

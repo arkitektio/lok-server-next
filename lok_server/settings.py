@@ -395,19 +395,28 @@ SOCIALACCOUNT_PROVIDERS = {
 
 
 # --- OAuth transport guard -----------------------------------------------------
-# authlib refuses token-endpoint traffic over plain HTTP unless
-# AUTHLIB_INSECURE_TRANSPORT is set. This deployment terminates TLS at the
-# gateway (Caddy), so lok itself legitimately sees plain HTTP and the variable
-# is required — but that also means Django cannot tell secure from insecure
-# clients on its own. Surface it loudly rather than silently: the clean fix is
-# forwarding X-Forwarded-Proto from the gateway and setting
-# SECURE_PROXY_SSL_HEADER here, after which the variable can be dropped.
+# authlib refuses OAuth2/OIDC traffic (token, authorize, discovery) over plain
+# HTTP unless the process env var AUTHLIB_INSECURE_TRANSPORT is set; only
+# https:// and localhost/127.0.0.1 URLs pass otherwise. Behind a TLS-terminating
+# gateway that forwards X-Forwarded-Proto this is a non-issue — SECURE_PROXY_SSL_HEADER
+# above makes Django build https URLs. Deployments that deliberately run lok
+# without TLS at all (lab LANs, plain-http gateways) opt out via the typed
+# config key `django.allow_insecure_transport`, which we translate into the env
+# var authlib reads at call time. A pre-existing AUTHLIB_INSECURE_TRANSPORT in
+# the environment keeps working as a backward-compatible alias.
 import logging as _logging
 import os as _os
 
+ALLOW_INSECURE_TRANSPORT = conf.django.allow_insecure_transport
+
+if ALLOW_INSECURE_TRANSPORT:
+    _os.environ.setdefault("AUTHLIB_INSECURE_TRANSPORT", "1")
+
 if not DEBUG and _os.environ.get("AUTHLIB_INSECURE_TRANSPORT"):
     _logging.getLogger(__name__).warning(
-        "AUTHLIB_INSECURE_TRANSPORT is set with DEBUG off: OAuth endpoints accept "
-        "plain-HTTP requests. This is only safe when TLS terminates at a gateway "
-        "in front of lok and lok is not reachable directly."
+        "OAuth endpoints accept plain-HTTP requests (django.allow_insecure_transport "
+        "/ AUTHLIB_INSECURE_TRANSPORT) with DEBUG off. This is only safe when lok is "
+        "not reachable over an untrusted network, e.g. on a trusted LAN or behind a "
+        "gateway in front of lok. Prefer TLS at the gateway with X-Forwarded-Proto "
+        "forwarded, which needs no opt-out."
     )
