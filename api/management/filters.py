@@ -208,6 +208,15 @@ class ManagementClientFilter:
         return Q(**{f"{prefix}functional": value})
 
     @strawberry_django.filter_field
+    def latest_report_resolved(self, value: bool, prefix: str) -> Q:
+        """Whether the client's most recent report has been acknowledged.
+
+        Combine with `functional: false` to list the clients that are broken AND
+        not yet triaged — the dashboard's action list.
+        """
+        return Q(**{f"{prefix}latest_report_resolved": value})
+
+    @strawberry_django.filter_field
     def role(self, value: fakts_enums.ClientRole, prefix: str) -> Q:
         return Q(**{f"{prefix}role": value.value})
 

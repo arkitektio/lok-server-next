@@ -1265,6 +1265,13 @@ class ManagementReport:
     client: "ManagementClient" = strawberry_django.field(description="The client this report belongs to.")
     functional: bool = strawberry_django.field(description="Did the client report itself as functional at report time?")
     created_at: datetime.datetime = strawberry_django.field(description="When the client submitted this report.")
+    resolved_at: Optional[datetime.datetime] = strawberry_django.field(description="When an operator acknowledged this report; null while it still needs attention.")
+    resolved_by: Optional["ManagementUser"] = strawberry_django.field(description="The member who acknowledged this report.")
+    resolution_note: Optional[str] = strawberry_django.field(description="Optional note the operator left when acknowledging this report.")
+
+    @strawberry_django.field(description="Has this report been acknowledged? Acknowledging does not change what the client reported — it only takes the client off the dashboard's action list until its next report.")
+    def is_resolved(self, info: Info) -> bool:
+        return self.resolved_at is not None
 
     @strawberry_django.field(description="The per-requirement alias reports captured in this snapshot.")
     def entries(self, info: Info) -> list[ManagementReportEntry]:
@@ -1341,6 +1348,7 @@ class ManagementClient:
     scopes: list["ManagementScope"] = strawberry_django.field(description="The scopes that are granted to this client.")
     reports: list["ManagementReport"] = strawberry_django.field(description="The retained self-reports of this client, most recent first.")
     last_healthy_report: Optional["ManagementReport"] = strawberry_django.field(description="The most recent report where the client was functional; null if it has never reported healthy.")
+    latest_report_resolved: bool = strawberry_django.field(description="Has an operator acknowledged this client's most recent report? Reset by every incoming report.")
 
     @strawberry_django.field(description="The app manifest this client was registered with, if it parses.")
     def manifest(self, info: Info) -> Optional[ManagementStagingManifest]:

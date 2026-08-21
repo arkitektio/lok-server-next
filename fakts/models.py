@@ -1,5 +1,6 @@
 import secrets as _secrets
 from django.db import models
+from django.utils import timezone
 from typing import Dict, Any
 from django.contrib.auth import get_user_model
 from django_choices_field import TextChoicesField
@@ -740,6 +741,15 @@ class Client(models.Model, ClientMixin):
     # --- App/deployment side ---------------------------------------------
     hub = models.ForeignKey(Hub, on_delete=models.CASCADE, related_name="clients", null=True, blank=True)
     functional = models.BooleanField(default=True)
+    latest_report_resolved = models.BooleanField(
+        default=False,
+        help_text=(
+            "Has an operator acknowledged the client's most recent report? Denormalised from"
+            " Report.resolved_at (like `functional` itself) so the dashboard can list clients"
+            " needing attention with a plain indexed filter. Cleared by every incoming report,"
+            " so a client that is still broken comes back onto the list."
+        ),
+    )
     name = models.CharField(max_length=1000, default="No name")
     release = models.ForeignKey(Release, on_delete=models.CASCADE, related_name="clients", null=True, blank=True)
     kind = TextChoicesField(
@@ -920,12 +930,67 @@ class Report(models.Model):
         help_text="Raw snapshot of the reported payload: {key: {alias_id, valid, reason}}.",
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When an operator acknowledged this report; null while it still needs attention.",
+    )
+    resolved_by = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="resolved_reports",
+        help_text="The member who acknowledged this report.",
+    )
+    resolution_note = models.TextField(
+        null=True,
+        blank=True,
+        help_text="Optional note from the operator explaining how the report was dealt with.",
+    )
 
     class Meta:
         ordering = ["-created_at", "-id"]
 
     def __str__(self):
         return f"Report for {self.client} at {self.created_at}"
+
+    @property
+    def is_resolved(self) -> bool:
+        return self.resolved_at is not None
+
+    @property
+    def is_latest(self) -> bool:
+        """Whether this is the client's most recent report."""
+        latest = self.client.reports.order_by("-created_at", "-id").first()
+        return latest is not None and latest.pk == self.pk
+
+    def resolve(self, user, note: str | None = None):
+        """Acknowledge this report.
+
+        Acknowledgement deliberately does NOT touch `client.functional` — the
+        client said it was broken and that stays on the record. It only means an
+        operator has triaged it, which is what takes the client off the
+        dashboard's action list. Resolving the client's *latest* report also
+        flips `client.latest_report_resolved`; the next report to arrive clears
+        that again (see fakts.services.clients.report_client), so a client that
+        is still broken comes back.
+        """
+        self.resolved_at = timezone.now()
+        self.resolved_by = user
+        self.resolution_note = note
+        self.save(update_fields=["resolved_at", "resolved_by", "resolution_note"])
+        if self.is_latest:
+            Client.objects.filter(pk=self.client_id).update(latest_report_resolved=True)
+
+    def unresolve(self):
+        """Reopen an acknowledged report."""
+        self.resolved_at = None
+        self.resolved_by = None
+        self.resolution_note = None
+        self.save(update_fields=["resolved_at", "resolved_by", "resolution_note"])
+        if self.is_latest:
+            Client.objects.filter(pk=self.client_id).update(latest_report_resolved=False)
 
 
 class TailscaleInspector(models.Model):

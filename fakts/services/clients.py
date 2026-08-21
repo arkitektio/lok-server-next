@@ -344,6 +344,10 @@ def report_client(client: models.Client, claim: base_models.ReportRequest) -> mo
     # Lock the client row so concurrent reports don't race the prune / pointer update.
     client = models.Client.objects.select_for_update().get(pk=client.pk)
     client.functional = claim.functional
+    # A fresh report is unacknowledged by definition: whatever an operator
+    # resolved applied to the *previous* report. This is what makes a still-broken
+    # client reappear on the dashboard's action list after being triaged.
+    client.latest_report_resolved = False
     client.save()
 
     for req_key, alias_report in claim.alias_reports.items():

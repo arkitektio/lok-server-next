@@ -18,6 +18,10 @@ from .role_request import (
     decline_role_request,
     cancel_role_request,
 )
+from .report import (
+    resolve_report,
+    unresolve_report,
+)
 from .device_code import (
     accept_device_code,
     decline_device_code,
