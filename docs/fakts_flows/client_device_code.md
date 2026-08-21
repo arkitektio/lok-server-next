@@ -100,7 +100,7 @@ While pending the endpoint returns HTTP 400 `{"error": "authorization_pending"}`
 ```
 
 The access token is an RS256 JWT (verify against `jwks_uri` from discovery)
-carrying `sub` (user id), `active_org` (organization slug), `roles`, `scope`,
+carrying `sub` (user id), `org` (organization id), `roles`, `scope`,
 `client_id`, `client_app`, `client_release`, `client_device`, `client_role`,
 and `aud` (the service identifiers of the granted instances, plus `lok`).
 

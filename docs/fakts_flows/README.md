@@ -71,7 +71,7 @@ Key properties:
   losing the chain means a human re-approves.
 - **Org-scoped by construction.** Approval binds the client to the approving
   user's membership in the chosen hub's organization; every issued token's
-  subject *is* that membership, and the JWT carries `active_org`.
+  subject *is* that membership, and the JWT carries `org` (the organization id).
 - **One response.** Tokens and the rendered instances arrive together; every
   refresh re-renders the instances (aliases are host-aware), so config drift
   propagates without re-approval.

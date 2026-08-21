@@ -8,6 +8,7 @@ from karakter import filters, models, scalars
 from allauth.socialaccount import models as smodels
 import kante
 from .type_gen import create_stats_type
+from django.db.models import Q
 from karakter.authz import build_prescoped_queryset, get_organization, get_user
 
 
@@ -413,19 +414,30 @@ class Invite:
 
     @classmethod
     def get_queryset(cls, queryset, info: Info, **kwargs):
-        """Restrict invites to the caller's active organization.
+        """Restrict invites to ones the caller owns or administers.
 
         This type exposes `token` — and `invite_url`, which embeds it — and an
         invite token is a bearer credential: whoever holds it can redeem it and
-        receive whatever roles the invite carries. Without this the root `invites`
-        list handed every tenant's pending tokens to any authenticated principal.
+        receive whatever roles the invite carries.
 
-        The management twin (`api.management.types.ManagementInvite`) narrows
-        further, to owner-or-admin. This one matches the rest of the main schema's
-        active-organization dialect; tightening it to owner-or-admin here would
-        also be defensible if the fleet does not need the broader read.
+        Scoping to the active organization alone was not enough. Every member of
+        that organization, `guest` included, could list the pending tokens of
+        their own tenant and redeem one carrying `admin` (from a second account,
+        or after leaving and rejoining — `accept_invite` never checks that the
+        caller is the intended recipient). This now matches the bar the
+        management twin already enforces, `api.management.types.ManagementInvite`,
+        whose docstring describes exactly that attack.
         """
-        return build_prescoped_queryset(info, queryset, field="created_for")
+        user = get_user(info)
+        organization = get_organization(info)
+        return queryset.filter(
+            Q(created_for=organization),
+            Q(created_for__owner=user)
+            | Q(
+                created_for__memberships__user=user,
+                created_for__memberships__roles__identifier="admin",
+            ),
+        ).distinct()
 
 
 @strawberry.type

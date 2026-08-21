@@ -3,6 +3,7 @@ import boto3
 from moto import mock_aws
 import os
 
+from django.conf import settings as django_settings
 from django.contrib.auth import get_user_model
 from karakter.models import Organization, User, Membership
 from karakter.managers import create_role
@@ -46,14 +47,27 @@ def build_auth_context(user, organization, oauth2_client, roles=("admin",)) -> H
     authentikate (v2) authenticates by decoding the ``Authorization`` header, so
     tests register a static token whose claims (``sub``/``active_org``/
     ``client_id``) match freshly-created fixtures and send it as a bearer token.
+    Note ``active_org`` here carries the organization *pk*: it is the only field
+    a ``StaticToken`` can carry it in (see ``authapp.extension.read_org_claim``);
+    real tokens use the ``org`` claim.
     The ``AuthAppExtension`` then resolves the karakter/fakts models from those
     claims exactly as it does in production.
     """
     token_str = f"static-{user.id}-{oauth2_client.client_id}"
     get_settings().static_tokens[token_str] = StaticToken(
         sub=str(user.id),
-        iss="lok",
-        active_org=organization.slug,
+        # `iss` and `aud` must match what a real lok-issued token carries:
+        # `AuthAppExtension` now rejects a token that was not issued by this
+        # server or not addressed to it (see `assert_addressed_to_lok`). Minting
+        # test tokens with production-shaped claims keeps that gate exercised
+        # rather than quietly bypassed.
+        iss=django_settings.OIDC_ISSUER,
+        aud=["lok"],
+        # Static tokens carry the org pk through the library's declared
+        # `active_org` field — `JWTToken` is extra="ignore", so a fixture cannot
+        # carry an `org` claim. Real tokens use `org`; see
+        # authapp.extension.read_org_claim.
+        active_org=str(organization.pk),
         client_id=oauth2_client.client_id,
         roles=list(roles),
     )

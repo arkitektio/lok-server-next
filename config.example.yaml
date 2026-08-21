@@ -1,3 +1,15 @@
+# Example lok configuration.
+#
+# Copy to `config.yaml` and replace every REPLACE-ME. `config.yaml` is
+# deliberately untracked and excluded from the Docker image: it previously
+# shipped a real OIDC signing key and SECRET_KEY, which meant anyone with the
+# repo could forge a token for any user of any deployment that booted without
+# mounting its own config.
+#
+# Generate the signing keypair with:
+#   openssl genrsa -out lok.pem 2048
+#   ssh-keygen -y -f lok.pem          # the matching ssh-rsa public key
+#
 deployment:
   name: default
   # URL the fakts well-known advertises as its `configure` endpoint. `{code}` is
@@ -8,12 +20,12 @@ deployment:
 django:
   admin:
     email: admin@admin.com
-    password: admin
+    password: REPLACE-ME
     username: admin
-  debug: true
+  debug: false
   hosts:
   - "*"
-  secret_key: c5d84589433e1d0b4198072c54ee0dd1
+  secret_key: REPLACE-ME-WITH-A-RANDOM-64-HEX-STRING
   csrf_trusted_origins:
   - http://localhost
   - https://localhost
@@ -23,8 +35,35 @@ django:
   log_level: INFO
   secure_proxy_ssl_header: true
 lok:
-  public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC5y2Qg6rRIvB6EeEBnvwArZfYYVq0cIzfs2d0G36n2y3QiHgADRsqXDXieFCGX4ps4rAjERRxmK4QqHcooOGMw8rwiguiBizjx9s8Cc2bHazBKKQLa8lIw+nZcVA9HZFo37Gk54QtIIl7hqIMAsqru+tykniP5Kan2PevVJrrIlhtvEzeilLr3GgyB3jaNiLJPgF1G/Z/xemkI+uh/Ids7QuubTY4yiKUNYPXDsNAVUnK+kVZu6PF0WZ5VHJauczBNXdTSnCyGXKkXwqdPMV8vgHM5b2pirZ39oNgAI85JbUHwM7/jmpCW4ugyFQcsI0XSwY3WT9yJt2G/zjDTeiI5 lok-example
-private_key: "-----BEGIN RSA PRIVATE KEY-----\nMIIEogIBAAKCAQEAuctkIOq0SLwehHhAZ78AK2X2GFatHCM37NndBt+p9st0Ih4A\nA0bKlw14nhQhl+KbOKwIxEUcZiuEKh3KKDhjMPK8IoLogYs48fbPAnNmx2swSikC\n2vJSMPp2XFQPR2RaN+xpOeELSCJe4aiDALKq7vrcpJ4j+Smp9j3r1Sa6yJYbbxM3\nopS69xoMgd42jYiyT4BdRv2f8XppCProfyHbO0Lrm02OMoilDWD1w7DQFVJyvpFW\nbujxdFmeVRyWrnMwTV3U0pwshlypF8KnTzFfL4BzOW9qYq2d/aDYACPOSW1B8DO/\n45qQluLoMhUHLCNF0sGN1k/cibdhv84w03oiOQIDAQABAoIBAAqVffHbmPNTRxxG\nAuo+ENcIDwu+JUym63TKSOtvMp4Y4zfd1GObZOdTuMEtlafSvIOvFi1DIB3oYPYq\nvgVKSAlF7KZ9JVxa116+T/bcZtiZoDW7Thq1pu28GOHD1p57JqIMrUZjLeq5LYVG\nnZbctrzYLNlSWmuDXnek+aIp+4Y5YLNaIch9CpbVHAe40/Is3MFcqh5L8yU9k9X5\ngwh6nYksWG5NE/qLY4Df4ezNxmezJNB9DW6JH4G8icKARMUwhgFBYLyNcJ0b5aqY\nSaX2Qn3nAfZAnlkVCARDruU6O1LNUyaNw8mjekBgwU2jnFyMvKftuG7hpbARQUpI\n9Ao815ECgYEA/6wb8ZPhc/4NJUdhDl6kB0U0iuYcxIfb1HulxVlvA0yMNVKh0tKO\nKTXr0ma1vRDwnWaGhpNZaI931AZyGRluVfCYTj7B1ofQF7GV1srgIvkAaFCVq0cw\niRy9MMaHhf6fRLlhFQxbrEN1RKWNj7QlVFRBYVFPTihudlY0BIiuEgkCgYEAugha\nkDMj98G1dZe80mar5XkGsgHVsU5C+SREXNduob3qrEMzow7nGcauxuZoiqYg4Pu4\nkSBpEn/SqYCKZeTQqElkKhsw0V3jJS/Ec0/tVLc92wMkU85l0hz8f8b+lWFlp02u\nDYvcGQGzPihGs56xf6fOSz/VpuNMelY0rLqk2rECgYAOmibSak7DECxyB5ycdH1L\nyQESOchE1TmR7inulogHmTScywZhAxOJeQHp92HD1ZbYdoWSZBIELcV7P47+rfwm\nPmKEfYMWnJUe9U6IgPfCJ5SFYKzbpmo4OoL3qS8OUReJlkjcKeOGeCfXbtkh7vj+\n0v0U8M7luNtuOMgpxiCi+QKBgDAtMabeV5Y16BRH83JZfHK04PMAXqLILbfvmHSi\npdflIvzxelHj7h1SwrhnuvMNCr648ZdD2XIdACU9UJoKo66xMutkl0PhGI3szOc/\n76pcufwZ2DKL5PqA3zMICa4NxxGIoGaJrbocIpsaOxURJ85zWo1KPr41ZvzXjlSd\nEUxBAoGAanjUkWR5cJt2UJ879JHK6FVzXGboKGUO4gVbPEMqsaI0DSs9j5dksxk3\nY0hp9rokP7IZfvVEqNOfV7oArydh5YqXemZ1uFO9fANStMu2vj3XuBlY/wYDF+hn\nWPt/Ozk490MOHva4xMGJOWKpZTfmrNZodZ8iBjnOUAaqUzbQG/0=\n-----END RSA PRIVATE KEY-----\n"
+  public_key: ssh-rsa REPLACE-ME-MATCHING-PUBLIC-KEY
+private_key: "-----BEGIN RSA PRIVATE KEY-----
+MIIEowIBAAKCAQEAsQIJvonrQaRCzNj+uQ+uiavPia/B7Nfi1guMwkTkAXUM1LyW
+jQ6LfkWO8hyDHJWzH3oho8zQ5G1rjW8nHbnrKvNn4FT09rOuRYzxN65LCf5yvnRg
+MfLc7pKGgEBOjLfyMQRTWmKqrVCo4ZA+WXehdlXnoRq6u+uo0agSrJypwxL9dzmA
+KDDpbLLJ07JsZ+tf2kH7pOYSMaJUXuALKbBszPPDn8FZTO66DQWQ5+eHrzClj/in
+Q8o0A0VWWzAq8NeTQRFXI1yE83NsXN5jYkYrrOiQ0a93ZsBqJbZxWawum/Ur0JPO
+FlQqc3mPeg+Y7LXpuPfNbCHkGUzJPRLm2AegjQIDAQABAoIBADdKMq8At6qGW5NP
+CKnXuyYns6kHbGTFvoYrj2kzSaEm5b4htkkTTQFBSvhXbaDlJdFkPdPDa1Ce2SSR
+nr9LTqjY5Q6OmwHgeEQjVUmWOLxDbaYOBeo0OUyQGlE/RQnxf0ZOWpb2EOgYNNhY
+TRF3K8kh5jtNdRyz7MSoYkTmnqRe6igymA0XZ2jfeaT5bSXFlGz8zTssATW4pxty
+egM6sU0htG+zb/e+iJij92yaKOZWKrCEyKo3hnTtuRzU/WDJZQhtIUooHHaAVsZw
+xccX4HtXUmctyMX7u603FEvZGP2i6TKUplvU0OjiOd2kLNS1StwsARx4qXU9DkQN
+j0mbuSUCgYEA2S9DuW4NxDcTN8NTK5JL2HPKn1npUAgZW07cXxvDNKlF6a1idRio
+2BtZvMS59MTuDw1WqlYmX46qhu0BE/LPpEB1g3WbWsCxNG3mgP7T6jmHAMMLcpTb
+MZ6BtfvK3UKHXD3aHjkwOOojOufx4IWGlSqF3AeayD5M9oYlS8QpU9sCgYEA0KSX
+ZOm9ccO/7aYJdssPNohacfC1DBK6C+6eC/NBj+4eNMTjx2oNh1CEsrpmUUrjpViC
+IltyxmGRsXkJlUz0vWuaitfX0Sn7dxbHaQlsbvSaVA/jj1I4b8cv6TARTandkxPy
+UAc4HjwgaOgHQSok3lx2WpU9UJRzCtzlorD8vbcCgYEAxrxrWokMa9qB6WsA9kP+
+x2jdpwedabCfk2AMY7OB4vRqlzQjfkc8adRNP2E9UG/L71YjUedXYeWowaKqc9ii
+jQi2/75klJzzCqjuXmfQ/un5UYcpOIZiNXt38lEgB2vTdWLb7wAh0lLePg701KEa
+z/CDYR5MUqQ/xO5nvncX4jUCgYAKKxtdxa5/7uRZtq/bZEYXiEmwJ+UK85axoi19
+s5tMYnSCad4YB+kk4R22gDMgXx/9HPUqq35KgNLS7W00I44B9U6Q2bgg74Tb5vZM
+/jKUrcMfua6De6RYfkKtgLQ3LsInut8iW1e20YNa2YQQ/vbRB3yVKZTVaoa4zs86
+QJnwvQKBgHdmIMdExd6pWT9z0OQG/7UX4+80sW3A7Po26L+tRrZJpynFcbCwS3bo
+3etAGSHZo01lxHIArtcaPwT4Z5zzNZujEvJ75zuIjNBvKF3V2YtQRjNygCwUUkYB
+boAf1Rqpjy5XjTTVtmohUsr/X3UHYw2aYJPG9jsPoEwDyYOmAEc1
+-----END RSA PRIVATE KEY-----
+"
 redeem_tokens:
 - token: example-redeem-token
   user: demo
@@ -42,7 +81,7 @@ organizations:
 users:
 - name: Demo User
   username: demo
-  password: demo
+  password: REPLACE-ME
   # An email lets the demo user also log in under the email world
   # (login_methods: [email]); it is provisioned as verified + primary.
   email: demo@example.com
@@ -60,19 +99,19 @@ authentikate:
   - kind: rsa
     iss: lok
     kid: lok-key-1
-    public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC5y2Qg6rRIvB6EeEBnvwArZfYYVq0cIzfs2d0G36n2y3QiHgADRsqXDXieFCGX4ps4rAjERRxmK4QqHcooOGMw8rwiguiBizjx9s8Cc2bHazBKKQLa8lIw+nZcVA9HZFo37Gk54QtIIl7hqIMAsqru+tykniP5Kan2PevVJrrIlhtvEzeilLr3GgyB3jaNiLJPgF1G/Z/xemkI+uh/Ids7QuubTY4yiKUNYPXDsNAVUnK+kVZu6PF0WZ5VHJauczBNXdTSnCyGXKkXwqdPMV8vgHM5b2pirZ39oNgAI85JbUHwM7/jmpCW4ugyFQcsI0XSwY3WT9yJt2G/zjDTeiI5 lok-example
+    public_key: ssh-rsa REPLACE-ME-MATCHING-PUBLIC-KEY
   static_tokens: {}
 postgres:
   db_name: lok
   dependency: db
   engine: django.db.backends.postgresql
   host: db
-  password: 8b13613b7518e1b293133d68622635ad
+  password: REPLACE-ME
   port: 5432
   username: flakyvioletcaterpillar
 datalayer:
-  access_key: ZvBLOQAApECKXISSJyiox192s6RNhVgmN9LZhWFYbdA
-  secret_key: rqh27SKddiMciJ2RPSpQF3l_SYtlXNKCA9Fp3NgrYBQ
+  access_key: REPLACE-ME
+  secret_key: REPLACE-ME
   host: minio
   port: 9000
   protocol: http

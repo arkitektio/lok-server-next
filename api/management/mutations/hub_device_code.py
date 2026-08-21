@@ -196,7 +196,7 @@ def decline_hub_device_code(info: Info, input: DeclineHubDeviceCodeInput) -> typ
     Marks the device code as denied; the polling hub receives `access_denied`.
     """
     device_code = resolve_device_code_with_proof(
-        fakts_models.DeviceCode, device_code_id=input.device_code, code=input.code
+        fakts_models.DeviceCode, device_code_id=input.device_code, code=input.code, kind="hub"
     )
 
     device_code.denied = True

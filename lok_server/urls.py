@@ -16,6 +16,7 @@ Including another URLconf
 """
 
 from django.contrib import admin
+from django.contrib.auth.decorators import login_required
 from django.urls import include
 from fakts.views import WellKnownFakts
 from django.shortcuts import render
@@ -61,8 +62,12 @@ urlpatterns = [
     # allow_queries_via_get=False: GET is exempt from Django's CSRF check, so
     # leaving GET queries on lets an unauthenticated caller read data cross-site.
     # The SPA only ever POSTs, so this is safe and closes that bypass.
-    dynamicpath("managementgraphql/", AsyncGraphQLView.as_view(schema=schema, allow_queries_via_get=False)),
-    dynamicpath("managementschema/", csrf_exempt(management_schema), name="management_schema"),
+    # graphql_ide=None: strawberry renders the GraphiQL IDE *before* execution,
+    # so it is served ahead of `RequireAuthenticationExtension` — an anonymous
+    # GET with a browser Accept header got the full IDE. `allow_queries_via_get`
+    # does not suppress it.
+    dynamicpath("managementgraphql/", AsyncGraphQLView.as_view(schema=schema, allow_queries_via_get=False, graphql_ide=None)),
+    dynamicpath("managementschema/", csrf_exempt(login_required(management_schema)), name="management_schema"),
     dynamicpath("admin/", admin.site.urls),
     dynamicpath("f/", include("fakts.urls", namespace="fakts")),
     dynamicpath("o/", include("authapp.urls")),  # /auth/login/, /auth/logout/

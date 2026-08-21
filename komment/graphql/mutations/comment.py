@@ -1,6 +1,7 @@
 from kante.types import Info
 import strawberry
 from komment import types, models, inputs, scalars
+from django.db.models import Q
 from karakter.authz import get_or_denied, get_organization, get_user
 import logging
 from typing import Dict, Tuple, List, Any
@@ -79,13 +80,27 @@ def create_comment(info: Info, input: CreateCommentInput) -> types.Comment:
 
     # TODO: Check if user is allowed to comment on these types of objects
 
+    # A caller-supplied `parent` must be a comment the caller may actually see.
+    # It was written straight to the FK column, which let anyone thread a reply
+    # onto *any* comment in the deployment by guessing a (sequential) pk — and
+    # then read that comment back through the `parent` hop, which is a forward
+    # FK and therefore does not re-apply `Comment.get_queryset`. That was a
+    # cross-tenant read of the comment body and its author's username/email.
+    parent = None
+    if input.parent is not None:
+        parent = get_or_denied(
+            models.Comment.objects.distinct(),
+            Q(user=creator) | Q(mentions=creator),
+            id=input.parent,
+        )
+
     exp = models.Comment.objects.create(
         identifier=input.identifier,
         object=input.object,
         user=creator,
         text="",
         descendants=serialized_descendants,
-        parent_id=input.parent,
+        parent=parent,
     )
 
     # Mentioned users must be members of the caller's organization: a mention

@@ -407,6 +407,14 @@ class Mutation:
         resolver=mutations.cancel_role_request,
     )
 
+    # Client Report Mutations
+    resolve_report = strawberry_django.mutation(
+        resolver=mutations.resolve_report,
+    )
+    unresolve_report = strawberry_django.mutation(
+        resolver=mutations.unresolve_report,
+    )
+
     # Hub Device Code Mutations
     accept_hub_device_code = strawberry_django.mutation(
         resolver=mutations.accept_hub_device_code,

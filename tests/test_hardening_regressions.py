@@ -6,6 +6,8 @@ Covers the user-directory scoping, device-code entropy/lifetime/single-use, the
 
 import datetime
 
+import pathlib
+
 import pytest
 from asgiref.sync import sync_to_async
 from django.utils import timezone
@@ -148,12 +150,37 @@ class TestCommittedKeyMaterialGuard:
 
     @staticmethod
     def _repo_config():
+        """The historically-committed config, read out of git history.
+
+        `config.yaml` is no longer tracked, so this reads the last revision that
+        still carried it. The key material in there is public forever — git
+        history keeps it — which is exactly why the guard has to keep matching it.
+        """
         import subprocess
 
         import yaml
 
-        raw = subprocess.check_output(["git", "show", "HEAD:config.yaml"], text=True)
-        return yaml.safe_load(raw)
+        raw = subprocess.check_output(
+            ["git", "log", "--format=%H", "-1", "--", "config.yaml"], text=True
+        ).strip()
+        if not raw:
+            pytest.skip("config.yaml never existed in this history")
+        blob = subprocess.check_output(["git", "show", f"{raw}:config.yaml"], text=True)
+        return yaml.safe_load(blob)
+
+    def test_config_yaml_is_not_tracked(self):
+        """It was listed in .gitignore but tracked anyway, so it shipped in the
+        image as the *default* config source."""
+        import subprocess
+
+        tracked = subprocess.run(
+            ["git", "ls-files", "--error-unmatch", "config.yaml"],
+            capture_output=True,
+        )
+        assert tracked.returncode != 0, "config.yaml is tracked in git again"
+
+    def test_config_yaml_is_excluded_from_the_image(self):
+        assert "config.yaml" in pathlib.Path(".dockerignore").read_text().split()
 
     def test_production_boot_refuses_the_committed_keys(self):
         from lok_server.configuration import Settings
@@ -165,12 +192,27 @@ class TestCommittedKeyMaterialGuard:
             Settings(**cfg)
         assert "committed" in str(excinfo.value).lower()
 
-    def test_development_boot_still_works(self):
-        """Local development against the shipped config must keep working."""
+    def test_debug_does_not_bypass_the_guard(self):
+        """`debug` used to short-circuit the guard — and the shipped config.yaml
+        set `debug: true`, so the guard never fired on the one configuration it
+        exists to catch. Opting out is now explicit.
+        """
         from lok_server.configuration import Settings
 
         cfg = self._repo_config()
         cfg["django"]["debug"] = True
+
+        with pytest.raises(Exception) as excinfo:
+            Settings(**cfg)
+        assert "committed" in str(excinfo.value).lower()
+
+    def test_explicit_opt_out_allows_the_committed_keys(self, monkeypatch):
+        """The escape hatch still exists, but you have to say so deliberately."""
+        from lok_server.configuration import Settings
+
+        monkeypatch.setenv("LOK_ALLOW_COMMITTED_KEYS", "1")
+        cfg = self._repo_config()
+        cfg["django"]["debug"] = False
 
         Settings(**cfg)
 

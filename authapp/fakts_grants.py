@@ -27,7 +27,7 @@ Two grants live here, plus a mixin shared with the standard grants:
 Org scoping: every token minted here has a ``karakter.Membership`` as its
 subject (``OAuth2Token.user`` is a FK to Membership), so the issuing
 organization is pinned at the database level and lands in the JWT as
-``active_org``.
+``org`` (its primary key).
 
 fakts imports are deliberately lazy — ``fakts.models`` imports
 ``authapp.models``, so importing fakts at module level here would cycle.
@@ -223,6 +223,8 @@ class FaktsRedeemGrant(FaktsEnvelopeMixin, BaseGrant, TokenEndpointMixin):
             fakts_client = client_services.redeem_token(redeem_token, manifest, role=role)
         except fakts_models.RedeemToken.DoesNotExist:
             raise InvalidGrantError(description="Invalid redeem token.")
+        except client_services.RedeemTokenExhausted as e:
+            raise InvalidGrantError(description=str(e))
         except client_services.RedeemTokenExpired:
             raise InvalidGrantError(description="Redeem token expired.")
         except client_services.RedeemTokenManifestChanged as e:

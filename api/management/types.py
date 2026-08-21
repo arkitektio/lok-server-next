@@ -25,10 +25,17 @@ from ionscale.repo import get_ionscale_repo
 
 
 def build_prescoper(field="organization"):
-    def prescoper(queryset, info):
-        return queryset
+    """Deliberately absent: use `karakter.types.build_prescoper`.
 
-    return prescoper
+    A no-op copy used to live here under the same name as the real scoping
+    helper, returning the queryset unchanged. Nothing called it, but any future
+    `create_stats_type(..., prescope=build_prescoper(...))` in this module would
+    have aggregated across every tenant while reading as if it were scoped.
+    """
+    raise NotImplementedError(
+        "api.management.types.build_prescoper was a no-op. Import "
+        "karakter.types.build_prescoper (or write real scoping) instead."
+    )
 
 
 def _caller(info: Info):
@@ -1085,13 +1092,26 @@ class ManagementLayer:
 
     @strawberry.field(description="A specific machine associated with this layer (only works for IonscaleLayers)")
     def machine(self, info: Info, id: str) -> Optional[ManagementMachine]:
-        if self.tailnet_name:
-             try:
-                machine = get_ionscale_repo().get_machine(str(id))
-                return ManagementMachine(instance=machine, tailnet=self.tailnet_name, layer_id=self.id, magic_dns_enabled=self.magic_dns_enabled)
-             except Exception:
-                 return None
-        return None
+        """Look one machine up *within this layer's tailnet*.
+
+        `ionscale machines get --machine-id` is a global lookup that takes no
+        tailnet argument, so fetching by raw id and trusting the result returned
+        another organization's machine — hostname, OS, tailnet IPs, ACL tags,
+        key expiry — labelled as if it were on the caller's own tailnet. Resolve
+        through `list_machines(self.tailnet_name)` instead, which is the same
+        pattern the root `machine` resolver uses and documents as its
+        authorization check.
+        """
+        if not self.tailnet_name:
+            return None
+        try:
+            machines = get_ionscale_repo().list_machines(self.tailnet_name)
+        except Exception:
+            return None
+        match = next((m for m in machines if str(m.id) == str(id)), None)
+        if match is None:
+            return None
+        return ManagementMachine(instance=match, tailnet=self.tailnet_name, layer_id=self.id, magic_dns_enabled=self.magic_dns_enabled)
 
     @classmethod
     def get_queryset(cls, queryset, info: Info):
@@ -1245,6 +1265,13 @@ class ManagementReport:
     client: "ManagementClient" = strawberry_django.field(description="The client this report belongs to.")
     functional: bool = strawberry_django.field(description="Did the client report itself as functional at report time?")
     created_at: datetime.datetime = strawberry_django.field(description="When the client submitted this report.")
+    resolved_at: Optional[datetime.datetime] = strawberry_django.field(description="When an operator acknowledged this report; null while it still needs attention.")
+    resolved_by: Optional["ManagementUser"] = strawberry_django.field(description="The member who acknowledged this report.")
+    resolution_note: Optional[str] = strawberry_django.field(description="Optional note the operator left when acknowledging this report.")
+
+    @strawberry_django.field(description="Has this report been acknowledged? Acknowledging does not change what the client reported — it only takes the client off the dashboard's action list until its next report.")
+    def is_resolved(self, info: Info) -> bool:
+        return self.resolved_at is not None
 
     @strawberry_django.field(description="The per-requirement alias reports captured in this snapshot.")
     def entries(self, info: Info) -> list[ManagementReportEntry]:
@@ -1321,6 +1348,7 @@ class ManagementClient:
     scopes: list["ManagementScope"] = strawberry_django.field(description="The scopes that are granted to this client.")
     reports: list["ManagementReport"] = strawberry_django.field(description="The retained self-reports of this client, most recent first.")
     last_healthy_report: Optional["ManagementReport"] = strawberry_django.field(description="The most recent report where the client was functional; null if it has never reported healthy.")
+    latest_report_resolved: bool = strawberry_django.field(description="Has an operator acknowledged this client's most recent report? Reset by every incoming report.")
 
     @strawberry_django.field(description="The app manifest this client was registered with, if it parses.")
     def manifest(self, info: Info) -> Optional[ManagementStagingManifest]:

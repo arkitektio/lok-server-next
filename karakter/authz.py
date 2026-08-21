@@ -4,7 +4,7 @@
 authenticates by session and scopes to "any organization the caller is a member
 of". This module is its counterpart for the token-authenticated main schema,
 which speaks a different dialect: the caller's organization is the one named by
-their JWT's `active_org` claim, resolved onto the request by
+their JWT's `org` claim (the organization pk), resolved onto the request by
 `authapp.extension.AuthAppExtension` — which already refuses to resolve a
 membership the user does not hold. So `request.organization` is a *trusted*
 value here, and scoping to it is the correct tenant boundary.
@@ -40,8 +40,8 @@ def get_user(info):
 def get_organization(info):
     """Return the caller's active organization, or fail closed.
 
-    Resolved from the token's `active_org` claim, and already validated against
-    the caller's memberships by `AuthAppExtension`.
+    Resolved from the token's `org` claim (the organization pk), and already
+    validated against the caller's memberships by `AuthAppExtension`.
     """
     try:
         organization = info.context.request.organization

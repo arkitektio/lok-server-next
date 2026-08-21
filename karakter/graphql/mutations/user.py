@@ -5,7 +5,7 @@ import logging
 import kante
 from graphql import GraphQLError
 
-from api.management.authz import assert_owner_or_admin
+from api.management.authz import DENIED, assert_owner_or_admin
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +29,41 @@ def add_user_to_organization(info: Info, input: AddUserToOrganizationInput) -> t
     organization = models.Organization.objects.filter(pk=input.organization).first()
     assert_owner_or_admin(info, organization)
 
+    # The caller-side bar is right; the *target* side had none. `input.user` was
+    # an arbitrary pk and the person named by it never consented — which is what
+    # the invite flow exists to model. And "org admin" is not a barrier here:
+    # any authenticated user can create an organization and be made its owner
+    # and admin in the same call. So this was: create an org, attach every
+    # sequential user pk, then read `users { username email }` — a
+    # deployment-wide directory harvest.
+    #
+    # A user may now only be attached directly if they already have a
+    # relationship with this organization (an existing membership whose roles
+    # are being changed, or a pending/accepted invite). Everyone else has to be
+    # invited, which is the consented path.
+    target = models.User.objects.filter(pk=input.user).first()
+    if target is None:
+        raise GraphQLError(DENIED)
+
+    already_related = (
+        models.Membership.objects.filter(user=target, organization=organization).exists()
+        or models.Invite.objects.filter(
+            created_for=organization, accepted_by=target
+        ).exists()
+        or models.Invite.objects.filter(
+            created_for=organization,
+            email__iexact=(target.email or "\x00"),
+        ).exists()
+    )
+    if not already_related:
+        raise GraphQLError(
+            "This user has not been invited to the organization. Create an invite "
+            "for them instead — a person cannot be added to an organization "
+            "without their consent."
+        )
+
     membership, _ = models.Membership.objects.get_or_create(
-        user_id=input.user,
+        user=target,
         organization=organization,
     )
 

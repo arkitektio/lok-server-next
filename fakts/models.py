@@ -1,5 +1,6 @@
 import secrets as _secrets
 from django.db import models
+from django.utils import timezone
 from typing import Dict, Any
 from django.contrib.auth import get_user_model
 from django_choices_field import TextChoicesField
@@ -398,6 +399,25 @@ class RedeemToken(models.Model):
         default=False,
         help_text="If set, this token may be re-redeemed even when the manifest hash differs from the originally redeemed one.",
     )
+    max_redemptions = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text=(
+            "How many times this token may be redeemed. NULL means unlimited. "
+            "Each redeem mints a fresh access+refresh pair, so an unlimited, "
+            "never-expiring token is a permanent foothold for whoever holds it."
+        ),
+    )
+    redemption_count = models.PositiveIntegerField(
+        default=0,
+        help_text="How many times this token has been redeemed so far.",
+    )
+
+    def redemptions_exhausted(self) -> bool:
+        """Whether this token has been redeemed as many times as it is allowed."""
+        if self.max_redemptions is None:
+            return False
+        return self.redemption_count >= self.max_redemptions
     user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="issued_tokens")
     hub = models.ForeignKey(
         "Hub",
@@ -721,6 +741,15 @@ class Client(models.Model, ClientMixin):
     # --- App/deployment side ---------------------------------------------
     hub = models.ForeignKey(Hub, on_delete=models.CASCADE, related_name="clients", null=True, blank=True)
     functional = models.BooleanField(default=True)
+    latest_report_resolved = models.BooleanField(
+        default=False,
+        help_text=(
+            "Has an operator acknowledged the client's most recent report? Denormalised from"
+            " Report.resolved_at (like `functional` itself) so the dashboard can list clients"
+            " needing attention with a plain indexed filter. Cleared by every incoming report,"
+            " so a client that is still broken comes back onto the list."
+        ),
+    )
     name = models.CharField(max_length=1000, default="No name")
     release = models.ForeignKey(Release, on_delete=models.CASCADE, related_name="clients", null=True, blank=True)
     kind = TextChoicesField(
@@ -802,8 +831,22 @@ class Client(models.Model, ClientMixin):
         return self.redirect_uris.split()[0] if self.redirect_uris.split() else None
 
     def get_allowed_scope(self, scope):
+        """Narrow a requested scope to what this client is registered for.
+
+        An omitted scope resolves to the client's *own* registered scope rather
+        than "". Returning "" made the stored `OAuth2Token.scope` disagree with
+        the token actually issued: `authapp.token_generators.get_extra_claims`
+        falls back to `client.scope` when the request carries none, and RFC 9068
+        extra claims override the base claim — so the signed JWT advertised the
+        client's entire allowed scope while the database row recorded none.
+
+        That split had two edges: the DB-backed validator at `/o/user_info/`
+        rejected a token whose own JWT claimed `profile`, and any resource server
+        trusting the JWT granted more than lok had recorded as granted. Both
+        halves now derive from the same value.
+        """
         if not scope:
-            return ""
+            return self.scope or ""
         allowed = set(self.scope.split())
         return " ".join([s for s in scope.split() if s in allowed])
 
@@ -887,12 +930,67 @@ class Report(models.Model):
         help_text="Raw snapshot of the reported payload: {key: {alias_id, valid, reason}}.",
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When an operator acknowledged this report; null while it still needs attention.",
+    )
+    resolved_by = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="resolved_reports",
+        help_text="The member who acknowledged this report.",
+    )
+    resolution_note = models.TextField(
+        null=True,
+        blank=True,
+        help_text="Optional note from the operator explaining how the report was dealt with.",
+    )
 
     class Meta:
         ordering = ["-created_at", "-id"]
 
     def __str__(self):
         return f"Report for {self.client} at {self.created_at}"
+
+    @property
+    def is_resolved(self) -> bool:
+        return self.resolved_at is not None
+
+    @property
+    def is_latest(self) -> bool:
+        """Whether this is the client's most recent report."""
+        latest = self.client.reports.order_by("-created_at", "-id").first()
+        return latest is not None and latest.pk == self.pk
+
+    def resolve(self, user, note: str | None = None):
+        """Acknowledge this report.
+
+        Acknowledgement deliberately does NOT touch `client.functional` — the
+        client said it was broken and that stays on the record. It only means an
+        operator has triaged it, which is what takes the client off the
+        dashboard's action list. Resolving the client's *latest* report also
+        flips `client.latest_report_resolved`; the next report to arrive clears
+        that again (see fakts.services.clients.report_client), so a client that
+        is still broken comes back.
+        """
+        self.resolved_at = timezone.now()
+        self.resolved_by = user
+        self.resolution_note = note
+        self.save(update_fields=["resolved_at", "resolved_by", "resolution_note"])
+        if self.is_latest:
+            Client.objects.filter(pk=self.client_id).update(latest_report_resolved=True)
+
+    def unresolve(self):
+        """Reopen an acknowledged report."""
+        self.resolved_at = None
+        self.resolved_by = None
+        self.resolution_note = None
+        self.save(update_fields=["resolved_at", "resolved_by", "resolution_note"])
+        if self.is_latest:
+            Client.objects.filter(pk=self.client_id).update(latest_report_resolved=False)
 
 
 class TailscaleInspector(models.Model):

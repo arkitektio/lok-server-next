@@ -137,7 +137,7 @@ def test_full_device_code_grant_returns_tokens_and_instances(client):
     assert token["statuses"] == {}
 
     claims = _decode(token["access_token"])
-    assert claims["active_org"] == fakts_client.organization.slug
+    assert claims["org"] == str(fakts_client.organization_id)
     assert claims["client_id"] == body["client_id"]
     assert "openid" in claims["scope"]
     assert claims["aud"] == ["lok"]
@@ -236,7 +236,7 @@ def test_redeem_grant_mints_client_and_tokens(client):
     assert token["client_id"] == redeem.client.client_id
 
     claims = _decode(token["access_token"])
-    assert claims["active_org"] == hub.organization.slug
+    assert claims["org"] == str(hub.organization_id)
 
 
 @pytest.mark.django_db
@@ -332,7 +332,7 @@ def test_full_hub_grant_returns_tokens_and_hub_config(client):
     assert token["clients"] == {}
 
     claims = _decode(token["access_token"])
-    assert claims["active_org"] == membership.organization.slug
+    assert claims["org"] == str(membership.organization_id)
     assert claims["hub"] == "hubgrant"
     assert claims["aud"] == ["lok"]
 
