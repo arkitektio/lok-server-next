@@ -46,6 +46,20 @@ class IonscaleRepository:
         if not self.binary:
             raise FileNotFoundError(f"Ionscale binary not found at: {binary_path}")
 
+    # Values that reach argv must not be able to masquerade as flags. The
+    # subprocess runs with IONSCALE_SYSTEM_ADMIN_KEY in its environment, so even
+    # a bounded argument-injection is worth closing. (This is not shell
+    # injection — args are a list and shell=False — but a value like "--foo"
+    # still lands in argv as a flag-shaped token.)
+    _SAFE_ARG = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:@/-]*$")
+
+    @classmethod
+    def _check_arg(cls, value: str, what: str) -> str:
+        text = str(value)
+        if not cls._SAFE_ARG.match(text):
+            raise ValueError(f"Invalid {what}: {value!r}")
+        return text
+
     def _run_command(self, args: List[str], command_type: str = "tailnet") -> str:
         """
         Executes the ionscale CLI command securely.
@@ -98,7 +112,9 @@ class IonscaleRepository:
         """
         Runs `ionscale machines get --machine-id <machine_id>` and parses the output.
         """
-        output = self._run_command(["machines", "get", "--machine-id", machine_id])
+        output = self._run_command(
+            ["machines", "get", "--machine-id", self._check_arg(machine_id, "machine id")]
+        )
         return self._parse_machine_detail_output(output)
 
     def create_tailnet(self, tailnet_input: TailnetCreate) -> Tailnet:
@@ -353,7 +369,7 @@ class IonscaleRepository:
             
         if tags:
             for tag in tags:
-                args.extend(["--tag", tag])
+                args.extend(["--tag", self._check_arg(tag, "tag")])
 
         output = self._run_command(args, command_type="auth-keys")
         

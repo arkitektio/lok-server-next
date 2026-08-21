@@ -9,6 +9,7 @@ from fakts import models as fakts_models
 from fakts.logic import create_hub_from_partner
 from graphql import GraphQLError
 from api.management.authz import get_or_denied, is_owner, is_owner_or_admin
+from karakter.authz import resolve_own_media_store
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,7 @@ def update_organization(info: Info, input: UpdateOrganizationInput) -> types.Man
         organization.slug = candidate
 
     if input.avatar is not None:
-        organization.avatar = get_or_denied(models.MediaStore.objects, pk=input.avatar)
+        organization.avatar = resolve_own_media_store(info, input.avatar, models.MediaStore)
 
     if input.brand_hue is not None:
         organization.brand_hue = input.brand_hue

@@ -80,7 +80,7 @@ unresolved; on success the standard token response **plus the hub envelope**:
 }
 ```
 
-The JWT carries `active_org`, a `hub` claim (the hub identifier), and
+The JWT carries `org` (the organization id), a `hub` claim (the hub identifier), and
 `aud=["lok"]`. The staged code is single-use; the hub server refreshes with
 `grant_type=refresh_token` + `client_id` (no secret, rotating, 30-day sliding /
 180-day absolute cap) and the **hub config is re-rendered onto every refresh

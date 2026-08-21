@@ -37,6 +37,16 @@ def accept_device_code(info: Info, input: AcceptDeviceCodeInput) -> types.Manage
     device_code = resolve_device_code_with_proof(
         fakts_models.DeviceCode, device_code_id=input.device_code, code=input.code, kind="app"
     )
+
+    # A code that can never yield a token must not be "accepted": the grant side
+    # rejects expired and denied codes, but `bind_client` still ran, and its
+    # identity rotation *deletes* the existing client for the same
+    # (release, membership, node, hub) tuple — so accepting a stale or already
+    # declined code knocked out a working client.
+    if device_code.is_expired():
+        raise GraphQLError("This device code has expired.")
+    if device_code.denied:
+        raise GraphQLError("This device code was already denied.")
     hub = get_or_denied(fakts_models.Hub.objects, id=input.hub)
 
     organization = hub.organization
@@ -77,8 +87,7 @@ def decline_device_code(info: Info, input: DeclineDeviceCodeInput) -> types.Mana
     Marks the device code as denied; the polling device receives `access_denied`.
     """
     device_code = resolve_device_code_with_proof(
-        fakts_models.DeviceCode, device_code_id=input.device_code, code=input.code
-    )
+        fakts_models.DeviceCode, device_code_id=input.device_code, code=input.code, kind="app")
 
     device_code.denied = True
     device_code.save()

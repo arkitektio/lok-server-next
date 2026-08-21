@@ -11,6 +11,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import View
 
 from authapp.bearer import InvalidBearerToken, decode_bearer_token
+from authapp.views import issuer_absolute_uri, issuer_base_url
 from authapp.throttle import AUTHORIZATION_LIMIT_PER_MINUTE, is_throttled, throttled_response
 from fakts import base_models, models
 from fakts.services import clients, device_codes, rendering
@@ -140,27 +141,27 @@ class WellKnownFakts(View):
         # The deployment's base domain — also the base a root-relative configure_url
         # resolves against. (frontend_url is kept for back-compat but is deprecated in
         # favour of the explicit, always-absolute `configure` endpoint below.)
-        base_domain = request.build_absolute_uri(reverse("mainhome")).replace(f"/{settings.MY_SCRIPT_NAME}", "")
+        base_domain = issuer_base_url(request)
         return JsonResponse(
             data=base_models.WellKnownFakts(
                 name=settings.DEPLOYMENT_NAME,
                 version=settings.FAKTS_PROTOCOL_VERSION,
                 description=settings.DEPLOYMENT_DESCRIPTION,
-                base_url=request.build_absolute_uri(reverse("fakts:index")),
+                base_url=issuer_absolute_uri(request, "fakts:index"),
                 frontend_url=base_domain,
                 configure=_absolute_configure_url(settings.DEPLOYMENT_CONFIGURE_URL, base_domain),
                 issuer=settings.OIDC_ISSUER,
-                device_authorization_endpoint=request.build_absolute_uri(reverse("app_authorization")),
-                token_endpoint=request.build_absolute_uri(reverse("token")),
-                jwks_uri=request.build_absolute_uri(reverse("jwks")),
+                device_authorization_endpoint=issuer_absolute_uri(request, "app_authorization"),
+                token_endpoint=issuer_absolute_uri(request, "token"),
+                jwks_uri=issuer_absolute_uri(request, "jwks"),
                 grant_types_supported=GRANT_TYPES_SUPPORTED,
                 token_endpoint_auth_methods_supported=TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED,
                 mesh_coord_url=settings.IONSCALE_COORD_URL,
-                mesh_device_code_start=request.build_absolute_uri(reverse("fakts:meshstart")),
-                mesh_challenge_url=request.build_absolute_uri(reverse("fakts:meshchallenge")),
+                mesh_device_code_start=issuer_absolute_uri(request, "fakts:meshstart"),
+                mesh_challenge_url=issuer_absolute_uri(request, "fakts:meshchallenge"),
                 mesh_configure=_absolute_configure_url(settings.DEPLOYMENT_MESH_CONFIGURE_URL, base_domain),
-                hub_authorization_endpoint=request.build_absolute_uri(reverse("hub_authorization")),
-                hub_claim=request.build_absolute_uri(reverse("fakts:hubclaim")),
+                hub_authorization_endpoint=issuer_absolute_uri(request, "hub_authorization"),
+                hub_claim=issuer_absolute_uri(request, "fakts:hubclaim"),
                 hub_configure=_absolute_configure_url(settings.DEPLOYMENT_HUB_CONFIGURE_URL, base_domain),
             ).model_dump()
         )
@@ -193,7 +194,7 @@ class AppAuthorizationView(View):
         # dynamically-registered OAuth2 clients don't accumulate.
         device_codes.purge_expired_device_codes()
 
-        base_domain = request.build_absolute_uri(reverse("mainhome")).replace(f"/{settings.MY_SCRIPT_NAME}", "")
+        base_domain = issuer_base_url(request)
         configure_template = _absolute_configure_url(settings.DEPLOYMENT_CONFIGURE_URL, base_domain)
 
         return JsonResponse(
@@ -204,7 +205,7 @@ class AppAuthorizationView(View):
                 "device_code": device_code.secret,
                 "user_code": device_code.code,
                 "client_id": device_code.client.client_id,
-                "token_endpoint": request.build_absolute_uri(reverse("token")),
+                "token_endpoint": issuer_absolute_uri(request, "token"),
                 "verification_uri": configure_template,
                 "verification_uri_complete": configure_template.replace("{code}", device_code.code),
                 "expires_in": device_code.get_expires_in(),
@@ -239,7 +240,7 @@ class HubAuthorizationView(View):
 
         device_codes.purge_expired_device_codes()
 
-        base_domain = request.build_absolute_uri(reverse("mainhome")).replace(f"/{settings.MY_SCRIPT_NAME}", "")
+        base_domain = issuer_base_url(request)
         configure_template = _absolute_configure_url(settings.DEPLOYMENT_HUB_CONFIGURE_URL, base_domain)
 
         return JsonResponse(
@@ -248,7 +249,7 @@ class HubAuthorizationView(View):
                 "device_code": device_code.secret,
                 "user_code": device_code.code,
                 "client_id": device_code.client.client_id,
-                "token_endpoint": request.build_absolute_uri(reverse("token")),
+                "token_endpoint": issuer_absolute_uri(request, "token"),
                 "verification_uri": configure_template,
                 "verification_uri_complete": configure_template.replace("{code}", device_code.code),
                 "expires_in": device_code.get_expires_in(),

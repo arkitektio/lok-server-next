@@ -16,9 +16,10 @@ WELL_KNOWN = "/lok/.well-known/fakts"
 @override_settings(DEPLOYMENT_CONFIGURE_URL="/configure/{code}")
 def test_root_relative_configure_url_joins_base_domain(client):
     data = client.get(WELL_KNOWN).json()
-    # The Django test client serves from http://testserver; the base domain is that
-    # host with lok's script-name stripped.
-    assert data["configure"] == "http://testserver/configure/{code}"
+    # The base domain is the configured issuer with lok's script-name stripped.
+    # Deliberately *not* the request host: see
+    # test_discovery_endpoints_ignore_a_spoofed_forwarded_host.
+    assert data["configure"] == "http://lok/configure/{code}"
 
 
 @pytest.mark.django_db
@@ -61,9 +62,9 @@ def test_oauth_metadata_is_advertised(client):
     (device authorization + dynamic registration) and token endpoints as
     absolute URLs, plus the supported grants and client auth methods."""
     data = client.get(WELL_KNOWN).json()
-    assert data["device_authorization_endpoint"] == "http://testserver/lok/o/app-authorization/"
-    assert data["token_endpoint"] == "http://testserver/lok/o/token/"
-    assert data["jwks_uri"] == "http://testserver/lok/o/jwks/"
+    assert data["device_authorization_endpoint"] == "http://lok/lok/o/app-authorization/"
+    assert data["token_endpoint"] == "http://lok/lok/o/token/"
+    assert data["jwks_uri"] == "http://lok/lok/o/jwks/"
     assert "urn:ietf:params:oauth:grant-type:device_code" in data["grant_types_supported"]
     assert "urn:fakts:grant-type:redeem" in data["grant_types_supported"]
     assert "refresh_token" in data["grant_types_supported"]
@@ -83,7 +84,7 @@ def test_oauth_authorization_server_document(client):
 
     # The OIDC-specific fields live only on openid-configuration.
     assert "userinfo_endpoint" in oidc and "userinfo_endpoint" not in rfc8414
-    assert rfc8414["device_authorization_endpoint"] == "http://testserver/lok/o/app-authorization/"
+    assert rfc8414["device_authorization_endpoint"] == "http://lok/lok/o/app-authorization/"
 
 
 @pytest.mark.django_db
@@ -93,8 +94,30 @@ def test_hub_endpoints_are_advertised(client):
     advertised as absolute URLs (configure resolves the template against the
     base domain with `{code}` preserved)."""
     data = client.get(WELL_KNOWN).json()
-    assert data["hub_authorization_endpoint"] == "http://testserver/lok/o/hub-authorization/"
+    assert data["hub_authorization_endpoint"] == "http://lok/lok/o/hub-authorization/"
     assert "hub_device_code_start" not in data
     assert "hub_challenge_url" not in data
-    assert data["hub_claim"] == "http://testserver/lok/f/claimhub/"
-    assert data["hub_configure"] == "http://testserver/hubconfigure/{code}"
+    assert data["hub_claim"] == "http://lok/lok/f/claimhub/"
+    assert data["hub_configure"] == "http://lok/hubconfigure/{code}"
+
+
+@pytest.mark.django_db
+def test_discovery_endpoints_ignore_a_spoofed_forwarded_host(client):
+    """Regression for the host-header poisoning finding.
+
+    Endpoint URLs were built with `request.build_absolute_uri`, and with
+    `ALLOWED_HOSTS = ["*"]` plus `USE_X_FORWARDED_HOST = True` (both defaults)
+    the host came from the caller's own `X-Forwarded-Host` header. A relying
+    party bootstrapping from a poisoned document would post its `code` and
+    `client_secret` to the attacker's token endpoint, and fetch `jwks_uri` —
+    i.e. the signing key it validates id_tokens against — from the attacker.
+    """
+    for path in (
+        "/lok/.well-known/openid-configuration",
+        "/lok/.well-known/oauth-authorization-server",
+        "/lok/.well-known/fakts",
+    ):
+        response = client.get(path, HTTP_X_FORWARDED_HOST="evil.tld")
+        assert response.status_code == 200, path
+        body = response.content.decode()
+        assert "evil.tld" not in body, f"{path} echoed an attacker-supplied host"

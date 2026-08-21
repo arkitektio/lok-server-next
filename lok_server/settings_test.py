@@ -14,7 +14,11 @@ DATABASES["default"] = {
 }
 
 
-AUTHENTIKATE = {**AUTHENTIKATE, "static_tokens": {"test": {"sub": "1", "active_org": "testorg"}}}
+# No process-wide static token: `build_auth_context` registers its own per-test
+# token (and restores the snapshot afterwards). The one that used to live here
+# was unreferenced and carried an org *slug* in `active_org`, which is no longer
+# how tenancy is keyed — see authapp.extension.read_org_claim.
+AUTHENTIKATE = {**AUTHENTIKATE, "static_tokens": {}}
 
 # Never touch the real ionscale CLI in tests: build the in-memory fake by default.
 # The ``_reset_ionscale_repo`` autouse fixture rebuilds it fresh per test.

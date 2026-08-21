@@ -100,10 +100,19 @@ class AuthorizationCode(models.Model, AuthorizationCodeMixin):
     nonce = models.CharField(max_length=120, default="", null=True)
 
     # PKCE (RFC 7636). Populated from the authorization request when the client
-    # sends one; `CodeChallenge` (registered in authapp.server) then requires and
-    # verifies a matching `code_verifier` at token exchange. Blank means the
-    # client did not use PKCE — see the note in authapp/server.py about why the
-    # extension is registered with required=False for now.
+    # sends one; `CodeChallenge` (registered in authapp.server with
+    # required=True) then requires and verifies a matching `code_verifier` at
+    # token exchange.
+    #
+    # `required=True` does not reject a challenge-less /o/authorize/ — authlib
+    # returns early there when neither code_challenge nor code_challenge_method
+    # is present. Enforcement happens at the *token* request: a public client
+    # (auth method "none") that skipped PKCE can obtain a code but can never
+    # exchange it. Confidential relying parties authenticate with a secret and
+    # are not PKCE-gated.
+    #
+    # (This comment previously said the extension was registered with
+    # required=False, which was the opposite of the actual configuration.)
     code_challenge = models.CharField(max_length=128, blank=True, default="")
     code_challenge_method = models.CharField(max_length=10, blank=True, default="")
     # ... other fields and methods ...
@@ -138,3 +147,28 @@ class AuthorizationCode(models.Model, AuthorizationCodeMixin):
 
     def get_amr(self):
         return ["pwd"]  # Authentication Methods References (check what this should be)
+
+
+class UsedNonce(models.Model):
+    """A nonce this client has already spent on a completed token exchange.
+
+    `AuthorizationCode` rows are deleted at exchange, so they cannot answer
+    "has this nonce been used before?" — a consumed nonce simply vanished and
+    was accepted again. This table keeps the answer after the code is gone, so
+    `OpenIDCode.exists_nonce` can actually enforce uniqueness (the property that
+    makes `require_nonce=True` an id_token replay defence rather than just a
+    presence check).
+
+    Rows are only useful while an id_token minted with that nonce could still be
+    replayed, so they are prunable by `created_at`.
+    """
+
+    client_id = models.CharField(max_length=48, db_index=True)
+    nonce = models.CharField(max_length=120)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        unique_together = ("client_id", "nonce")
+
+    def __str__(self):
+        return f"{self.client_id}:{self.nonce}"

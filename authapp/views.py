@@ -28,7 +28,10 @@ from django.views.decorators.http import require_http_methods
 from authapp.server import server, resource_protector
 from authlib.oauth2 import OAuth2Error
 from django.views.decorators.csrf import csrf_exempt
+from urllib.parse import urljoin, urlsplit, urlunsplit
+
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from authapp.token_generators import public_jwks
 
 
@@ -67,9 +70,56 @@ def user_info(request: HttpRequest) -> JsonResponse:
             "email": resolve_email(membership, email_template),
             "roles": [role.identifier for role in membership.roles.all()],
             "scope": "scope",
-            "active_org": membership.organization.slug,
+            "org": str(membership.organization_id),
         }
     )
+
+
+def issuer_absolute_uri(request: HttpRequest, view_name: str) -> str:
+    """Absolute URL for ``view_name``, anchored to the configured issuer.
+
+    These used to be built with ``request.build_absolute_uri``, which derives the
+    host from the request. With ``ALLOWED_HOSTS = ["*"]`` and
+    ``USE_X_FORWARDED_HOST = True`` (both defaults) that host is the client's own
+    ``X-Forwarded-Host`` header, so anyone could make the discovery document
+    advertise their endpoints: a relying party bootstrapping from it would post
+    its ``code`` and ``client_secret`` to the attacker's token endpoint and fetch
+    ``jwks_uri`` from attacker infrastructure — letting the attacker also choose
+    the key the RP validates id_tokens against.
+
+    ``issuer`` was already pinned to config; every other endpoint in the document
+    now shares that anchor. Falls back to the request only when ``oidc_issuer``
+    is left unconfigured, which keeps a bare development server working.
+    """
+    path = reverse(view_name)
+    issuer = (settings.OIDC_ISSUER or "").rstrip("/")
+    if not issuer:
+        return request.build_absolute_uri(path)
+    return urljoin(issuer + "/", path.lstrip("/"))
+
+
+def issuer_base_url(request: HttpRequest) -> str:
+    """The deployment's base domain, anchored to the configured issuer.
+
+    Same reasoning as :func:`issuer_absolute_uri`. This one matters for the
+    human-facing half: a root-relative ``configure_url`` is resolved against
+    this, and that is the URL a person is sent to in order to approve a device
+    code — so letting the caller choose its host is a ready-made phishing
+    primitive on the deployment's own name.
+    """
+    issuer = (settings.OIDC_ISSUER or "").rstrip("/")
+    if not issuer:
+        issuer = request.build_absolute_uri("/").rstrip("/")
+
+    # Strip the script name from the *path*, never by string suffix: an issuer
+    # of "http://lok" with script name "lok" ends with "/lok" in the host part,
+    # and a naive endswith() would eat the host.
+    parsed = urlsplit(issuer)
+    script_name = (settings.MY_SCRIPT_NAME or "").strip("/")
+    path = parsed.path.rstrip("/")
+    if script_name and path.endswith(f"/{script_name}"):
+        path = path[: -(len(script_name) + 1)]
+    return urlunsplit((parsed.scheme, parsed.netloc, path, "", "")).rstrip("/")
 
 
 def _authorization_server_metadata(request: HttpRequest) -> dict:
@@ -81,21 +131,21 @@ def _authorization_server_metadata(request: HttpRequest) -> dict:
 
     return {
         "issuer": settings.OIDC_ISSUER,
-        "authorization_endpoint": request.build_absolute_uri(reverse("authorize")),
-        "token_endpoint": request.build_absolute_uri(reverse("token")),
-        "jwks_uri": request.build_absolute_uri(reverse("jwks")),
+        "authorization_endpoint": issuer_absolute_uri(request, "authorize"),
+        "token_endpoint": issuer_absolute_uri(request, "token"),
+        "jwks_uri": issuer_absolute_uri(request, "jwks"),
         "response_types_supported": ["code"],
         "scopes_supported": ["openid", "profile", "email"],
         "token_endpoint_auth_methods_supported": TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED,
         "grant_types_supported": GRANT_TYPES_SUPPORTED,
         "code_challenge_methods_supported": ["S256"],
-        "revocation_endpoint": request.build_absolute_uri(reverse("revoke")),
+        "revocation_endpoint": issuer_absolute_uri(request, "revoke"),
         "revocation_endpoint_auth_methods_supported": TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED,
         # RFC 8628 device authorization endpoint, named "app authorization"
         # here. Non-standard in one respect: it also performs dynamic client
         # registration (the manifest in the request mints a public client
         # alongside the device code).
-        "device_authorization_endpoint": request.build_absolute_uri(reverse("app_authorization")),
+        "device_authorization_endpoint": issuer_absolute_uri(request, "app_authorization"),
     }
 
 
@@ -111,7 +161,7 @@ def open_id_configuration(request: HttpRequest) -> JsonResponse:
     metadata = _authorization_server_metadata(request)
     metadata.update(
         {
-            "userinfo_endpoint": request.build_absolute_uri(reverse("user_info")),
+            "userinfo_endpoint": issuer_absolute_uri(request, "user_info"),
             "subject_types_supported": ["public"],
             "id_token_signing_alg_values_supported": ["RS256"],
         }
@@ -156,10 +206,14 @@ def authorize(request: HttpRequest) -> HttpResponse:
         # Denied: authlib produces the standard access_denied redirect.
         return server.create_authorization_response(request, grant_user=None)
 
+    # The organization *id*, not its slug: this choice decides which tenant every
+    # token minted from this authorization is scoped to, so it is keyed on the row
+    # rather than on a mutable, user-chosen handle. A malformed value fails closed
+    # as a 400 rather than surfacing as a 500.
     organization = request.POST.get("organization")
     try:
-        membership = Membership.objects.get(user=request.user, organization__slug=organization)
-    except Membership.DoesNotExist:
+        membership = Membership.objects.get(user=request.user, organization_id=organization)
+    except (Membership.DoesNotExist, ValueError, ValidationError):
         return JsonResponse(
             {"error": "invalid_request", "error_description": "You are not a member of the selected organization."},
             status=400,

@@ -8,6 +8,7 @@ with a ``ValidationError`` if they are not supplied via config or environment.
 """
 
 import hashlib
+import warnings
 import os
 from typing import Any, Dict, List, Literal, Optional
 
@@ -67,6 +68,33 @@ class DjangoSettings(BaseModel):
             "and bearer-authenticated (no cookies are sent cross-origin), so this is "
             "safe for deployments whose web apps live on arbitrary hosts; prefer an "
             "explicit cors_allowed_origins list when the hosts are known."
+        ),
+    )
+    trusted_proxy_depth: int = Field(
+        default=0,
+        ge=0,
+        description=(
+            "How many reverse proxies you control sit in front of lok. Per-IP rate "
+            "limiting reads the client address this many entries from the RIGHT of "
+            "X-Forwarded-For, so a client-supplied prefix cannot forge it. 0 means "
+            "no trusted proxy: X-Forwarded-For is ignored entirely and REMOTE_ADDR "
+            "is used. Set to 1 behind a single gateway (Caddy/nginx/ELB)."
+        ),
+    )
+    secure_cookies: Optional[bool] = Field(
+        default=None,
+        description=(
+            "Mark session and CSRF cookies Secure (HTTPS-only). Defaults to the "
+            "opposite of allow_insecure_transport, i.e. on unless the deployment "
+            "deliberately runs without TLS."
+        ),
+    )
+    hsts_seconds: int = Field(
+        default=31536000,
+        ge=0,
+        description=(
+            "SECURE_HSTS_SECONDS. 0 disables HSTS. Ignored when the deployment has "
+            "opted into plain HTTP via allow_insecure_transport."
         ),
     )
     admin: AdminSettings = Field(description="Superuser provisioned on first boot.")
@@ -443,11 +471,16 @@ class Settings(BaseSettings):
         `SECRET_KEY` matters beyond signing too: `karakter.hashers.hash_device_id`
         uses it as the HMAC pepper for device-id pseudonymisation.
 
-        Compared by digest rather than by embedding the secrets again here. This
-        is a boot-time guard only in production (`debug=False`), so local
-        development against the shipped config keeps working.
+        Compared by digest rather than by embedding the secrets again here.
+
+        The bypass used to be `if self.django.debug: return self` — but the
+        shipped `config.yaml` *itself* sets `debug: true`, so the guard never
+        fired on the exact configuration it exists to catch: `docker run` with no
+        config mounted booted happily on the public signing key. The opt-out is
+        now an explicit, deliberate environment variable, so running on committed
+        key material is something you have to *say*, not something you inherit.
         """
-        if self.django.debug:
+        if os.environ.get("LOK_ALLOW_COMMITTED_KEYS") == "1":
             return self
 
         compromised = {
@@ -464,15 +497,57 @@ class Settings(BaseSettings):
             if compromised.get(hashlib.sha256(value.strip().encode()).hexdigest()) == name
         ]
 
+        # The rest of the committed credentials. These are *warned* about rather
+        # than refused: unlike the signing secrets they cannot be used to forge a
+        # token, and failing the boot on them would strand any deployment whose
+        # database already uses the shipped password. Loud, not fatal.
+        stale = [
+            name
+            for value, name, digest in (
+                (self.postgres.password, "postgres.password",
+                 "f1421261b9b60d46855115e9e96b9f976fbbfc093943785537c90d1a3ae13cc1"),
+                (self.django.admin.password, "django.admin.password",
+                 "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918"),
+            )
+            if value and hashlib.sha256(value.strip().encode()).hexdigest() == digest
+        ]
+        if stale and not self.django.debug:
+            warnings.warn(
+                "Running with credentials from the repository's committed config.yaml "
+                f"({', '.join(stale)}). These values are public — rotate them.",
+                stacklevel=2,
+            )
+
         if offenders:
             raise ValueError(
                 "Refusing to start with key material from the repository's committed "
                 f"config.yaml ({', '.join(offenders)}). These values are public — anyone "
                 "with the repo can forge tokens. Generate fresh values and supply them "
                 "via your deployment config or environment (PRIVATE_KEY, DJANGO__SECRET_KEY). "
-                "Set django.debug=true to bypass this for local development."
+                "Set LOK_ALLOW_COMMITTED_KEYS=1 to bypass this deliberately (local development only)."
             )
 
+        return self
+
+    @model_validator(mode="after")
+    def _refuse_static_tokens_in_production(self) -> "Settings":
+        """Static tokens bypass signature verification entirely.
+
+        `authentikate.utils.authenticate_token` short-circuits on
+        `static_tokens[token]`, and `StaticToken` defaults to `roles: ["admin"]`.
+        The library calls it "testing only", but it was surfaced as an ordinary
+        deployment config key sitting in the same block as the issuer list, with
+        nothing tying it to DEBUG — one copy-paste from an unauthenticated admin
+        principal in production.
+        """
+        if self.django.debug:
+            return self
+        if self.lok.static_tokens:
+            raise ValueError(
+                "authentikate.static_tokens / lok.static_tokens bypass signature "
+                "verification and are for tests only. Refusing to start with them "
+                "configured while debug is off."
+            )
         return self
 
     @model_validator(mode="after")

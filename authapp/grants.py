@@ -1,10 +1,16 @@
+import logging
+
 from authlib.oauth2.rfc6749 import grants
-from .models import OAuth2Token, AuthorizationCode
+from authlib.oauth2.rfc6749.errors import InvalidGrantError
+from .models import OAuth2Token, AuthorizationCode, UsedNonce
 from .oidc_claims import resolve_email, resolve_sub
 from .fakts_grants import FaktsEnvelopeMixin
 from authlib.oidc.core import grants as oidcgrants, UserInfo
 from karakter.models import Membership
 from django.conf import settings
+from django.db import transaction
+
+logger = logging.getLogger(__name__)
 
 
 class ClientCredentialsGrant(grants.ClientCredentialsGrant):
@@ -13,11 +19,23 @@ class ClientCredentialsGrant(grants.ClientCredentialsGrant):
 
 class OpenIDCode(oidcgrants.OpenIDCode):
     def exists_nonce(self, nonce, request):
-        try:
-            AuthorizationCode.objects.get(client_id=request.payload.client_id, nonce=nonce)
+        """Whether this client has already used this nonce.
+
+        Consulting only `AuthorizationCode` could never detect a replay: the row
+        is deleted at token exchange, so an *already-consumed* nonce always
+        reported "does not exist" and was accepted again. `require_nonce=True`
+        therefore enforced nonce presence but not nonce uniqueness — which is
+        the property that makes it an id_token replay defence.
+
+        A consumed nonce is now recorded in `UsedNonce` and checked here as
+        well. `.exists()` rather than `.get()` also avoids the
+        `MultipleObjectsReturned` 500 the old lookup raised whenever one client
+        happened to have two live codes carrying the same nonce.
+        """
+        client_id = request.payload.client_id
+        if AuthorizationCode.objects.filter(client_id=client_id, nonce=nonce).exists():
             return True
-        except AuthorizationCode.DoesNotExist:
-            return False
+        return UsedNonce.objects.filter(client_id=client_id, nonce=nonce).exists()
 
     def get_jwt_config(self, grant, client):
         # Implement key rotation and retrieval as needed
@@ -48,7 +66,7 @@ class OpenIDCode(oidcgrants.OpenIDCode):
             sub=resolve_sub(membership, membership_is_subject),
             name=membership.user.username,
             preferred_username=membership.user.username,
-            active_org=membership.organization.slug,
+            org=str(membership.organization_id),
             email=resolve_email(membership, email_template),
         )
 
@@ -60,18 +78,48 @@ class AuthorizationCodeGrant(FaktsEnvelopeMixin, grants.AuthorizationCodeGrant):
     TOKEN_ENDPOINT_AUTH_METHODS = ["client_secret_basic", "client_secret_post", "none"]
 
     def query_authorization_code(self, code, client):
-        try:
-            item = AuthorizationCode.objects.get(code=code, client_id=client.client_id)
-        except AuthorizationCode.DoesNotExist:
-            return None
+        """Claim the code for this exchange, atomically.
 
-        if not item.is_expired():
+        authlib runs query -> generate_token -> save_token -> delete with no
+        transaction and no row lock, so two concurrent POSTs with the same code
+        both passed this lookup before either delete landed, and both received a
+        full token pair with independent refresh chains.
+
+        `select_for_update` serialises the claim: the second request blocks here
+        and then finds the row gone (the first has deleted it) or, on a backend
+        without row locking, still races only as far as the delete below, which
+        is now guarded by an affected-row count. This is the same pattern
+        `fakts.services.clients` already uses for the redeem path.
+        """
+        with transaction.atomic():
+            try:
+                item = (
+                    AuthorizationCode.objects.select_for_update()
+                    .get(code=code, client_id=client.client_id)
+                )
+            except AuthorizationCode.DoesNotExist:
+                return None
+
+            if item.is_expired():
+                return None
             return item
 
     def delete_authorization_code(self, authorization_code: AuthorizationCode):
-        authorization_code.delete()
+        # Delete by pk and check the affected-row count: if another concurrent
+        # exchange already consumed this code, we must not let this one issue a
+        # second token pair from it.
+        deleted, _ = AuthorizationCode.objects.filter(pk=authorization_code.pk).delete()
+        if not deleted:
+            raise InvalidGrantError(description="Authorization code has already been used.")
 
     def authenticate_user(self, authorization_code: AuthorizationCode):
+        # Remember the nonce before the code row disappears, so `exists_nonce`
+        # can still recognise it as spent (see OpenIDCode.exists_nonce).
+        if authorization_code.nonce:
+            UsedNonce.objects.get_or_create(
+                client_id=authorization_code.client_id,
+                nonce=authorization_code.nonce,
+            )
         return authorization_code.user
 
     def save_authorization_code(self, code: str, request):
@@ -122,10 +170,36 @@ class RefreshTokenGrant(FaktsEnvelopeMixin, grants.RefreshTokenGrant):
             return None
         try:
             item = OAuth2Token.objects.get(refresh_token=refresh_token)
-            if item.is_refresh_token_active():
-                return item
         except OAuth2Token.DoesNotExist:
             return None
+
+        if item.is_refresh_token_active():
+            return item
+
+        # Reuse detection (RFC 9700 §4.14.2). Rotation already revoked this row
+        # when it was consumed, and replaying it was rejected — but rejection
+        # was the end of it, so the *legitimate* chain kept working and the
+        # thief's branch survived alongside it, unflagged, for up to the
+        # 180-day chain cap.
+        #
+        # Presenting an already-revoked refresh token means the token leaked:
+        # either the attacker is replaying what the client already spent, or the
+        # client is replaying what the attacker spent. We cannot tell which, and
+        # that is precisely why the whole chain has to go.
+        if item.revoked:
+            revoked_count = OAuth2Token.objects.filter(
+                client_id=item.client_id,
+                chain_started_at=item.chain_started_at,
+                revoked=False,
+            ).update(revoked=True)
+            logger.warning(
+                "Refresh token reuse detected for client %s (chain started %s); "
+                "revoked %s live token(s) in that chain.",
+                item.client_id,
+                item.chain_started_at,
+                revoked_count,
+            )
+        return None
 
     def authenticate_user(self, credential: OAuth2Token):
         return credential.user

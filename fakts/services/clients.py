@@ -43,6 +43,10 @@ class RedeemTokenExpired(Exception):
     """Raised when a redeem token has passed its expiry (and has been deleted)."""
 
 
+class RedeemTokenExhausted(Exception):
+    """Raised when a redeem token has been redeemed as many times as allowed."""
+
+
 class RedeemTokenManifestChanged(Exception):
     """Raised when an already-redeemed token is re-redeemed with a different
     manifest while ``allow_reredeem`` is not set."""
@@ -257,6 +261,14 @@ def redeem_token(token: str, manifest: Manifest, role: enums.ClientRoleVanilla =
         # instead of racing to create duplicate clients.
         valid_token = models.RedeemToken.objects.select_for_update().get(token=token)
 
+        # A token with a redemption budget must stop working once it is spent.
+        # Each redeem mints a fresh access+refresh pair, so without this an
+        # unlimited token is a permanent, unrevocable foothold as its user.
+        if valid_token.redemptions_exhausted():
+            raise RedeemTokenExhausted(
+                "This redeem token has already been redeemed the maximum number of times."
+            )
+
         if not (valid_token.expires_at and valid_token.expires_at < timezone.now()):
             incoming_hash = hash_manifest(manifest)
 
@@ -278,6 +290,7 @@ def redeem_token(token: str, manifest: Manifest, role: enums.ClientRoleVanilla =
 
             valid_token = validate_redeem_token(redeem_token=valid_token, manifest=manifest, role=role)
             valid_token.manifest_hash = incoming_hash
+            valid_token.redemption_count = valid_token.redemption_count + 1
             valid_token.save()
             return valid_token.client
 

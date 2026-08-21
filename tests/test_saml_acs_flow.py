@@ -21,6 +21,7 @@ from django.test import Client, override_settings
 from django.urls import reverse
 
 from karakter.models import Membership, User
+from karakter.slugs import validate_slug
 
 HOST = "example.com"
 # The URL segment is the app's client_id — an identity-provider name, not an
@@ -163,9 +164,17 @@ def test_saml_login_grants_no_organization_membership(saml_response, mocked_sign
     post_assertion(Client(HTTP_HOST=HOST), saml_response)
 
     user = User.objects.get(socialaccount__uid="dummysamluid")
-    slugs = set(Membership.objects.filter(user=user).values_list("organization__slug", flat=True))
+    memberships = Membership.objects.filter(user=user).select_related("organization")
 
-    assert slugs == {f"{user.username}-org"}
+    # The invariant is "their own personal organization, and nothing else".
+    # Assert that directly rather than pinning a derived slug string: the slug is
+    # now normalised through `slugs.slugify_name` (a username like "john.doe"
+    # previously produced "john.doe-org", which `SLUG_RE` does not even accept),
+    # and it is suffixed on collision so signup can never join an existing org.
+    assert memberships.count() == 1
+    only = memberships.get().organization
+    assert only.owner_id == user.pk
+    validate_slug(only.slug)
 
 
 @pytest.mark.django_db

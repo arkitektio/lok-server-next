@@ -463,3 +463,41 @@ if not DEBUG and _os.environ.get("AUTHLIB_INSECURE_TRANSPORT"):
         "gateway in front of lok. Prefer TLS at the gateway with X-Forwarded-Proto "
         "forwarded, which needs no opt-out."
     )
+
+
+# --------------------------------------------------------------------------- #
+# Transport / cookie hardening
+#
+# None of these were set, so every one ran at its off-by-default value: the
+# allauth and admin session cookies (and the CSRF token) were transmitted over
+# plain HTTP, and there was no HSTS, so a first request was downgradeable.
+#
+# They key off `allow_insecure_transport` rather than being unconditionally on:
+# a deployment that has *deliberately* opted into plain HTTP (lab LAN, plain-http
+# gateway) would be locked out of its own session cookie otherwise. Everyone else
+# — the overwhelming majority, terminating TLS at a gateway — gets the secure
+# defaults without touching their config.
+# --------------------------------------------------------------------------- #
+_secure_cookies = conf.django.secure_cookies
+if _secure_cookies is None:
+    _secure_cookies = not ALLOW_INSECURE_TRANSPORT
+
+# How many proxies we control sit in front of lok; see authapp.throttle.
+TRUSTED_PROXY_DEPTH = conf.django.trusted_proxy_depth
+
+SESSION_COOKIE_SECURE = _secure_cookies
+CSRF_COOKIE_SECURE = _secure_cookies
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
+
+SECURE_HSTS_SECONDS = 0 if ALLOW_INSECURE_TRANSPORT else conf.django.hsts_seconds
+SECURE_HSTS_INCLUDE_SUBDOMAINS = bool(SECURE_HSTS_SECONDS)
+SECURE_HSTS_PRELOAD = False
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+
+# TLS terminates at the gateway, which is also what sets X-Forwarded-Proto, so
+# Django must not additionally redirect (that would loop behind a proxy that
+# forwards the header). Left off deliberately; the gateway owns the redirect.
+SECURE_SSL_REDIRECT = False

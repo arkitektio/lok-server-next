@@ -1,7 +1,94 @@
+import base64
+import json
 from typing import cast
+
+from authentikate import errors as authentikate_errors
 from authentikate.strawberry.extension import AuthentikateExtension, UserModel, JWTToken
+from django.conf import settings
+from django.core.exceptions import ValidationError
+
 from karakter.models import User, Organization, Membership
 from fakts.models import Client
+
+
+# The audience every token addressed to *this* service carries. `get_audiences`
+# in authapp/token_generators.py mints ["lok", *services] for a fakts client and
+# ["lok"] for a hub, but [client_id] for a plain OIDC relying party — an RP's
+# access token is deliberately *not* for lok.
+LOK_AUDIENCE = "lok"
+
+
+def assert_addressed_to_lok(token: JWTToken) -> None:
+    """Reject a token that was not issued by us, or not issued *for* us.
+
+    authentikate's `decode_token` validates the signature and `exp` and nothing
+    else — no `iss`, no `aud`. Without this gate any lok-signed JWT authenticated
+    the main GraphQL API, so an OIDC relying party (or anyone who obtained a
+    token from one: its logs, a compromised or malicious RP) could replay a
+    user's access token against /graphql and act as that user.
+
+    This is the same check `authapp.bearer.decode_bearer_token` already applies
+    at /f/report/; it belongs on every token-authenticated surface, not one.
+
+    Static tokens are exempt only in the sense that they must still carry the
+    right claims — `AuthentikateSettings.static_tokens` bypasses signature
+    verification upstream of us and is a separate (test-only) concern.
+    """
+    if token.iss != settings.OIDC_ISSUER:
+        raise authentikate_errors.InvalidJwtTokenError(
+            "Token was not issued by this server"
+        )
+
+    audiences = token.aud or []
+    if LOK_AUDIENCE not in audiences:
+        raise authentikate_errors.InvalidJwtTokenError(
+            "Token is not addressed to lok"
+        )
+
+
+def read_org_claim(token: JWTToken) -> str:
+    """The organization pk this token is scoped to.
+
+    Read out of the raw payload rather than off the model. authentikate's
+    ``JWTToken`` is declared ``extra="ignore"``
+    (``authentikate/base_models.py``), so any claim the library does not itself
+    declare — ``org`` included — is silently dropped during validation and is not
+    reachable via attribute access or ``__pydantic_extra__``. Reading ``raw``
+    keeps lok working regardless of whether the library ever grows an ``org``
+    field.
+
+    This is safe: authentikate verifies the signature in ``decode_token`` before
+    ever constructing the ``JWTToken`` we are handed, so by the time this runs
+    the payload has already been authenticated. We are re-reading a verified
+    blob, not trusting an unverified one.
+    """
+    raw = getattr(token, "raw", "") or ""
+    parts = raw.split(".")
+    if len(parts) == 3:
+        try:
+            payload_segment = parts[1]
+            padding = "=" * (-len(payload_segment) % 4)
+            claims = json.loads(base64.urlsafe_b64decode(payload_segment + padding))
+        except Exception as exc:
+            raise authentikate_errors.MalformedJwtTokenError(
+                "Could not read the organization claim from the token"
+            ) from exc
+        org = claims.get("org")
+    else:
+        # Static tokens only: `StaticToken.raw` defaults to the literal
+        # "static_token", not a JWT, and `extra="ignore"` applies to them too —
+        # so a test fixture cannot carry `org` either and has to use the
+        # declared `active_org` field as the carrier. Unreachable in production:
+        # `Settings._refuse_static_tokens_in_production` refuses to boot with
+        # static tokens configured while debug is off. Delete this branch once
+        # authentikate declares an `org` field.
+        org = token.active_org
+
+    if not org:
+        raise authentikate_errors.InvalidJwtTokenError(
+            "Token does not name an organization"
+        )
+    return str(org)
 
 
 async def expand_user_from_token(token: str):
@@ -21,6 +108,7 @@ class AuthAppExtension(AuthentikateExtension):
         rather than the per-entity ``aexpand_*`` helpers, so we compose them
         here to keep authentication backed by the karakter/fakts models.
         """
+        assert_addressed_to_lok(token)
         organization = await self.aexpand_organization_from_token(token)
         user = await self.aexpand_user_from_token(token)
         client = await self.aexpand_client_from_token(token)
@@ -38,10 +126,20 @@ class AuthAppExtension(AuthentikateExtension):
         return cast("Client", await Client.objects.aget(client_id=token.client_id))
 
     async def aexpand_organization_from_token(self, token: JWTToken) -> "Organization":
-        """Expand an organization from the provided JWT token"""
+        """Expand an organization from the provided JWT token.
 
-        # Assuming the organization is stored in the token
-        return cast("Organization", await Organization.objects.aget(slug=token.active_org))
+        Resolved by primary key. This used to be `aget(slug=token.active_org)`,
+        which keyed the tenancy boundary for the entire token-authenticated
+        schema on a user-chosen, mutable string.
+        """
+        org_pk = read_org_claim(token)
+        try:
+            return cast("Organization", await Organization.objects.aget(pk=org_pk))
+        except (Organization.DoesNotExist, ValueError, ValidationError) as exc:
+            # A malformed pk must fail closed like an unknown one, not 500.
+            raise authentikate_errors.InvalidJwtTokenError(
+                "Token names an organization that does not exist"
+            ) from exc
 
     async def aexpand_membership_from_user_and_organization(self, user: "UserModel", organization: "Organization", token: JWTToken) -> "Membership":
         """Expand membership from user and organization"""

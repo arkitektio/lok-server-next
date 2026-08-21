@@ -16,6 +16,23 @@ ADD_USER = """
 """
 
 
+def _invite(target, org):
+    """Give `target` a consented relationship with `org`.
+
+    `addUserToOrganization` no longer attaches a stranger by raw pk: pks are
+    sequential, so "admin adds any user id" was a deployment-wide directory
+    harvest (create an org, attach 1..N, read `users { username email }`).
+    Role management for people who *are* part of the organization is unchanged,
+    which is what these tests cover.
+    """
+    from karakter.models import Invite
+
+    invite = Invite.objects.create(created_by=org.owner, created_for=org, email=target.email or None)
+    invite.accepted_by = target
+    invite.save(update_fields=["accepted_by"])
+    return invite
+
+
 async def _add_user(context, user_id, org_id, roles):
     return await schema.execute(
         ADD_USER,
@@ -34,6 +51,7 @@ async def test_admin_can_add_user_to_organization(db, authenticated_context: Htt
     await sync_to_async(_grant_admin)(caller, org)
 
     target = await sync_to_async(User.objects.create)(username="newcomer")
+    await sync_to_async(_invite)(target, org)
     result = await _add_user(authenticated_context, target.id, org.id, ["labeler"])
 
     assert result.data, result.errors
@@ -90,6 +108,7 @@ async def test_unknown_role_is_rejected_rather_than_half_applied(db, authenticat
     await sync_to_async(_grant_admin)(caller, org)
 
     target = await sync_to_async(User.objects.create)(username="rolecheck")
+    await sync_to_async(_invite)(target, org)
     result = await _add_user(authenticated_context, target.id, org.id, ["labeler", "notarole"])
 
     assert result.errors
@@ -101,3 +120,24 @@ def _grant_admin(user: User, organization: Organization) -> None:
 
     membership, _ = Membership.objects.get_or_create(user=user, organization=organization)
     membership.roles.add(create_role(organization=organization, identifier="admin"))
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.asyncio
+async def test_admin_cannot_add_an_uninvited_stranger(db, authenticated_context: HttpContext):
+    """The consent gap: `input.user` was an arbitrary pk and the person named by
+    it never agreed to join. Combined with self-service org creation (any user
+    can create an org and be its admin) this was a directory-harvesting
+    primitive, not just an unsolicited membership.
+    """
+    org = await sync_to_async(Organization.objects.get)(slug="testorg")
+    caller = await sync_to_async(User.objects.get)(username="fart")
+    await sync_to_async(_grant_admin)(caller, org)
+
+    stranger = await sync_to_async(User.objects.create)(username="stranger")
+    result = await _add_user(authenticated_context, stranger.id, org.id, ["labeler"])
+
+    assert result.errors
+    assert not await sync_to_async(
+        Membership.objects.filter(user=stranger, organization=org).exists
+    )()

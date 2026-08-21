@@ -70,7 +70,7 @@ def test_post_consent_redirects_with_code(client):
 
     resp = client.post(
         reverse("authorize"),
-        {**_authorize_params(rp), "allow": "true", "organization": organization.slug},
+        {**_authorize_params(rp), "allow": "true", "organization": str(organization.pk)},
         secure=True,
     )
 
@@ -107,7 +107,7 @@ def test_post_without_membership_is_rejected(client):
 
     resp = client.post(
         reverse("authorize"),
-        {**_authorize_params(rp), "allow": "true", "organization": "some-other-org"},
+        {**_authorize_params(rp), "allow": "true", "organization": "999999"},
         secure=True,
     )
 
@@ -166,7 +166,7 @@ def test_pkce_is_required_for_public_clients(client):
         "code_challenge": _s256(verifier),
         "code_challenge_method": "S256",
         "allow": "true",
-        "organization": membership.organization.slug,
+        "organization": str(membership.organization_id),
     }
     resp = client.post(reverse("authorize"), params, secure=True)
     assert resp.status_code == 302

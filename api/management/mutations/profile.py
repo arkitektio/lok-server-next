@@ -7,6 +7,7 @@ from karakter import models
 from api.management import types
 from api.management.authz import DENIED, get_or_denied, get_user
 from graphql import GraphQLError
+from karakter.authz import resolve_own_media_store
 
 logger = logging.getLogger(__name__)
 
@@ -47,9 +48,9 @@ def update_profile(info: Info, input: UpdateProfileInput) -> types.ManagementPro
     if input.name:
         profile.name = input.name
     if input.avatar:
-        profile.avatar = get_or_denied(models.MediaStore.objects, pk=input.avatar)
+        profile.avatar = resolve_own_media_store(info, input.avatar, models.MediaStore)
     if input.banner:
-        profile.banner = get_or_denied(models.MediaStore.objects, pk=input.banner)
+        profile.banner = resolve_own_media_store(info, input.banner, models.MediaStore)
     profile.save()
     return profile
 
