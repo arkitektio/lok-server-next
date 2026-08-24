@@ -3,14 +3,14 @@ from .settings import DATABASES, AUTHENTIKATE
 import logging
 
 DATABASES["default"] = {
-    "ENGINE": "django.db.backends.sqlite3", 
+    "ENGINE": "django.db.backends.sqlite3",
     "NAME": ":memory:",
     "OPTIONS": {
         "timeout": 30,
     },
     "TEST": {
         "NAME": ":memory:",
-    }
+    },
 }
 
 
@@ -26,17 +26,19 @@ IONSCALE_REPOSITORY = "ionscale.testing.FakeIonscaleRepository"
 # Don't fail-fast / eagerly build the repo at boot during tests.
 IONSCALE_EAGER_INIT = False
 
+
 # Disable migrations for faster tests
 class DisableMigrations:
     """Disable migrations during testing for faster test execution."""
-    
+
     def __contains__(self, item: str) -> bool:
         """Check if item is in migration modules."""
         return True
-    
+
     def __getitem__(self, item: str) -> None:
         """Get migration module for item."""
         return None
+
 
 # For faster test execution, you can uncomment this:
 # MIGRATION_MODULES = DisableMigrations()
@@ -48,8 +50,4 @@ logging.disable(logging.CRITICAL)
 DATABASE_ROUTERS = []
 
 # Use in-memory channel layer for tests instead of Redis
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels.layers.InMemoryChannelLayer"
-    }
-}
+CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
