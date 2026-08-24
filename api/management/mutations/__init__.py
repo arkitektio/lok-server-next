@@ -12,6 +12,7 @@ from .invite import (
     cancel_invite,
 )
 from .membership import update_membership, delete_membership, set_membership_brand_hue
+from .notification import set_membership_notifications, notify_member
 from .role_request import (
     request_role,
     approve_role_request,

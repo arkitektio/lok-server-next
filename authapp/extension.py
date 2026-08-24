@@ -1,5 +1,3 @@
-import base64
-import json
 from typing import cast
 
 from authentikate import errors as authentikate_errors
@@ -49,40 +47,15 @@ def assert_addressed_to_lok(token: JWTToken) -> None:
 def read_org_claim(token: JWTToken) -> str:
     """The organization pk this token is scoped to.
 
-    Read out of the raw payload rather than off the model. authentikate's
-    ``JWTToken`` is declared ``extra="ignore"``
-    (``authentikate/base_models.py``), so any claim the library does not itself
-    declare — ``org`` included — is silently dropped during validation and is not
-    reachable via attribute access or ``__pydantic_extra__``. Reading ``raw``
-    keeps lok working regardless of whether the library ever grows an ``org``
-    field.
-
-    This is safe: authentikate verifies the signature in ``decode_token`` before
-    ever constructing the ``JWTToken`` we are handed, so by the time this runs
-    the payload has already been authenticated. We are re-reading a verified
-    blob, not trusting an unverified one.
+    ``org`` is a field authentikate declares on ``JWTToken``/``StaticToken`` (as
+    of v4), so it is parsed off the verified payload like any other claim. This
+    used to base64-decode ``token.raw`` by hand, because the library was
+    ``extra="ignore"`` and silently dropped every claim it did not declare —
+    ``org`` among them. That workaround is gone now that the field exists, which
+    also means static tokens (whose ``raw`` is the literal "static_token", not a
+    JWT) no longer need a separate carrier field.
     """
-    raw = getattr(token, "raw", "") or ""
-    parts = raw.split(".")
-    if len(parts) == 3:
-        try:
-            payload_segment = parts[1]
-            padding = "=" * (-len(payload_segment) % 4)
-            claims = json.loads(base64.urlsafe_b64decode(payload_segment + padding))
-        except Exception as exc:
-            raise authentikate_errors.MalformedJwtTokenError(
-                "Could not read the organization claim from the token"
-            ) from exc
-        org = claims.get("org")
-    else:
-        # Static tokens only: `StaticToken.raw` defaults to the literal
-        # "static_token", not a JWT, and `extra="ignore"` applies to them too —
-        # so a test fixture cannot carry `org` either and has to use the
-        # declared `active_org` field as the carrier. Unreachable in production:
-        # `Settings._refuse_static_tokens_in_production` refuses to boot with
-        # static tokens configured while debug is off. Delete this branch once
-        # authentikate declares an `org` field.
-        org = token.active_org
+    org = token.org
 
     if not org:
         raise authentikate_errors.InvalidJwtTokenError(

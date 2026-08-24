@@ -78,20 +78,36 @@ def delete_membership(info: Info, input: DeleteMembershipInput) -> strawberry.ID
 @strawberry.input
 class SetMembershipBrandHueInput:
     organization: strawberry.ID
-    brand_hue: float | None = None
+    # UNSET (field omitted) leaves the stored value alone; an explicit null
+    # clears it back to the organization default. The two have to be tellable
+    # apart now that hue and chroma share this mutation — otherwise setting one
+    # would silently wipe the other.
+    brand_hue: float | None = strawberry.UNSET
+    brand_chroma: float | None = strawberry.UNSET
 
 
 def set_membership_brand_hue(
     info: Info, input: SetMembershipBrandHueInput
 ) -> types.ManagementMembership:
-    """Set the requesting user's personal brand hue for one of their organizations.
+    """Set the requesting user's personal brand hue/chroma for one of their organizations.
 
     Scoped to the caller's own membership, so a user can only recolor their own
-    view of an organization. Pass a null `brand_hue` to clear it.
+    view of an organization. Pass an explicit null `brand_hue`/`brand_chroma` to
+    clear it (falling back to the organization default); omit a field to leave it
+    unchanged.
     """
     membership = get_or_denied(
         models.Membership.objects, user=info.context.request.user, organization_id=input.organization
     )
-    membership.brand_hue = input.brand_hue
-    membership.save()
+
+    updated = []
+    if input.brand_hue is not strawberry.UNSET:
+        membership.brand_hue = input.brand_hue
+        updated.append("brand_hue")
+    if input.brand_chroma is not strawberry.UNSET:
+        membership.brand_chroma = input.brand_chroma
+        updated.append("brand_chroma")
+
+    if updated:
+        membership.save(update_fields=updated)
     return membership

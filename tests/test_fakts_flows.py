@@ -89,6 +89,31 @@ def test_start_registers_a_public_client(client):
     assert "refresh_token" in staged.grant_types
 
 
+def test_every_client_kind_maps_to_a_graphql_enum():
+    """A kind missing from `_CLIENT_KINDS` does not error — it silently reports as
+    DEVELOPMENT over GraphQL — so assert the mapping covers every DB choice."""
+    from fakts.enums import ClientKindChoices
+    from fakts.types import _CLIENT_KINDS
+
+    for choice in ClientKindChoices:
+        assert choice.value in _CLIENT_KINDS, choice.value
+        # `ClientKind` members are built from `strawberry.enum_value(...)`, so their
+        # `.value` is an EnumValueDefinition — compare by member name.
+        assert _CLIENT_KINDS[choice.value].name == choice.name
+
+
+@pytest.mark.django_db
+def test_start_accepts_the_mobile_client_kind(client):
+    """A mobile app may register itself: `mobile` is a valid requested kind, and
+    the staged client keeps it (rather than being rejected by request validation)."""
+    body = _start(client, requested_client_kind="mobile", request_public=True)
+
+    assert body["status"] == "granted"
+    staged = models.DeviceCode.objects.get(secret=body["device_code"]).client
+    assert staged.kind == "mobile"
+    assert staged.public is True
+
+
 @pytest.mark.django_db
 def test_poll_before_approval_is_authorization_pending(client):
     body = _start(client)
@@ -305,8 +330,10 @@ def test_full_hub_grant_returns_tokens_and_hub_config(client):
     assert pending.status_code == 400
     assert pending.json()["error"] == "authorization_pending"
 
-    # Human accepts in kontrol (org member).
-    membership = factories.make_membership()
+    # Human accepts in kontrol (adding a hub is an owner/admin operation, and the
+    # org owner is made an admin member by the organization post_save signal).
+    org = factories.make_organization()
+    membership = factories.make_membership(user=org.owner, organization=org)
     info = SimpleNamespace(context=SimpleNamespace(request=SimpleNamespace(user=membership.user)))
     hub = accept_hub_device_code(
         info,

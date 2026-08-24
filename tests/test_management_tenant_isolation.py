@@ -15,6 +15,7 @@ ORM is not usable from the event loop the async schema executes on.
 import pytest
 from asgiref.sync import sync_to_async
 
+from api.management.authz import HUB_ADMIN_REQUIRED
 from api.management.schema import schema as management_schema
 from fakts import models as fakts_models
 from tests import factories
@@ -341,3 +342,112 @@ async def test_admin_cannot_remove_the_owner():
     assert result.errors, f"owner was removable: {result.data}"
     assert "owner cannot be removed" in result.errors[0].message
     assert await _exists(s["owner_membership"])
+
+
+# --------------------------------------------------------------------------- #
+# adding a hub is an owner/admin operation
+# --------------------------------------------------------------------------- #
+
+
+ACCEPT_HUB = "mutation ($input: AcceptHubDeviceCodeInput!) { acceptHubDeviceCode(input: $input) { id name } }"
+
+
+def _staged_hub_code(identifier: str):
+    return factories.make_device_code(
+        kind="hub",
+        staging_manifest={"identifier": identifier, "instances": [], "clients": []},
+    )
+
+
+async def _accept(context, device_code, organization):
+    return await management_schema.execute(
+        ACCEPT_HUB,
+        context_value=context,
+        variable_values={
+            "input": {
+                "deviceCode": str(device_code.id),
+                "code": device_code.code,
+                "organization": str(organization.id),
+                "allowIonscale": False,
+            }
+        },
+    )
+
+
+async def _hub_count(organization, identifier):
+    return await sync_to_async(
+        lambda: fakts_models.Hub.objects.filter(organization=organization, identifier=identifier).count()
+    )()
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.asyncio
+async def test_plain_member_cannot_add_a_hub():
+    """A hub provisions instances, roles, scopes and clients into the tenant, so a
+    plain member is told to ask an admin rather than doing it themselves."""
+    s = await sync_to_async(_org_with_admin_and_member)()
+    device_code = await sync_to_async(_staged_hub_code)("member-hub")
+
+    result = await _accept(s["member"], device_code, s["org"])
+
+    assert result.errors, f"hub was created by a plain member: {result.data}"
+    assert result.errors[0].message == HUB_ADMIN_REQUIRED
+    assert await _hub_count(s["org"], "member-hub") == 0
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.asyncio
+async def test_admin_can_add_a_hub():
+    s = await sync_to_async(_org_with_admin_and_member)()
+    device_code = await sync_to_async(_staged_hub_code)("admin-hub")
+
+    result = await _accept(s["admin"], device_code, s["org"])
+
+    assert not result.errors, result.errors
+    assert result.data["acceptHubDeviceCode"]["name"] == "admin-hub"
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.asyncio
+async def test_owner_can_add_a_hub():
+    s = await sync_to_async(_org_with_admin_and_member)()
+    device_code = await sync_to_async(_staged_hub_code)("owner-hub")
+
+    result = await _accept(s["owner"], device_code, s["org"])
+
+    assert not result.errors, result.errors
+    assert result.data["acceptHubDeviceCode"]["name"] == "owner-hub"
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.asyncio
+async def test_non_member_adding_a_hub_gets_the_uniform_denial():
+    """The friendly "ask an admin" sentence must not double as an existence
+    oracle: someone outside the tenant still only learns DENIED."""
+    context, _org_a, org_b, _attacker, _victim = await sync_to_async(_two_org_setup)()
+    device_code = await sync_to_async(_staged_hub_code)("outsider-hub")
+
+    result = await _accept(context, device_code, org_b)
+
+    _assert_denied(result)
+    assert result.errors[0].message != HUB_ADMIN_REQUIRED
+    assert await _hub_count(org_b, "outsider-hub") == 0
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.asyncio
+async def test_am_i_admin_reflects_the_same_bar():
+    s = await sync_to_async(_org_with_admin_and_member)()
+
+    async def am_i_admin(context):
+        result = await management_schema.execute(
+            "query ($id: ID!) { organization(id: $id) { amIAdmin amIOwner } }",
+            context_value=context,
+            variable_values={"id": str(s["org"].id)},
+        )
+        assert not result.errors, result.errors
+        return result.data["organization"]
+
+    assert (await am_i_admin(s["owner"])) == {"amIAdmin": True, "amIOwner": True}
+    assert (await am_i_admin(s["admin"])) == {"amIAdmin": True, "amIOwner": False}
+    assert (await am_i_admin(s["member"])) == {"amIAdmin": False, "amIOwner": False}

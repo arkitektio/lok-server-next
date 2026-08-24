@@ -343,6 +343,16 @@ class Membership:
     user: User
     organization: "Organization"
     roles: List["Role"] = strawberry.field(description="The roles that the user has in the organization")
+    brand_hue: Optional[float] = strawberry.field(
+        description="The member's personal brand hue (0–360) for this organization, if set. "
+        "Null means they have not overridden the organization's default — fall back to "
+        "`organization.brandHue`."
+    )
+    brand_chroma: Optional[float] = strawberry.field(
+        description="The member's personal brand chroma (0–1) for this organization, if set. "
+        "Null means they have not overridden the organization's default — fall back to "
+        "`organization.brandChroma`."
+    )
 
     @classmethod
     def get_queryset(cls, queryset, info: Info):
@@ -354,6 +364,8 @@ class Organization:
     id: strawberry.ID
     slug: str
     description: str | None = strawberry.field(description="A short description of the organization")
+    brand_hue: Optional[float] = strawberry.field(description="The organization's default brand hue (0–360), if set. Members can override it per-membership.")
+    brand_chroma: Optional[float] = strawberry.field(description="The organization's default brand chroma (0–1), if set. Members can override it per-membership.")
     avatar: MediaStore | None = strawberry.field(description="The logo of the organization")
     active_users: List[User] = strawberry.field(description="The users that are currently active in the organization")
     profile: "OrganizationProfile"

@@ -8,7 +8,7 @@ from django.db import IntegrityError
 from fakts import models as fakts_models
 from fakts.logic import create_hub_from_partner
 from graphql import GraphQLError
-from api.management.authz import get_or_denied, is_owner, is_owner_or_admin
+from api.management.authz import HUB_ADMIN_REQUIRED, get_or_denied, is_owner, is_owner_or_admin
 from karakter.authz import resolve_own_media_store
 
 logger = logging.getLogger(__name__)
@@ -22,6 +22,7 @@ class UpdateOrganizationInput:
     avatar: strawberry.ID | None = None
     slug: str | None = None
     brand_hue: float | None = None
+    brand_chroma: float | None = None
     require_device_auth: bool | None = None
     sync_mine: bool = False
 
@@ -30,7 +31,7 @@ def update_organization(info: Info, input: UpdateOrganizationInput) -> types.Man
     """Update an organization's details including name, description, slug, and avatar.
 
     Only the organization owner may change these org-wide settings (including the
-    default brand hue).
+    default brand hue and chroma).
     """
     organization = get_or_denied(models.Organization.objects, pk=input.id)
     if not is_owner(info.context.request.user, organization):
@@ -58,6 +59,9 @@ def update_organization(info: Info, input: UpdateOrganizationInput) -> types.Man
     if input.brand_hue is not None:
         organization.brand_hue = input.brand_hue
 
+    if input.brand_chroma is not None:
+        organization.brand_chroma = input.brand_chroma
+
     if input.require_device_auth is not None:
         organization.require_device_auth = input.require_device_auth
 
@@ -72,12 +76,18 @@ def update_organization(info: Info, input: UpdateOrganizationInput) -> types.Man
     # sync_mine: also copy the new default hue onto the owner's own membership, so
     # the owner's personal colour matches the org default they just set. Snapshots
     # the value (does not make the membership permanently follow the default).
-    if input.sync_mine and input.brand_hue is not None:
+    if input.sync_mine and (input.brand_hue is not None or input.brand_chroma is not None):
         membership, _ = models.Membership.objects.get_or_create(
             user=info.context.request.user, organization=organization
         )
-        membership.brand_hue = input.brand_hue
-        membership.save(update_fields=["brand_hue"])
+        synced = []
+        if input.brand_hue is not None:
+            membership.brand_hue = input.brand_hue
+            synced.append("brand_hue")
+        if input.brand_chroma is not None:
+            membership.brand_chroma = input.brand_chroma
+            synced.append("brand_chroma")
+        membership.save(update_fields=synced)
 
     logger.info(f"Updated Organization: {organization.id} with name: {organization.name}")
     return organization
@@ -88,6 +98,7 @@ class CreateOrganizationInput:
     name: str
     description: str | None = None
     brand_hue: float | None = None
+    brand_chroma: float | None = None
     slug: str | None = None
 
 
@@ -112,6 +123,7 @@ def create_organization(info: Info, input: CreateOrganizationInput) -> types.Man
             name=input.name,
             description=input.description,
             brand_hue=input.brand_hue,
+            brand_chroma=input.brand_chroma,
             owner=info.context.request.user,
         )
     except IntegrityError:
@@ -201,7 +213,9 @@ def connect_kommunity_partner(info: Info, input: ConnectKommunityPartnerInput) -
     user = info.context.request.user
 
     if not is_owner_or_admin(user, organization):
-        raise GraphQLError("You are not allowed to connect partners for this organization.")
+        # Connecting a partner provisions its hub — same bar, same sentence as
+        # accepting a hub device code.
+        raise GraphQLError(HUB_ADMIN_REQUIRED)
     if partner.partner_kind != "preauthorized":
         raise GraphQLError("Only preauthorized partners can be connected directly.")
     if partner.license_agreement and not (input.license_signature and input.license_signature.strip()):

@@ -684,7 +684,7 @@ class Client(models.Model, ClientMixin):
 
     Kinds of rows and their lifecycle:
 
-    - **App clients** (`development`/`website`/`desktop`): the row is created by
+    - **App clients** (`development`/`website`/`desktop`/`mobile`): the row is created by
       dynamic registration at ``/o/app-authorization/`` with identity fields
       only; human approval *binds* it (membership, organization, release, hub,
       mappings, scope). ``membership`` null == not yet approved.

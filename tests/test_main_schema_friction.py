@@ -67,15 +67,17 @@ async def test_client_kind_covers_hub_and_relying_party():
     def _clients():
         hub = factories.make_client(membership=membership, kind="hub")
         rp = factories.make_client(membership=membership, kind="relying_party")
-        return hub, rp
+        mobile = factories.make_client(membership=membership, kind="mobile")
+        return hub, rp, mobile
 
-    hub, rp = await sync_to_async(_clients)()
+    hub, rp, mobile = await sync_to_async(_clients)()
 
     result = await schema.execute("query { clients { id kind } }", context_value=context)
     assert not result.errors, result.errors
     kinds = {row["id"]: row["kind"] for row in result.data["clients"]}
     assert kinds[str(hub.id)] == "HUB"
     assert kinds[str(rp.id)] == "RELYING_PARTY"
+    assert kinds[str(mobile.id)] == "MOBILE"
 
 
 @pytest.mark.django_db(transaction=True)

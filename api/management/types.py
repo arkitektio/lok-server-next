@@ -16,7 +16,7 @@ from fakts import scalars as fakts_scalars
 from fakts import base_models
 from fakts import enums as fakts_enums
 from api.management import filters, enums, scalars
-from api.management.authz import is_owner_or_admin
+from api.management.authz import is_owner_or_admin, owner_or_admin_q
 from pydantic import ValidationError as PydanticValidationError
 from karakter import filters as karakter_filters
 from strawberry.experimental import pydantic
@@ -501,7 +501,15 @@ class ManagementMembership:
     roles: List["ManagementRole"] = strawberry.field(description="The roles that the user has in the organization")
     created_through: Optional["ManagementInvite"] = strawberry.field(description="The invite that created this membership")
     brand_hue: Optional[float] = strawberry.field(description="The member's personal brand hue (0–360) for this organization, if set.")
+    brand_chroma: Optional[float] = strawberry.field(description="The member's personal brand chroma (0–1) for this organization, if set.")
+    allow_notifications: bool = strawberry.field(description="Whether this organization is allowed to push notifications to the member's registered devices.")
     role_requests: List["ManagementRoleRequest"] = strawberry_django.field(description="The role requests this member has made in the organization")
+
+    @strawberry_django.field(
+        description="Whether the member has at least one device registered for notifications (e.g. through the companion app). Opting in does nothing until they do."
+    )
+    def has_notification_channel(self) -> bool:
+        return models.ComChannel.objects.filter(user_id=self.user_id).exists()
 
     @classmethod
     def get_queryset(cls, queryset, info: Info):
@@ -529,10 +537,14 @@ class ManagementRoleRequest:
     @classmethod
     def get_queryset(cls, queryset, info: Info):
         # A caller may see a role request only if it is their own, or if they own
-        # the organization it targets (so owners can review their inbox).
+        # *or administer* the organization it targets (so the admin inbox can list
+        # what its holder is already allowed to approve). This deliberately mirrors
+        # `is_owner_or_admin`, the bar `approve_role_request`/`decline_role_request`
+        # enforce — an admin who could approve a request but not read it could only
+        # ever act on ids they guessed.
         user = info.context.request.user
         return queryset.filter(
-            Q(membership__user=user) | Q(membership__organization__owner=user)
+            Q(membership__user=user) | owner_or_admin_q(user, "membership__organization")
         ).distinct()
 
 
@@ -543,6 +555,7 @@ class ManagementOrganization:
     name: str | None = strawberry.field(description="The name of this organization")
     description: str | None = strawberry.field(description="A short description of the organization")
     brand_hue: Optional[float] = strawberry.field(description="The organization's default brand hue (0–360), if set. Members can override it per-membership.")
+    brand_chroma: Optional[float] = strawberry.field(description="The organization's default brand chroma (0–1), if set. Members can override it per-membership.")
     require_device_auth: Optional[bool] = strawberry.field(description="Whether clients created in this organization must present a device node_id. None/False means device auth is not required.")
     active_users: List[ManagementUser] = strawberry.field(description="The users that are currently active in the organization")
     profile: Optional["ManagementOrganizationProfile"] = strawberry.field(description="The profile of the organization")
@@ -570,6 +583,13 @@ class ManagementOrganization:
             return False
         return self.owner_id == user.id
 
+    @strawberry_django.field(description="Whether the currently authenticated user owns this organization or holds its `admin` role — the bar for privileged operations such as adding a hub.")
+    def am_i_admin(self, info: Info) -> bool:
+        user = info.context.request.user
+        if not user.is_authenticated:
+            return False
+        return is_owner_or_admin(user, self)
+
     @classmethod
     def get_queryset(cls, queryset, info: Info):
         return queryset.filter(memberships__user=info.context.request.user).distinct()
@@ -579,6 +599,13 @@ class ManagementOrganization:
 class ManagementComChannel:
     id: strawberry.ID
     user: ManagementUser
+
+
+@strawberry.type(description="""The outcome of sending a notification to a member. `delivered` counts the devices the push actually reached, so a send to a member with no registered device is visibly a no-op rather than a silent success.""")
+class ManagementNotificationResult:
+    delivered: int = strawberry.field(description="How many of the member's devices accepted the notification.")
+    attempted: int = strawberry.field(description="How many registered devices were tried.")
+    membership: "ManagementMembership" = strawberry.field(description="The member the notification was addressed to.")
 
 
 @strawberry_django.type(models.Invite, filters=filters.ManagementInviteFilter, pagination=True, description="""A single-use magic invite link that allows one person to join an organization.""")

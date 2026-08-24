@@ -68,6 +68,10 @@ def generate_device_salt() -> str:
     return secrets.token_hex(32)
 
 
+class NotificationsMuted(Exception):
+    """Raised when a member has opted an organization out of notifying them."""
+
+
 class Organization(models.Model):
     """An Organization in the System
 
@@ -85,6 +89,12 @@ class Organization(models.Model):
         blank=True,
         help_text="The organization's default brand hue (0–360). Members can override "
         "it with their own membership brand hue.",
+    )
+    brand_chroma = models.FloatField(
+        null=True,
+        blank=True,
+        help_text="The organization's default brand chroma (0–1). Members can override "
+        "it with their own membership brand chroma.",
     )
     require_device_auth = models.BooleanField(
         null=True,
@@ -157,6 +167,18 @@ class Membership(models.Model):
         help_text="Personal brand hue (0–360) this member picked for the organization. "
         "Tints the UI while this organization is active.",
     )
+    brand_chroma = models.FloatField(
+        null=True,
+        blank=True,
+        help_text="Personal brand chroma (0–1) this member picked for the organization. "
+        "Sets how saturated the tint is while this organization is active.",
+    )
+    allow_notifications = models.BooleanField(
+        default=True,
+        help_text="Whether this organization may push notifications to the member's "
+        "registered devices. Registering a device (in the companion app) is the "
+        "global consent; this flag is the per-organization mute.",
+    )
 
     class Meta:
         unique_together = ("user", "organization")
@@ -164,14 +186,30 @@ class Membership(models.Model):
     def get_user_id(self):
         return str(self.user.pk)
 
+    def notify(self, title: str, message: str) -> List[Tuple[Optional[int], str]]:
+        """Send an organization notification to this member's devices.
+
+        The per-organization opt-in is enforced here rather than at the call
+        site, so no future caller can route around it: a muted membership is
+        never a delivery, whatever the sender believes.
+
+        Raises:
+            NotificationsMuted: when the member has opted this organization out.
+        """
+        if not self.allow_notifications:
+            raise NotificationsMuted(
+                "This member has turned off notifications from this organization."
+            )
+        return self.user.notify(title, message)
+
 
 class RoleRequest(models.Model):
     """A member's request to be granted an additional Role in their Organization.
 
     A request only makes sense for an existing membership, so it hangs off the
     Membership (which pins the user and organization) plus the Role being asked
-    for. The organization owner approves or declines it; approval adds the role
-    to the membership.
+    for. The organization's owner or one of its admins approves or declines it;
+    approval adds the role to the membership.
     """
 
     class Status(models.TextChoices):

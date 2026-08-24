@@ -6,7 +6,7 @@ from api.management import types
 from karakter import models
 from karakter.hashers import hash_device_id
 from fakts import models as fakts_models
-from api.management.authz import DENIED, assert_member, get_or_denied
+from api.management.authz import DENIED, HUB_ADMIN_REQUIRED, assert_member, get_or_denied, is_owner_or_admin
 from graphql import GraphQLError
 from fakts import logic, builders, base_models, enums
 from fakts.services import aliases as alias_services
@@ -33,7 +33,7 @@ def accept_hub_device_code(info: Info, input: AcceptHubDeviceCodeInput) -> types
     organization and bind the hub's identity client to the caller's membership.
 
     Requires the user code the device displayed (proof of possession) and
-    membership in the target organization.
+    ownership of — or the `admin` role in — the target organization.
     """
     user = info.context.request.user
     device_code = resolve_device_code_with_proof(
@@ -42,7 +42,11 @@ def accept_hub_device_code(info: Info, input: AcceptHubDeviceCodeInput) -> types
     organization = get_or_denied(models.Organization.objects, id=input.organization)
 
     # Creates a hub (plus service instances and auth keys) inside `organization`.
+    # Membership first, so a non-member still only learns the generic denial;
+    # a member who is not an owner/admin gets told to ask one.
     assert_member(info, organization)
+    if not is_owner_or_admin(user, organization):
+        raise GraphQLError(HUB_ADMIN_REQUIRED)
 
     try:
         manifest = device_code.hub_manifest_as_model

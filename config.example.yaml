@@ -91,6 +91,10 @@ users:
     roles: ["admin"]
 
 authentikate:
+  # "*" is authentikate's ANY_AUDIENCE: the `aud` claim stays required, but it is
+  # not matched against a single service name — so lok accepts the tokens it mints
+  # for individual service instances as well as those addressed to "lok" itself.
+  audience: "*"
   issuers:
   - kind: rsa
     iss: lok

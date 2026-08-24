@@ -393,6 +393,12 @@ class Mutation:
     set_membership_brand_hue = strawberry_django.mutation(
         resolver=mutations.set_membership_brand_hue,
     )
+    set_membership_notifications = strawberry_django.mutation(
+        resolver=mutations.set_membership_notifications,
+    )
+    notify_member = strawberry_django.mutation(
+        resolver=mutations.notify_member,
+    )
 
     request_role = strawberry_django.mutation(
         resolver=mutations.request_role,

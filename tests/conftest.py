@@ -44,12 +44,11 @@ def _restore_static_tokens():
 def build_auth_context(user, organization, oauth2_client, roles=("admin",)) -> HttpContext:
     """Build an authenticated ``HttpContext`` via a static token.
 
-    authentikate (v2) authenticates by decoding the ``Authorization`` header, so
-    tests register a static token whose claims (``sub``/``active_org``/
-    ``client_id``) match freshly-created fixtures and send it as a bearer token.
-    Note ``active_org`` here carries the organization *pk*: it is the only field
-    a ``StaticToken`` can carry it in (see ``authapp.extension.read_org_claim``);
-    real tokens use the ``org`` claim.
+    authentikate authenticates by decoding the ``Authorization`` header, so
+    tests register a static token whose claims (``sub``/``org``/``client_id``)
+    match freshly-created fixtures and send it as a bearer token. Note ``org``
+    here carries the organization *pk*, exactly as a real lok-issued token does
+    (see ``authapp.extension.read_org_claim``).
     The ``AuthAppExtension`` then resolves the karakter/fakts models from those
     claims exactly as it does in production.
     """
@@ -63,11 +62,9 @@ def build_auth_context(user, organization, oauth2_client, roles=("admin",)) -> H
         # rather than quietly bypassed.
         iss=django_settings.OIDC_ISSUER,
         aud=["lok"],
-        # Static tokens carry the org pk through the library's declared
-        # `active_org` field — `JWTToken` is extra="ignore", so a fixture cannot
-        # carry an `org` claim. Real tokens use `org`; see
-        # authapp.extension.read_org_claim.
-        active_org=str(organization.pk),
+        # The org pk, in the same claim a real token uses — authentikate v4
+        # declares `org` on both JWTToken and StaticToken.
+        org=str(organization.pk),
         client_id=oauth2_client.client_id,
         roles=list(roles),
     )

@@ -256,6 +256,10 @@ class Mutation:
         resolver=karakter_mutations.update_organization,
     )
 
+    update_membership_colors = strawberry_django.mutation(
+        resolver=karakter_mutations.update_membership_colors,
+    )
+
     update_device = strawberry_django.mutation(resolver=fakts_mutations.update_device)
 
 

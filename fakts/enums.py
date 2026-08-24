@@ -24,7 +24,8 @@ class ClientKindChoices(TextChoices):
 
     WEBSITE = "website", "WEBSITE (Value represent WEBSITE)"
     DEVELOPMENT = "development", "DEVELOPMENT (Value represent DEVELOPMENT)"
-    DESKTOP = "desktop", "DESKTOP (Value represent DESKTOP Aüü)"
+    DESKTOP = "desktop", "DESKTOP (Value represent DESKTOP)"
+    MOBILE = "mobile", "MOBILE (Value represent MOBILE)"
     HUB = "hub", "HUB (a hub server's identity)"
     RELYING_PARTY = "relying_party", "RELYING_PARTY (a config-provisioned OIDC relying party)"
 
@@ -33,6 +34,7 @@ class ClientKindVanilla(str, Enum):
     WEBSITE = "website"
     DEVELOPMENT = "development"
     DESKTOP = "desktop"
+    MOBILE = "mobile"
     HUB = "hub"
     RELYING_PARTY = "relying_party"
 
@@ -92,6 +94,10 @@ class ClientKind(str, Enum):
     DESKTOP = strawberry.enum_value(
         "desktop",
         description="""A desktop client. Desktop clients need to undergo an authentication flow, where the user is redirect back to the application. They use redirect but only on loopback adapters.""",
+    )
+    MOBILE = strawberry.enum_value(
+        "mobile",
+        description="""A mobile client. Mobile clients (iOS/Android apps) are public clients that need to undergo an authentication flow, where the user is redirected back to the application through a custom URL scheme or an app link, secured with PKCE.""",
     )
     HUB = strawberry.enum_value(
         "hub",

@@ -10,12 +10,20 @@ otherwise (rather than leaking existence).
 """
 
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.db.models import Q
 from graphql import GraphQLError
 
 # Reused for every authorization denial. Deliberately identical to the not-found
 # message so a caller cannot use the error text to probe whether an id exists in
 # another tenant (an existence oracle).
 DENIED = "Not found, or you are not authorized to access it."
+
+# Adding a hub provisions service instances, roles, scopes and clients into a
+# tenant, so it is an owner/admin operation. Ordinary members get this sentence
+# (not :data:`DENIED`) — they *can* see the organization, they just have to ask
+# someone who may act on it. Shared by every add-a-hub entry point so the UI can
+# say the same thing everywhere.
+HUB_ADMIN_REQUIRED = "Only organization admins can add a hub. Ask an admin of this organization to do it."
 
 
 def get_user(info):
@@ -55,6 +63,23 @@ def is_owner_or_admin(user, organization) -> bool:
     if is_owner(user, organization):
         return True
     return organization.memberships.filter(user=user, roles__identifier="admin").exists()
+
+
+def owner_or_admin_q(user, prefix: str) -> Q:
+    """Queryset analogue of :func:`is_owner_or_admin`, for ``get_queryset`` policies.
+
+    ``prefix`` is the lookup path from the queryset's model to the Organization
+    (e.g. ``"membership__organization"``). Both membership conditions live in the
+    *same* ``Q`` so Django keeps them on one joined row — split across two filter
+    calls they would match a user who is a member and *someone else* who holds
+    ``admin``. Callers must ``.distinct()``: the admin branch joins memberships.
+    """
+    return Q(**{f"{prefix}__owner": user}) | Q(
+        **{
+            f"{prefix}__memberships__user": user,
+            f"{prefix}__memberships__roles__identifier": "admin",
+        }
+    )
 
 
 def assert_member(info, organization) -> None:

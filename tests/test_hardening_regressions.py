@@ -165,8 +165,21 @@ class TestCommittedKeyMaterialGuard:
         ).strip()
         if not raw:
             pytest.skip("config.yaml never existed in this history")
-        blob = subprocess.check_output(["git", "show", f"{raw}:config.yaml"], text=True)
-        return yaml.safe_load(blob)
+
+        # That newest commit touching the path is the one that *deleted* the
+        # file, so the blob is not reachable at that revision — only at its
+        # parent. (When the file still exists it is a plain modification and the
+        # first read succeeds, so try both rather than assuming either.)
+        for rev in (raw, f"{raw}^"):
+            try:
+                blob = subprocess.check_output(
+                    ["git", "show", f"{rev}:config.yaml"], text=True, stderr=subprocess.DEVNULL
+                )
+            except subprocess.CalledProcessError:
+                continue
+            return yaml.safe_load(blob)
+
+        pytest.skip("config.yaml is not readable from this history (shallow clone?)")
 
     def test_config_yaml_is_not_tracked(self):
         """It was listed in .gitignore but tracked anyway, so it shipped in the

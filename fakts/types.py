@@ -254,6 +254,7 @@ class PublicSource:
 _CLIENT_KINDS = {
     enums.ClientKindChoices.WEBSITE.value: enums.ClientKind.WEBSITE,
     enums.ClientKindChoices.DESKTOP.value: enums.ClientKind.DESKTOP,
+    enums.ClientKindChoices.MOBILE.value: enums.ClientKind.MOBILE,
     enums.ClientKindChoices.DEVELOPMENT.value: enums.ClientKind.DEVELOPMENT,
     enums.ClientKindChoices.HUB.value: enums.ClientKind.HUB,
     enums.ClientKindChoices.RELYING_PARTY.value: enums.ClientKind.RELYING_PARTY,
@@ -275,7 +276,7 @@ class Client:
     functional: bool = strawberry_django.field(description="Is this client functional? A functional client is a client that is able to authenticate users. If a client is not functional, it will not be able to authenticate users.")
     release: Release | None = strawberry_django.field(description="The release that this client belongs to. Null for clients that are not bound to an app release (hub identities, relying parties, pending registrations).")
     client_id: str = strawberry_django.field(description="The OAuth2 client id this client authenticates as.")
-    public: bool = strawberry_django.field(description="Is this client public? A public client cannot keep a secret (desktop apps, SPAs, hub identities) and authenticates without one, relying on PKCE / device-code flows instead.")
+    public: bool = strawberry_django.field(description="Is this client public? A public client cannot keep a secret (desktop apps, mobile apps, SPAs, hub identities) and authenticates without one, relying on PKCE / device-code flows instead.")
 
     @strawberry_django.field(
         description="The user this client acts for (derived from its membership).",
@@ -310,7 +311,7 @@ class Client:
 
 
 
-    @strawberry_django.field(description="What kind of principal this client is (its authentication strategy): DEVELOPMENT, WEBSITE, DESKTOP, HUB or RELYING_PARTY.")
+    @strawberry_django.field(description="What kind of principal this client is (its authentication strategy): DEVELOPMENT, WEBSITE, DESKTOP, MOBILE, HUB or RELYING_PARTY.")
     def kind(self, info: Info) -> enums.ClientKind:
         return _CLIENT_KINDS.get(self.kind, enums.ClientKind.DEVELOPMENT)
 
