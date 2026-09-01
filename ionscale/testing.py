@@ -25,6 +25,7 @@ class FakeIonscaleRepository:
         self.updated_policies: List[tuple[str, Union[Dict[str, Any], str, Path]]] = []
         self.created_auth_keys: List[Dict[str, Any]] = []
         self.dns_configs: List[tuple[str, DNSConfig]] = []
+        self.policies: Dict[str, Dict[str, Any]] = {}
         # Canned read data — seed these in tests as needed.
         self.machines_by_tailnet: Dict[str, List[Machine]] = {}
         self.machines: Dict[str, MachineDetail] = {}
@@ -48,12 +49,18 @@ class FakeIonscaleRepository:
     def create_tailnet(self, tailnet_input: TailnetCreate) -> Tailnet:
         self.created_tailnets.append(tailnet_input)
         tailnet = Tailnet(id=str(len(self.created_tailnets)), name=tailnet_input.name, dns_name=tailnet_input.name)
+        # created_tailnets keeps the input, so tests can assert the organization binding.
         self.tailnets.append(tailnet)
         return tailnet
 
     def update_policy(self, tailnet: str, policy: Union[Dict[str, Any], str, Path]) -> str:
         self.updated_policies.append((tailnet, policy))
+        if isinstance(policy, dict):
+            self.policies[tailnet] = policy
         return "ok"
+
+    def get_policy(self, tailnet: str) -> Dict[str, Any]:
+        return dict(self.policies.get(tailnet, {}))
 
     def set_dns_config(self, tailnet: str, config: DNSConfig) -> str:
         self.dns_configs.append((tailnet, config))

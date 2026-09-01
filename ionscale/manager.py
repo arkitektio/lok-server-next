@@ -54,7 +54,14 @@ def ensure_org_mesh(organization) -> IonscaleLayer | None:
     # the organization itself (its slug) rather than a "<slug>-default" variant.
     tailnet_name = str(organization.slug or organization.pk)
     try:
-        get_ionscale_repo().create_tailnet(base_models.TailnetCreate(name=tailnet_name))
+        get_ionscale_repo().create_tailnet(
+            base_models.TailnetCreate(
+                name=tailnet_name,
+                # The organization *pk*, matching the `org` claim lok issues.
+                # ionscale binds this at creation and cannot rebind it later.
+                organization=str(organization.pk),
+            )
+        )
         layer = IonscaleLayer.objects.create(
             organization=organization,
             name=organization.name or tailnet_name,
@@ -73,15 +80,34 @@ def ensure_org_mesh(organization) -> IonscaleLayer | None:
 
 
 def sync(layer: IonscaleLayer) -> IonscaleLayer:
-    # Create iam policy for all organization members
+    """Push the organization's membership list to the mesh's IAM policy.
+
+    lok owns `subs` and nothing else in that policy. ionscale writes other keys
+    itself -- notably `roles`, which it fills in at login from the identity's
+    org roles -- and a wholesale rewrite silently dropped them on the next
+    membership change. Read the current policy and carry everything that is not
+    `subs` across.
+    """
     members = Membership.objects.filter(organization=layer.organization).select_related("user")
 
-    # Build policy
-    policy = {
-        "subs": [str(m.user.pk) for m in members]
-    }
+    repo = get_ionscale_repo()
 
-    get_ionscale_repo().update_policy(layer.tailnet_name, policy)
+    try:
+        current = repo.get_policy(layer.tailnet_name) or {}
+    except Exception:
+        # A control-plane blip must not block membership sync; falling back to a
+        # plain rewrite loses ionscale's keys, which it repopulates at next login.
+        logger.warning(
+            "Could not read the current IAM policy for %s; rewriting it wholesale",
+            layer.tailnet_name,
+            exc_info=True,
+        )
+        current = {}
+
+    policy = {k: v for k, v in current.items() if k != "subs"}
+    policy["subs"] = [str(m.user.pk) for m in members]
+
+    repo.update_policy(layer.tailnet_name, policy)
 
     return layer
 

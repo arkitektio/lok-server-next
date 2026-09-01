@@ -23,6 +23,7 @@ class IonscaleRepo(Protocol):
     def list_machines(self, tailnet: str) -> List[Machine]: ...
     def get_machine(self, machine_id: str) -> MachineDetail: ...
     def create_tailnet(self, tailnet_input: TailnetCreate) -> Tailnet: ...
+    def get_policy(self, tailnet: str) -> Dict[str, Any]: ...
     def update_policy(self, tailnet: str, policy: Union[Dict[str, Any], str, Path]) -> str: ...
     def set_dns_config(self, tailnet: str, config: DNSConfig) -> str: ...
     def create_auth_key(self, tailnet: str, ephemeral: bool = ..., pre_authorized: bool = ..., tags: List[str] = ...) -> str: ...
@@ -125,7 +126,12 @@ class IonscaleRepository:
         Runs `ionscale tailnet create` and returns the created object.
         """
         # Ionscale create usually returns "Tailnet created: {id}" or similar
-        self._run_command(["tailnet", "create", "--name", tailnet_input.name])
+        args = ["tailnet", "create", "--name", tailnet_input.name]
+        if tailnet_input.organization:
+            # Create-time only: ionscale has no RPC that rebinds an existing
+            # tailnet, so getting this wrong means a manual DB fix.
+            args += ["--org", self._check_arg(tailnet_input.organization, "organization")]
+        self._run_command(args)
 
         # Since create command output might be sparse, we fetch the specific tailnet
         # to return a full object. This is a "read-your-writes" pattern.
@@ -382,6 +388,22 @@ class IonscaleRepository:
         else:
             raise RuntimeError("Failed to parse auth key from output")
         
+
+    def get_policy(self, tailnet: str) -> Dict[str, Any]:
+        """Runs `ionscale tailnets get-iam-policy` and returns the parsed policy.
+
+        The CLI already emits plain JSON here, no flag needed. Used to preserve
+        the parts of the policy lok does not own (see manager.sync).
+        """
+        output = self._run_command(
+            ["tailnets", "get-iam-policy", "--tailnet", self._check_arg(tailnet, "tailnet")]
+        )
+        if not output.strip():
+            return {}
+        try:
+            return json.loads(output)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"Could not parse IAM policy: {exc}")
 
     def get_tailnet_lock_status(self, tailnet: str) -> TailnetLockStatus:
         """Runs `ionscale tailnets tailnet-lock-status --json`.

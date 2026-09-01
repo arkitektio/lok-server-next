@@ -5,7 +5,15 @@ from datetime import datetime
 
 class TailnetCreate(BaseModel):
     name: str = Field(..., description="The unique name of the tailnet")
-    # Add other create-time options here if needed (e.g., OIDC settings)
+    organization: Optional[str] = Field(
+        default=None,
+        description=(
+            "Organization this tailnet is bound to. Must be the organization *pk* as a string, "
+            "matching the `org` claim lok issues -- not the slug, which is mutable. ionscale "
+            "only offers a bound tailnet to identities carrying the same organization, and the "
+            "binding cannot be changed after creation."
+        ),
+    )
 
 
 class DNSConfig(BaseModel):
