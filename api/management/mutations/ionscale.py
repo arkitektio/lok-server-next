@@ -152,3 +152,51 @@ def create_ionscale_auth_key(info: Info, input: CreateIonscaleAuthKeyInput) -> t
     )
     
     return key
+
+
+@kante.input
+class TailnetLockInput:
+    """Input for changing a mesh's tailnet-lock capability."""
+
+    layer_id: strawberry.ID = strawberry.field(description="The ID of the Ionscale layer (mesh) to change.")
+
+
+def enable_tailnet_lock(info: Info, input: TailnetLockInput) -> types.ManagementLayer:
+    """Grant the mesh's machines the tailnet-lock capability.
+
+    This does NOT lock the network. It only permits `tailscale lock init`, which
+    an admin then runs on a machine to create the key authority -- the private
+    key never reaches the control plane, which is the entire point of tailnet
+    lock. Only the organization's owner or admins may grant it: it changes how
+    every machine on the mesh authenticates its peers.
+    """
+    layer = get_or_denied(fakts_models.IonscaleLayer.objects, id=input.layer_id)
+
+    assert_owner_or_admin(info, layer.organization)
+
+    try:
+        get_ionscale_repo().enable_tailnet_lock(layer.tailnet_name)
+    except Exception as exc:
+        raise GraphQLError(f"Could not enable tailnet lock: {exc}")
+
+    return layer
+
+
+def disable_tailnet_lock(info: Info, input: TailnetLockInput) -> types.ManagementLayer:
+    """Revoke the mesh's tailnet-lock capability.
+
+    ionscale refuses this while a key authority is still active -- the authority
+    has to be shut down from a client first (`tailscale lock disable` with a
+    disablement secret), otherwise revoking the capability would partition the
+    mesh. That refusal surfaces here as an error.
+    """
+    layer = get_or_denied(fakts_models.IonscaleLayer.objects, id=input.layer_id)
+
+    assert_owner_or_admin(info, layer.organization)
+
+    try:
+        get_ionscale_repo().disable_tailnet_lock(layer.tailnet_name)
+    except Exception as exc:
+        raise GraphQLError(f"Could not disable tailnet lock: {exc}")
+
+    return layer

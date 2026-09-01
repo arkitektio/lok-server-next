@@ -348,6 +348,11 @@ def report_client(client: models.Client, claim: base_models.ReportRequest) -> mo
     # resolved applied to the *previous* report. This is what makes a still-broken
     # client reappear on the dashboard's action list after being triaged.
     client.latest_report_resolved = False
+    # The client has now reported, so an operator's outstanding request is
+    # satisfied — clearing it here is what stops `please_report` from being
+    # repeated on every subsequent token refresh.
+    client.report_requested_at = None
+    client.report_requested_by = None
     client.save()
 
     for req_key, alias_report in claim.alias_reports.items():

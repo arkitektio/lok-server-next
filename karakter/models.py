@@ -103,6 +103,15 @@ class Organization(models.Model):
         help_text="When set, clients created in this organization must present a device "
         "node_id (device authentication). None/False means device auth is not required.",
     )
+    access_token_lifetime = models.IntegerField(
+        null=True,
+        blank=True,
+        default=None,
+        help_text="Access-token lifetime in seconds for tokens issued to this organization's "
+        "clients. None means the server default (authapp.server.ACCESS_TOKEN_EXPIRES_IN, one "
+        "hour). Clamped into [MIN_ACCESS_TOKEN_EXPIRES_IN, MAX_ACCESS_TOKEN_EXPIRES_IN] at "
+        "token generation, so a stale or oversized value can never outlive the cap.",
+    )
     # Server-only secret. Combined with SECRET_KEY to hash device ids so the same
     # device hashes differently across organizations and is never stored in the clear.
     device_salt = models.CharField(max_length=64, default=generate_device_salt, editable=False)

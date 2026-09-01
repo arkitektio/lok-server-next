@@ -24,6 +24,7 @@ class UpdateOrganizationInput:
     brand_hue: float | None = None
     brand_chroma: float | None = None
     require_device_auth: bool | None = None
+    access_token_lifetime: int | None = None
     sync_mine: bool = False
 
 
@@ -64,6 +65,22 @@ def update_organization(info: Info, input: UpdateOrganizationInput) -> types.Man
 
     if input.require_device_auth is not None:
         organization.require_device_auth = input.require_device_auth
+
+    if input.access_token_lifetime is not None:
+        # Imported here, not at module scope: authapp.server builds the whole
+        # authorization server (and loads the signing key) at import time, and
+        # this module is imported while the GraphQL schema is being assembled.
+        from authapp import server
+
+        # Rejected here as well as clamped at issue time (authapp.server
+        # .access_token_expires_in): an admin who types 0 or a year should be told
+        # so, not silently given something else.
+        if not (server.MIN_ACCESS_TOKEN_EXPIRES_IN <= input.access_token_lifetime <= server.MAX_ACCESS_TOKEN_EXPIRES_IN):
+            raise GraphQLError(
+                f"The access token lifetime must be between {server.MIN_ACCESS_TOKEN_EXPIRES_IN} and "
+                f"{server.MAX_ACCESS_TOKEN_EXPIRES_IN} seconds."
+            )
+        organization.access_token_lifetime = input.access_token_lifetime
 
     try:
         organization.save()

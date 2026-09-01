@@ -66,3 +66,32 @@ class MachineDetail(Machine):
 
 class MachineList(BaseModel):
     machines: List[Machine]
+
+
+class NodeLockState(BaseModel):
+    """One machine's standing under tailnet lock."""
+
+    machine_id: str
+    name: str
+    # False means locked peers cannot reach this node until an existing signing
+    # node signs its key -- it is registered but invisible to them.
+    signed: bool
+
+
+class TailnetLockStatus(BaseModel):
+    """The two independent halves of tailnet lock.
+
+    ``capability_enabled`` is granted by the control plane. ``authority_active``
+    only becomes true once someone runs ``tailscale lock init`` on a node -- the
+    control plane cannot create the key authority itself. A tailnet can sit with
+    the capability granted and no authority indefinitely, which is exactly the
+    state the kontrol UI has to explain.
+    """
+
+    capability_enabled: bool = False
+    authority_active: bool = False
+    # An authority that existed and was shut down with a disablement secret is
+    # not the same as one that never existed.
+    authority_disabled: bool = False
+    head: str = ""
+    nodes: List[NodeLockState] = []

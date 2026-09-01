@@ -22,7 +22,10 @@ Two grants live here, plus a mixin shared with the standard grants:
   ``statuses``, ``client_id``) to any token response whose OAuth2 client is
   backed by a fakts client. Also mixed into the refresh-token and
   authorization-code grants, so instances are re-rendered on every refresh and
-  website-kind clients receive them through the standard code flow.
+  website-kind clients receive them through the standard code flow. It also
+  carries ``please_report`` — the operator's standing request for a client to
+  re-report its configuration, which the client therefore picks up on its next
+  refresh.
 
 Org scoping: every token minted here has a ``karakter.Membership`` as its
 subject (``OAuth2Token.user`` is a FK to Membership), so the issuing
@@ -66,6 +69,15 @@ class FaktsEnvelopeMixin:
         from fakts.services.rendering import render_envelope, render_hub_envelope
 
         client = self.request.client
+
+        # The operator's "please re-report your configuration" flag. Set *before*
+        # any of the early returns below: a client whose envelope fails to render
+        # is exactly the client an operator most wants to hear from, so the flag
+        # must survive a rendering failure (and a request object we cannot see).
+        # Only ever emitted as `True` — a client with nothing pending gets no key
+        # at all, which keeps the token response unchanged for everyone else.
+        if getattr(client, "report_requested_at", None) is not None:
+            token["please_report"] = True
 
         # `_request` is the raw Django HttpRequest behind authlib's
         # DjangoOAuth2Request — needed because instance aliases render

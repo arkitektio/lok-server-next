@@ -5,7 +5,7 @@ import re
 import json
 from typing import List, Dict, Any, Union, Optional, Protocol, runtime_checkable
 from pathlib import Path
-from .base_models import Tailnet, TailnetCreate, Machine, MachineDetail, DNSConfig
+from .base_models import Tailnet, TailnetCreate, Machine, MachineDetail, DNSConfig, TailnetLockStatus, NodeLockState
 from django.conf import settings
 from django.utils.module_loading import import_string
 
@@ -26,6 +26,9 @@ class IonscaleRepo(Protocol):
     def update_policy(self, tailnet: str, policy: Union[Dict[str, Any], str, Path]) -> str: ...
     def set_dns_config(self, tailnet: str, config: DNSConfig) -> str: ...
     def create_auth_key(self, tailnet: str, ephemeral: bool = ..., pre_authorized: bool = ..., tags: List[str] = ...) -> str: ...
+    def get_tailnet_lock_status(self, tailnet: str) -> TailnetLockStatus: ...
+    def enable_tailnet_lock(self, tailnet: str) -> None: ...
+    def disable_tailnet_lock(self, tailnet: str) -> None: ...
     def run(self, *preargs) -> str: ...
     def help(self, *preargs) -> str: ...
 
@@ -379,6 +382,50 @@ class IonscaleRepository:
         else:
             raise RuntimeError("Failed to parse auth key from output")
         
+
+    def get_tailnet_lock_status(self, tailnet: str) -> TailnetLockStatus:
+        """Runs `ionscale tailnets tailnet-lock-status --json`.
+
+        Uses the CLI's JSON output rather than its table: this status drives a
+        UI, and the table parsers elsewhere in this file are brittle enough
+        without adding another.
+        """
+        output = self._run_command(
+            ["tailnets", "tailnet-lock-status", "--tailnet", self._check_arg(tailnet, "tailnet"), "--json"]
+        )
+        try:
+            data = json.loads(output)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"Could not parse tailnet lock status: {exc}")
+
+        return TailnetLockStatus(
+            capability_enabled=bool(data.get("capability_enabled", False)),
+            authority_active=bool(data.get("authority_active", False)),
+            authority_disabled=bool(data.get("authority_disabled", False)),
+            head=data.get("head") or "",
+            nodes=[
+                NodeLockState(
+                    machine_id=str(n.get("machine_id", "")),
+                    name=n.get("name") or "",
+                    signed=bool(n.get("signed", False)),
+                )
+                for n in (data.get("nodes") or [])
+            ],
+        )
+
+    def enable_tailnet_lock(self, tailnet: str) -> None:
+        """Grants the tailnet-lock capability. Does NOT create a key authority --
+        only `tailscale lock init` on a client can do that."""
+        self._run_command(
+            ["tailnets", "enable-tailnet-lock", "--tailnet", self._check_arg(tailnet, "tailnet")]
+        )
+
+    def disable_tailnet_lock(self, tailnet: str) -> None:
+        """Revokes the capability. ionscale refuses this while a key authority is
+        active, surfacing as a RuntimeError from the CLI."""
+        self._run_command(
+            ["tailnets", "disable-tailnet-lock", "--tailnet", self._check_arg(tailnet, "tailnet")]
+        )
 
     def run(self, *preargs) -> str:
         """

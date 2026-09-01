@@ -126,10 +126,47 @@ class RefreshTokenGenerator:
 # and those *are* revocable, since the refresh grant does hit the database.
 ACCESS_TOKEN_EXPIRES_IN = 3600
 
+# The bounds an organization may move its access-token lifetime between
+# (`karakter.Organization.access_token_lifetime`). Some deployments run agents on
+# links that cannot refresh hourly — a long-running acquisition, an instrument PC
+# behind a firewall — and for those an hour is operationally too short.
+#
+# The cap is deliberately conservative, for the reason spelled out above: token
+# verification on the consuming side is pure JWT, so `OAuth2Token.revoked` is
+# never read and expiry is the *only* revocation control there is. A day is long
+# enough to cover an unattended run and still well inside the refresh token's
+# 30-day sliding window (`OAuth2Token.REFRESH_TOKEN_LIFETIME`), so the two
+# lifetimes stay coherent: the refresh chain remains the thing that provides
+# continuity, and it *is* revocable.
+#
+# The floor keeps a fat-fingered `0`/`30` from making every client's token expire
+# before it can be used.
+MIN_ACCESS_TOKEN_EXPIRES_IN = 300
+MAX_ACCESS_TOKEN_EXPIRES_IN = 86400
+
 
 def access_token_expires_in(client, grant_type) -> int:
-    """Uniform access-token lifetime across every grant."""
-    return ACCESS_TOKEN_EXPIRES_IN
+    """The access-token lifetime for this client, in seconds.
+
+    The server default (one hour) unless the client's organization has set its
+    own `access_token_lifetime` — clamped into
+    [MIN_ACCESS_TOKEN_EXPIRES_IN, MAX_ACCESS_TOKEN_EXPIRES_IN] *here* rather than
+    trusted from the row, so neither a value stored before the cap existed nor one
+    written straight into the database can outlive it.
+
+    Must stay deterministic for a given client: authlib calls it twice per token
+    (once for the JWT's `exp` claim, once for the response's `expires_in`), and
+    the two have to agree.
+
+    `organization` is null for staged registrations and for the global relying
+    parties, so the attribute is read defensively — an OIDC login must not 500
+    because there is no organization to ask.
+    """
+    organization = getattr(client, "organization", None)
+    lifetime = getattr(organization, "access_token_lifetime", None) if organization else None
+    if not lifetime:
+        return ACCESS_TOKEN_EXPIRES_IN
+    return max(MIN_ACCESS_TOKEN_EXPIRES_IN, min(int(lifetime), MAX_ACCESS_TOKEN_EXPIRES_IN))
 
 
 server.register_token_generator(

@@ -20,6 +20,7 @@ from .role_request import (
     cancel_role_request,
 )
 from .report import (
+    request_client_report,
     resolve_report,
     unresolve_report,
 )
@@ -66,4 +67,6 @@ from .ionscale import (
     delete_ionscale_layer,
     update_ionscale_layer,
     create_ionscale_auth_key,
+    enable_tailnet_lock,
+    disable_tailnet_lock,
 )

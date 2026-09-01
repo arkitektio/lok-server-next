@@ -9,10 +9,20 @@ ENV UV_COMPILE_BYTECODE=1 \
 RUN apt-get update && apt-get install -y --no-install-recommends \
       curl \
  && rm -rf /var/lib/apt/lists/*
-# IonScale CLI (only the final binary is copied into the runtime layer):
-RUN curl -L -o /usr/local/bin/ionscale \
-      https://github.com/jsiebens/ionscale/releases/download/v0.18.0/ionscale_linux_amd64 \
- && chmod +x /usr/local/bin/ionscale
+# IonScale CLI (only the final binary is copied into the runtime layer).
+# Taken from this deployment's own ionscale image rather than an upstream
+# release: the fork adds org-scoped tailnets and tailnet lock, and an upstream
+# CLI lacks those subcommands. The failure is SILENT -- ensure_org_mesh catches
+# and logs, so a stale CLI means organizations quietly never get a tailnet.
+#
+# WARNING: this tag is only as current as the last push of the fork. If
+# ionskale has gained subcommands since (e.g. `tailnets tailnet-lock-status`),
+# this image does NOT have them. Push the fork before relying on this build;
+# the dev stack sidesteps it by bind-mounting a locally built binary over
+# /usr/local/bin/ionscale (see the lok service in docker-compose.yaml).
+# Verify with: docker compose exec lok ionscale tailnets --help
+COPY --from=jhnnsrs/ionskale:latest /usr/local/bin/ionscale /usr/local/bin/ionscale
+RUN chmod +x /usr/local/bin/ionscale
 WORKDIR /workspace
 # Dependency layer — cached until pyproject.toml / uv.lock change:
 COPY pyproject.toml uv.lock ./

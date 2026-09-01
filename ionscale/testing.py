@@ -13,7 +13,7 @@ test settings already point here) or per-test with
 from pathlib import Path
 from typing import Any, Dict, List, Union
 
-from .base_models import DNSConfig, Machine, MachineDetail, Tailnet, TailnetCreate
+from .base_models import DNSConfig, Machine, MachineDetail, Tailnet, TailnetCreate, TailnetLockStatus
 
 
 class FakeIonscaleRepository:
@@ -30,6 +30,11 @@ class FakeIonscaleRepository:
         self.machines: Dict[str, MachineDetail] = {}
         self.tailnets: List[Tailnet] = []
         self.auth_key: str = "tskey-fake-0000000000"
+        # Tailnet lock. Default is the state a freshly provisioned tailnet is
+        # actually in: no capability, no authority.
+        self.lock_status: Dict[str, TailnetLockStatus] = {}
+        self.enabled_tailnet_locks: List[str] = []
+        self.disabled_tailnet_locks: List[str] = []
 
     def list_tailnets(self) -> List[Tailnet]:
         return list(self.tailnets)
@@ -59,6 +64,24 @@ class FakeIonscaleRepository:
             {"tailnet": tailnet, "ephemeral": ephemeral, "pre_authorized": pre_authorized, "tags": tags or []}
         )
         return self.auth_key
+
+    def get_tailnet_lock_status(self, tailnet: str) -> TailnetLockStatus:
+        return self.lock_status.get(tailnet, TailnetLockStatus())
+
+    def enable_tailnet_lock(self, tailnet: str) -> None:
+        self.enabled_tailnet_locks.append(tailnet)
+        status = self.lock_status.setdefault(tailnet, TailnetLockStatus())
+        # Only the capability flips: the key authority is established by a
+        # client running `tailscale lock init`, which the control plane -- and
+        # therefore this fake -- cannot do.
+        status.capability_enabled = True
+
+    def disable_tailnet_lock(self, tailnet: str) -> None:
+        status = self.lock_status.setdefault(tailnet, TailnetLockStatus())
+        if status.authority_active:
+            raise RuntimeError("the tailnet's key authority is active")
+        self.disabled_tailnet_locks.append(tailnet)
+        status.capability_enabled = False
 
     def run(self, *preargs) -> str:
         return ""

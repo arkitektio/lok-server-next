@@ -750,6 +750,25 @@ class Client(models.Model, ClientMixin):
             " so a client that is still broken comes back onto the list."
         ),
     )
+    report_requested_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "When an operator asked this client to re-report its configuration; null when"
+            " nothing is pending. While set, every token response for this client carries"
+            " `please_report: true` (see authapp.fakts_grants.FaktsEnvelopeMixin), so the"
+            " client re-reports on its next hourly refresh at the latest. Cleared by the"
+            " incoming report (fakts.services.clients.report_client)."
+        ),
+    )
+    report_requested_by = models.ForeignKey(
+        get_user_model(),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="requested_client_reports",
+        help_text="The operator who asked for the report; kept for the dashboard's audit trail.",
+    )
     name = models.CharField(max_length=1000, default="No name")
     release = models.ForeignKey(Release, on_delete=models.CASCADE, related_name="clients", null=True, blank=True)
     kind = TextChoicesField(
@@ -804,6 +823,11 @@ class Client(models.Model, ClientMixin):
         return f"{self.kind} Client {self.client_id}"
 
     # --- Derived identity -------------------------------------------------
+
+    @property
+    def please_report(self) -> bool:
+        """Whether an operator is waiting for this client to re-report itself."""
+        return self.report_requested_at is not None
 
     @property
     def user(self):

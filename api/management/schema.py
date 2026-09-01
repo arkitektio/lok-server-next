@@ -420,6 +420,9 @@ class Mutation:
     unresolve_report = strawberry_django.mutation(
         resolver=mutations.unresolve_report,
     )
+    request_client_report = strawberry_django.mutation(
+        resolver=mutations.request_client_report,
+    )
 
     # Hub Device Code Mutations
     accept_hub_device_code = strawberry_django.mutation(
@@ -529,6 +532,14 @@ class Mutation:
 
     create_ionscale_auth_key = strawberry_django.mutation(
         resolver=mutations.create_ionscale_auth_key,
+    )
+
+    enable_tailnet_lock = strawberry_django.mutation(
+        resolver=mutations.enable_tailnet_lock,
+    )
+
+    disable_tailnet_lock = strawberry_django.mutation(
+        resolver=mutations.disable_tailnet_lock,
     )
 
 

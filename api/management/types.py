@@ -557,6 +557,7 @@ class ManagementOrganization:
     brand_hue: Optional[float] = strawberry.field(description="The organization's default brand hue (0–360), if set. Members can override it per-membership.")
     brand_chroma: Optional[float] = strawberry.field(description="The organization's default brand chroma (0–1), if set. Members can override it per-membership.")
     require_device_auth: Optional[bool] = strawberry.field(description="Whether clients created in this organization must present a device node_id. None/False means device auth is not required.")
+    access_token_lifetime: Optional[int] = strawberry.field(description="Access-token lifetime in seconds for this organization's clients. Null means the server default (one hour). Clamped into the server's allowed range when tokens are issued.")
     active_users: List[ManagementUser] = strawberry.field(description="The users that are currently active in the organization")
     profile: Optional["ManagementOrganizationProfile"] = strawberry.field(description="The profile of the organization")
     memberships: List["ManagementMembership"] = strawberry_django.field(description="the memberships of people")
@@ -1086,6 +1087,32 @@ class ManagementMachine:
 
 
 
+@strawberry.type(description="One machine's standing under tailnet lock.")
+class ManagementTailnetLockNode:
+    machine_id: str = strawberry.field(description="The ionscale machine id.")
+    name: str = strawberry.field(description="The machine's name.")
+    signed: bool = strawberry.field(
+        description="Whether the machine's node key is signed by the key authority. An unsigned machine is registered but unreachable by locked peers until an existing signing node signs it."
+    )
+
+
+@strawberry.type(
+    description="The state of tailnet lock for a mesh. Tailnet lock has two independent halves: the control plane grants the capability, but the key authority itself is created by running `tailscale lock init` on a machine. A mesh can sit with the capability granted and no authority indefinitely."
+)
+class ManagementTailnetLockStatus:
+    capability_enabled: bool = strawberry.field(
+        description="Whether the control plane grants machines the tailnet-lock capability. Required before `tailscale lock init` will work."
+    )
+    authority_active: bool = strawberry.field(
+        description="Whether a key authority actually exists and is enforcing signatures. Only a client can bring this about."
+    )
+    authority_disabled: bool = strawberry.field(
+        description="Whether an authority existed and was shut down with a disablement secret. Distinct from never having had one."
+    )
+    head: str = strawberry.field(description="The head of the tailnet key authority chain, empty when there is no authority.")
+    nodes: List[ManagementTailnetLockNode] = strawberry.field(description="Every machine on the mesh and whether its key is signed.")
+
+
 @strawberry_django.type(
     fakts_models.IonscaleLayer,
     description="A Layer is a transport layer that needs to be used to reach an alias. E.g a VPN layer or a Tor layer.",
@@ -1110,6 +1137,29 @@ class ManagementLayer:
     
     
     
+    @strawberry.field(
+        description="Tailnet lock status for this mesh (only works for IonscaleLayers). Null when the layer has no tailnet or ionscale is unreachable."
+    )
+    def tailnet_lock(self, info: Info) -> Optional[ManagementTailnetLockStatus]:
+        if not self.tailnet_name:
+            return None
+        try:
+            status = get_ionscale_repo().get_tailnet_lock_status(self.tailnet_name)
+        except Exception:
+            # Same degradation as `machine` above: a mesh page should still
+            # render when ionscale is down, rather than failing the whole query.
+            return None
+        return ManagementTailnetLockStatus(
+            capability_enabled=status.capability_enabled,
+            authority_active=status.authority_active,
+            authority_disabled=status.authority_disabled,
+            head=status.head,
+            nodes=[
+                ManagementTailnetLockNode(machine_id=n.machine_id, name=n.name, signed=n.signed)
+                for n in status.nodes
+            ],
+        )
+
     @strawberry.field(description="The machines associated with this layer (only works for IonscaleLayers)")
     def machines(self, info: Info) -> List[ManagementMachine]:
         if self.tailnet_name:
@@ -1376,6 +1426,12 @@ class ManagementClient:
     reports: list["ManagementReport"] = strawberry_django.field(description="The retained self-reports of this client, most recent first.")
     last_healthy_report: Optional["ManagementReport"] = strawberry_django.field(description="The most recent report where the client was functional; null if it has never reported healthy.")
     latest_report_resolved: bool = strawberry_django.field(description="Has an operator acknowledged this client's most recent report? Reset by every incoming report.")
+    report_requested_at: Optional[datetime.datetime] = strawberry_django.field(description="When an operator asked this client to re-report its configuration; null when nothing is pending. While set, the client's token responses carry `please_report`.")
+    report_requested_by: Optional[ManagementUser] = strawberry_django.field(description="The operator who asked this client to re-report.")
+
+    @strawberry_django.field(description="Is this client being asked to re-report its configuration? True until the client's next report arrives.", only=["report_requested_at"])
+    def please_report(self, info: Info) -> bool:
+        return self.report_requested_at is not None
 
     @strawberry_django.field(description="The app manifest this client was registered with, if it parses.")
     def manifest(self, info: Info) -> Optional[ManagementStagingManifest]:
