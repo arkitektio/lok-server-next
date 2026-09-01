@@ -50,20 +50,18 @@ def user_info(request: HttpRequest) -> JsonResponse:
 
     membership = request.oauth_token.user  # type: ignore
 
-    # Recover the per-client `sub`/`email` policy from the token's client. The
-    # `sub` here MUST match the id_token's `sub` for the same client (OIDC Core
+    # Recover the per-client `email` policy from the token's client. The `sub`
+    # here MUST match the id_token's `sub` for the same client (OIDC Core
     # §5.3.2), so it is resolved identically to grants.OpenIDCode.
     try:
         client = Client.objects.get(client_id=request.oauth_token.client_id)  # type: ignore
-        membership_is_subject = client.membership_is_subject
         email_template = client.email_template
     except Client.DoesNotExist:
-        membership_is_subject = False
         email_template = None
 
     return JsonResponse(
         {
-            "sub": resolve_sub(membership, membership_is_subject),
+            "sub": resolve_sub(membership),
             "name": membership.user.username,
             "nickname": membership.user.username,
             "preferred_username": membership.user.username,

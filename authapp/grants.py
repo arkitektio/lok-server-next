@@ -59,11 +59,10 @@ class OpenIDCode(oidcgrants.OpenIDCode):
         # The user is actually a membership object (see token_generators.py)
         membership = user
         client = getattr(membership, "_oauth_client", None)
-        membership_is_subject = bool(getattr(client, "membership_is_subject", False))
         email_template = getattr(client, "email_template", None)
 
         return UserInfo(
-            sub=resolve_sub(membership, membership_is_subject),
+            sub=resolve_sub(membership),
             name=membership.user.username,
             preferred_username=membership.user.username,
             org=str(membership.organization_id),

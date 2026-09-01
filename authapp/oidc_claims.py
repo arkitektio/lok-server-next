@@ -1,14 +1,16 @@
 """Per-client OIDC claim shaping (``sub`` and ``email``).
 
-Two aspects of the claims lok issues to an OpenID relying party are
-configurable **per client** (see ``Client.membership_is_subject`` and
-``Client.email_template``, provisioned from the ``openid_apps`` config):
+One aspect of the claims lok issues to an OpenID relying party is configurable
+**per client** (see ``Client.email_template``, provisioned from the
+``openid_apps`` config):
 
-- **Subject** — by default the ``sub`` claim is the *user* id, so the same
-  human is the same subject across every organization they belong to. A client
-  can instead opt into the *membership* id as the subject
-  (``membership_is_subject``), so each (user, organization) pair is a distinct
-  subject.
+The ``sub`` claim is always the *user* id, so the same human is the same
+subject across every organization they belong to; the organization is carried
+separately in the ``org`` claim. A relying party that needs to tell a person's
+organizations apart resolves them on ``(sub, org)``. (A ``membership_is_subject``
+option used to fake a per-membership ``sub`` for relying parties that could not
+do that; ionscale, its only user, now keys on the pair, and the option is gone.)
+
 - **Email** — by default the ``email`` claim is the user's email (falling back
   to a synthetic ``<pk>@users.noreply`` address). A client can instead supply an
   ``email_template`` such as ``"{username}@corp.example"`` rendered from a fixed
@@ -93,14 +95,15 @@ def build_email_variables(membership: "Membership") -> Dict[str, str]:
     }
 
 
-def resolve_sub(membership: "Membership", membership_is_subject: bool) -> str:
-    """Resolve the ``sub`` claim for a membership given the client's policy.
+def resolve_sub(membership: "Membership") -> str:
+    """Resolve the ``sub`` claim for a membership.
+
+    Always the user id: one human is one subject, and the organization travels
+    in the ``org`` claim alongside it.
 
     Must be computed identically for the id_token and the userinfo response —
     OIDC requires the two ``sub`` values to match (Core §5.3.2).
     """
-    if membership_is_subject:
-        return str(membership.id)
     return str(membership.user.id)
 
 

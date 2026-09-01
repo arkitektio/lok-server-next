@@ -8,7 +8,6 @@ class OpenIDAppConfig(BaseModel):
     client_id: str
     client_secret: str
     redirect_uris: list[str]
-    membership_is_subject: bool = False
     email_template: str | None = None
 
 
@@ -41,7 +40,6 @@ class Command(BaseCommand):
                 client.token_endpoint_auth_method = "client_secret_post"
                 client.kind = "relying_party"
                 client.name = getattr(config, "client_name", None) or config.client_id
-                client.membership_is_subject = config.membership_is_subject
                 client.email_template = config.email_template
                 client.save()
 
@@ -57,7 +55,6 @@ class Command(BaseCommand):
                     token_endpoint_auth_method="client_secret_post",
                     kind="relying_party",
                     name=getattr(config, "client_name", None) or config.client_id,
-                    membership_is_subject=config.membership_is_subject,
                     email_template=config.email_template,
                 )
 

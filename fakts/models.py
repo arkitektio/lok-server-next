@@ -724,11 +724,6 @@ class Client(models.Model, ClientMixin):
         blank=True,
         help_text="The (user, organization) this client acts for. Null means not yet approved (staged) or a global relying party.",
     )
-    membership_is_subject = models.BooleanField(
-        default=False,
-        help_text="Use the membership id as the OIDC `sub` claim instead of the user id. "
-        "See authapp.oidc_claims.resolve_sub.",
-    )
     email_template = models.CharField(
         max_length=500,
         null=True,

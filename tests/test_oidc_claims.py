@@ -1,4 +1,4 @@
-"""Per-client OIDC `sub`/`email` shaping (membership_is_subject + email_template).
+"""Per-client OIDC `sub`/`email` shaping (email_template) and sub/userinfo agreement.
 
 Covers the pure helpers, config-time template validation, provisioning via
 `ensureopenid`, and — most importantly — that the id_token path
@@ -35,10 +35,17 @@ def test_validate_email_template_rejects_bad_templates(template):
 
 
 @pytest.mark.django_db
-def test_resolve_sub_honours_membership_is_subject():
+def test_resolve_sub_is_always_the_user_id():
+    """One human is one subject, in every organization they belong to.
+
+    Relying parties tell a person's organizations apart on (sub, org), not by
+    the subject alone -- which is why the old membership_is_subject option is
+    gone. A membership-shaped sub here would silently split one human into
+    several identities downstream.
+    """
     membership = factories.make_membership()
-    assert oidc_claims.resolve_sub(membership, False) == str(membership.user.id)
-    assert oidc_claims.resolve_sub(membership, True) == str(membership.id)
+    assert oidc_claims.resolve_sub(membership) == str(membership.user.id)
+    assert oidc_claims.resolve_sub(membership) != str(membership.id) or membership.id == membership.user.id
 
 
 @pytest.mark.django_db
@@ -92,14 +99,12 @@ def test_ensureopenid_provisions_new_fields(settings):
             "client_id": "rp-1",
             "client_secret": "sekret",
             "redirect_uris": ["https://rp.example/cb"],
-            "membership_is_subject": True,
             "email_template": "{username}@corp.example",
         }
     ]
     call_command("ensureopenid")
 
     client = OAuth2Client.objects.get(client_id="rp-1")
-    assert client.membership_is_subject is True
     assert client.email_template == "{username}@corp.example"
 
 
@@ -107,14 +112,12 @@ def test_ensureopenid_provisions_new_fields(settings):
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("membership_is_subject", [False, True])
-def test_id_token_and_userinfo_sub_agree(membership_is_subject):
+def test_id_token_and_userinfo_sub_agree():
     """The `sub` computed for the id_token must equal the one the userinfo
     endpoint computes for the same client (OIDC Core §5.3.2)."""
     membership = factories.make_membership()
     client = factories.make_oauth2_client(
         membership=membership,
-        membership_is_subject=membership_is_subject,
         email_template="{username}@corp.example",
     )
 
@@ -124,17 +127,16 @@ def test_id_token_and_userinfo_sub_agree(membership_is_subject):
     info = OpenIDCode(require_nonce=True).generate_user_info(membership, "openid profile email")
 
     # userinfo path (views.user_info): client recovered by client_id.
-    userinfo_sub = oidc_claims.resolve_sub(membership, client.membership_is_subject)
+    userinfo_sub = oidc_claims.resolve_sub(membership)
 
-    expected = str(membership.id) if membership_is_subject else str(membership.user.id)
+    expected = str(membership.user.id)
     assert info["sub"] == expected
     assert info["sub"] == userinfo_sub
     assert info["email"] == f"{membership.user.username}@corp.example"
 
 
 @pytest.mark.django_db(transaction=True)
-@pytest.mark.parametrize("membership_is_subject", [False, True])
-def test_token_endpoint_id_token_carries_configured_sub_and_email(client, membership_is_subject):
+def test_token_endpoint_id_token_carries_configured_sub_and_email(client):
     """End-to-end: exchange an auth code at the token endpoint and decode the
     real id_token, asserting the per-client `sub`/`email` policy took effect."""
     import base64
@@ -148,7 +150,6 @@ def test_token_endpoint_id_token_carries_configured_sub_and_email(client, member
     rp = factories.make_oauth2_client(
         membership=membership,
         redirect_uris="https://rp.example/cb",
-        membership_is_subject=membership_is_subject,
         email_template="{username}@corp.example",
     )
 
@@ -182,6 +183,6 @@ def test_token_endpoint_id_token_carries_configured_sub_and_email(client, member
     payload_b64 += "=" * (-len(payload_b64) % 4)  # pad for urlsafe_b64decode
     claims = json.loads(base64.urlsafe_b64decode(payload_b64))
 
-    expected = str(membership.id) if membership_is_subject else str(membership.user.id)
+    expected = str(membership.user.id)
     assert claims["sub"] == expected
     assert claims["email"] == f"{membership.user.username}@corp.example"

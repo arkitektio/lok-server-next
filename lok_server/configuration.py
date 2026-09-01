@@ -346,14 +346,6 @@ class OpenIDAppSettings(BaseModel):
     client_id: str = Field(description="OAuth2 client_id.")
     client_secret: str = Field(description="OAuth2 client secret. Override per deployment.")
     redirect_uris: List[str] = Field(default_factory=list, description="Allowed OAuth2 redirect URIs.")
-    membership_is_subject: bool = Field(
-        default=False,
-        description="Use the membership id as the token `sub` (subject) instead of the user id. "
-        "When false (default) the same human is one subject across all their organizations; "
-        "when true each (user, organization) membership is a distinct subject. NOTE: flipping "
-        "this on an existing client changes every user's `sub`, so the relying party sees them "
-        "as brand-new identities.",
-    )
     email_template: Optional[str] = Field(
         default=None,
         description="Template for the `email` claim, rendered per user from membership variables "
