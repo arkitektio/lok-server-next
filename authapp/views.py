@@ -43,16 +43,26 @@ def jwks(request: HttpRequest) -> JsonResponse:
 
 
 @csrf_exempt
-@resource_protector("profile")
+@resource_protector("openid")
 def user_info(request: HttpRequest) -> JsonResponse:
+    """The OIDC UserInfo endpoint (OIDC Core §5.3).
+
+    Gated on `openid`, not `profile`: §5.3.1 says any access token obtained
+    with the `openid` scope MUST be served here. Requiring `profile` happened
+    to work only because `ensureopenid` provisions every relying party with
+    "openid profile email"; a third-party RP asking for `openid` alone got a
+    403. The individual claims are gated by scope instead (§5.4), which is
+    where that gating belongs.
+    """
     from fakts.models import Client
-    from authapp.oidc_claims import resolve_email, resolve_sub
+    from authapp.oidc_claims import build_claims
 
     membership = request.oauth_token.user  # type: ignore
 
     # Recover the per-client `email` policy from the token's client. The `sub`
     # here MUST match the id_token's `sub` for the same client (OIDC Core
-    # §5.3.2), so it is resolved identically to grants.OpenIDCode.
+    # §5.3.2), so the whole claim set is built by the same helper
+    # grants.OpenIDCode uses.
     try:
         client = Client.objects.get(client_id=request.oauth_token.client_id)  # type: ignore
         email_template = client.email_template
@@ -60,16 +70,7 @@ def user_info(request: HttpRequest) -> JsonResponse:
         email_template = None
 
     return JsonResponse(
-        {
-            "sub": resolve_sub(membership),
-            "name": membership.user.username,
-            "nickname": membership.user.username,
-            "preferred_username": membership.user.username,
-            "email": resolve_email(membership, email_template),
-            "roles": [role.identifier for role in membership.roles.all()],
-            "scope": "scope",
-            "org": str(membership.organization_id),
-        }
+        build_claims(membership, request.oauth_token.scope, email_template)  # type: ignore
     )
 
 
@@ -139,11 +140,18 @@ def _authorization_server_metadata(request: HttpRequest) -> dict:
         "code_challenge_methods_supported": ["S256"],
         "revocation_endpoint": issuer_absolute_uri(request, "revoke"),
         "revocation_endpoint_auth_methods_supported": TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED,
-        # RFC 8628 device authorization endpoint, named "app authorization"
-        # here. Non-standard in one respect: it also performs dynamic client
-        # registration (the manifest in the request mints a public client
-        # alongside the device code).
-        "device_authorization_endpoint": issuer_absolute_uri(request, "app_authorization"),
+        "response_modes_supported": ["query"],
+        # There is deliberately NO `device_authorization_endpoint` here, even
+        # though `urn:ietf:params:oauth:grant-type:device_code` is advertised
+        # above. The *grant* at /o/token/ is conforming RFC 8628; the front
+        # door that mints device codes (/o/app-authorization/) is not — it
+        # takes a JSON manifest and doubles as dynamic client registration
+        # rather than accepting the form-encoded `client_id` RFC 8628 §3.1
+        # requires. Advertising it under the standard name told generic
+        # device-flow libraries to speak a protocol lok does not answer, so
+        # they failed on their first request with an opaque validation error.
+        # fakts clients find it under the same key in /.well-known/fakts,
+        # which is explicitly a private protocol document.
     }
 
 
@@ -162,6 +170,27 @@ def open_id_configuration(request: HttpRequest) -> JsonResponse:
             "userinfo_endpoint": issuer_absolute_uri(request, "user_info"),
             "subject_types_supported": ["public"],
             "id_token_signing_alg_values_supported": ["RS256"],
+            # Every claim `authapp.oidc_claims.build_claims` can emit, in the
+            # order of the scope that buys it. `org` and `roles` are lok's own
+            # additions (§5.4 allows them); they are listed so relying parties
+            # can discover them rather than having to be told out of band.
+            # `roles` is UserInfo-only — build_claims omits it from the
+            # id_token, where the list would be unbounded and signed.
+            "claims_supported": [
+                "sub",
+                "iss",
+                "aud",
+                "exp",
+                "iat",
+                "auth_time",
+                "nonce",
+                "org",
+                "roles",
+                "name",
+                "nickname",
+                "preferred_username",
+                "email",
+            ],
         }
     )
     return JsonResponse(metadata)

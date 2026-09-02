@@ -23,11 +23,53 @@ from authlib.oidc.core.userinfo import UserInfoEndpoint
 
 from authlib.oauth2.rfc7636 import CodeChallenge
 from authlib.oauth2.rfc9068 import JWTBearerTokenValidator
+from authlib.oauth2.rfc6749.errors import InvalidRequestError
+
+
+class RequiredCodeChallenge(CodeChallenge):
+    """PKCE required for confidential clients too, and S256 only.
+
+    Two gaps in `CodeChallenge(required=True)`:
+
+    1. It only enforces the verifier when `request.auth_method == "none"`
+       (`validate_code_verifier`, authlib/oauth2/rfc7636/challenge.py), and
+       `validate_code_challenge` returns early when neither `code_challenge`
+       nor `code_challenge_method` is present. So every `client_secret_*`
+       relying party could run a code flow with no challenge at all.
+       Authorization-code interception is not a public-client-only problem —
+       RFC 9700 §2.1.1 wants PKCE everywhere — so a challenge is required here
+       at the authorization endpoint, which makes the base class demand the
+       matching verifier at the token endpoint for free.
+    2. authlib defaults a challenge with no method to `plain`, but the
+       discovery documents advertise `code_challenge_methods_supported:
+       ["S256"]`. `plain` is dropped so the advertisement is true and the weak
+       method is not silently reachable.
+    """
+
+    DEFAULT_CODE_CHALLENGE_METHOD = "S256"
+    SUPPORTED_CODE_CHALLENGE_METHOD = ["S256"]
+
+    def validate_code_challenge(self, grant, redirect_uri):
+        challenge = grant.request.payload.data.get("code_challenge")
+        if not challenge:
+            raise InvalidRequestError(
+                description="Missing 'code_challenge' in request.",
+                redirect_uri=redirect_uri,
+            )
+        return super().validate_code_challenge(grant, redirect_uri)
+
 
 # The grant surface this server exposes, as advertised by every discovery
 # document (/.well-known/fakts, /.well-known/oauth-authorization-server,
 # /.well-known/openid-configuration). Keep in sync with the register_grant
 # calls below.
+#
+# `urn:ietf:params:oauth:grant-type:device_code` is advertised even though the
+# OIDC and RFC 8414 documents carry no `device_authorization_endpoint`: the
+# grant here at /o/token/ is conforming RFC 8628, but the endpoint that mints
+# device codes (/o/app-authorization/) is a private, manifest-driven one that
+# also does dynamic client registration. See the comment in
+# authapp.views._authorization_server_metadata.
 GRANT_TYPES_SUPPORTED = [
     "authorization_code",
     "refresh_token",
@@ -52,12 +94,17 @@ server = AuthorizationServer(Client, OAuth2Token)
 # class is kept in grants.py for easy re-enable if a machine-to-machine
 # integration ever needs it.
 #
-# PKCE (RFC 7636), required=True: authlib enforces the verifier for *public*
-# clients (auth method `none`) only, so confidential relying parties are
-# unaffected while authorization-code interception is closed for everyone
-# without a client secret. The kontrol consent page posts through the real
-# /o/authorize/ endpoint, which passes challenges through to the stored code.
-server.register_grant(AuthorizationCodeGrant, [OpenIDCode(require_nonce=True), CodeChallenge(required=True)])
+# PKCE (RFC 7636) for *every* client, public and confidential alike — see
+# RequiredCodeChallenge below.
+#
+# `require_nonce=False` is the server-wide default because OIDC Core §3.1.2.1
+# makes `nonce` OPTIONAL for the code flow and no discovery field can advertise
+# a stricter rule. Clients that want it required opt in through
+# `fakts.Client.require_nonce`, which
+# `grants.OpenIDCode.validate_openid_authorization_request` applies per request.
+# The `UsedNonce` replay defence is unaffected: it still fires for every client
+# that does send a nonce.
+server.register_grant(AuthorizationCodeGrant, [OpenIDCode(require_nonce=False), RequiredCodeChallenge()])
 server.register_grant(RefreshTokenGrant)
 
 # The canonical fakts grants: RFC 8628 device-code (interactive, approved in the

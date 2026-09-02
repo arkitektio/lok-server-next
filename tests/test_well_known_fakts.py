@@ -78,13 +78,36 @@ def test_oauth_authorization_server_document(client):
     rfc8414 = client.get("/lok/.well-known/oauth-authorization-server").json()
     oidc = client.get("/lok/.well-known/openid-configuration").json()
 
-    for key in ("issuer", "token_endpoint", "jwks_uri", "device_authorization_endpoint",
+    for key in ("issuer", "token_endpoint", "jwks_uri",
                 "grant_types_supported", "token_endpoint_auth_methods_supported"):
         assert rfc8414[key] == oidc[key]
 
     # The OIDC-specific fields live only on openid-configuration.
     assert "userinfo_endpoint" in oidc and "userinfo_endpoint" not in rfc8414
-    assert rfc8414["device_authorization_endpoint"] == "http://lok/lok/o/app-authorization/"
+    assert "claims_supported" in oidc and "claims_supported" not in rfc8414
+
+
+@pytest.mark.django_db
+def test_standard_metadata_does_not_advertise_the_private_device_endpoint(client):
+    """The device *grant* is standard; the endpoint that mints device codes is not.
+
+    /o/app-authorization/ takes a JSON manifest and doubles as dynamic client
+    registration, so it is not RFC 8628 §3.1. Advertising it as
+    `device_authorization_endpoint` pointed generic device-flow libraries at a
+    protocol lok does not answer. It stays in /.well-known/fakts (a private
+    protocol document) only.
+    """
+    fakts = client.get(WELL_KNOWN).json()
+    rfc8414 = client.get("/lok/.well-known/oauth-authorization-server").json()
+    oidc = client.get("/lok/.well-known/openid-configuration").json()
+
+    assert "device_authorization_endpoint" not in rfc8414
+    assert "device_authorization_endpoint" not in oidc
+    assert fakts["device_authorization_endpoint"] == "http://lok/lok/o/app-authorization/"
+
+    # The grant itself is conforming and stays advertised everywhere.
+    for doc in (fakts, rfc8414, oidc):
+        assert "urn:ietf:params:oauth:grant-type:device_code" in doc["grant_types_supported"]
 
 
 @pytest.mark.django_db

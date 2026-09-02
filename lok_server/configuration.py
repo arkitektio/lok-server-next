@@ -354,6 +354,35 @@ class OpenIDAppSettings(BaseModel):
         "back to a synthetic <pk>@users.noreply address).",
     )
 
+    scope: str = Field(
+        default="openid profile email",
+        description="Space-separated scopes this relying party may request. Claims are gated "
+        "per scope (OIDC Core §5.4): `profile` buys the name claims, `email` the address, and "
+        "`openid` alone buys only `sub`/`org`. Narrow this for a relying party that needs "
+        "nothing but identity.",
+    )
+    require_nonce: bool = Field(
+        default=False,
+        description="Reject an authorization request from this client that carries no `nonce`. "
+        "OIDC Core §3.1.2.1 makes `nonce` OPTIONAL for the code flow and no discovery field "
+        "can advertise a stricter rule, so this must be agreed with the relying party out of "
+        "band. Off by default.",
+    )
+
+    @field_validator("scope")
+    @classmethod
+    def _validate_scope(cls, value: str) -> str:
+        scopes = value.split()
+        if "openid" not in scopes:
+            raise ValueError("`scope` must include 'openid' for an OIDC relying party.")
+        unknown = sorted(set(scopes) - {"openid", "profile", "email"})
+        if unknown:
+            raise ValueError(
+                f"`scope` contains scopes lok does not advertise: {', '.join(unknown)}. "
+                "Supported: openid, profile, email."
+            )
+        return " ".join(scopes)
+
     @field_validator("email_template")
     @classmethod
     def _validate_email_template(cls, value: Optional[str]) -> Optional[str]:

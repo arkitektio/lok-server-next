@@ -172,10 +172,20 @@ class AppAuthorizationView(View):
     """The app authorization endpoint — the canonical grant's front door,
     served at /o/app-authorization/ next to the token endpoint.
 
-    RFC 8628 device authorization doubling as dynamic client registration: the
-    manifest in the request mints a public OAuth2 client, and the app then
-    polls the OAuth2 token endpoint with
-    grant_type=urn:ietf:params:oauth:grant-type:device_code as that client."""
+    Device authorization doubling as dynamic client registration: the manifest
+    in the request mints a public OAuth2 client, and the app then polls the
+    OAuth2 token endpoint with
+    grant_type=urn:ietf:params:oauth:grant-type:device_code as that client.
+
+    This is a **private** endpoint, not RFC 8628 §3.1: it takes a JSON body
+    carrying a manifest rather than form-encoded `client_id`, and its response
+    adds `status`/`client_id` and a `verification_uri` holding a literal
+    `{code}` placeholder. It is therefore advertised only in
+    /.well-known/fakts, never as `device_authorization_endpoint` in the OIDC
+    or RFC 8414 metadata — a generic device-flow library reading those would
+    otherwise fail here on its first request. The *grant* it feeds
+    (authapp.fakts_grants.FaktsDeviceCodeGrant, at /o/token/) is conforming,
+    which is why the grant type stays in `grant_types_supported`."""
 
     def post(self, request, *args, **kwargs):
         if is_throttled(request, "authorization", AUTHORIZATION_LIMIT_PER_MINUTE):

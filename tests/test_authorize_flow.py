@@ -24,6 +24,16 @@ def _setup():
     return membership.user, membership.organization, rp
 
 
+#: A fixed verifier/challenge pair — PKCE is required of *every* client now
+#: (server.RequiredCodeChallenge), confidential relying parties included.
+PKCE_VERIFIER = "a-very-long-code-verifier-string-for-pkce-testing-1234567890"
+
+
+def _s256(verifier: str) -> str:
+    digest = hashlib.sha256(verifier.encode()).digest()
+    return base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
+
+
 def _authorize_params(rp, **extra):
     params = {
         "response_type": "code",
@@ -32,6 +42,8 @@ def _authorize_params(rp, **extra):
         "scope": "openid profile",
         "state": "xyz-state",
         "nonce": "n-0S6",
+        "code_challenge": _s256(PKCE_VERIFIER),
+        "code_challenge_method": "S256",
     }
     params.update(extra)
     return params
@@ -137,11 +149,6 @@ def test_post_refuses_an_unregistered_redirect_uri(client):
     assert "evil.example" not in resp.get("Location", "")
 
 
-def _s256(verifier: str) -> str:
-    digest = hashlib.sha256(verifier.encode()).digest()
-    return base64.urlsafe_b64encode(digest).rstrip(b"=").decode()
-
-
 @pytest.mark.django_db
 def test_pkce_is_required_for_public_clients(client):
     """A public client (no secret) cannot even obtain a code without a PKCE
@@ -223,3 +230,61 @@ def test_ensureopenid_provisions_client(settings):
     assert client.grant_types == "authorization_code refresh_token"
     assert client.kind == "relying_party"
     assert client.token_endpoint_auth_method == "client_secret_post"
+
+
+@pytest.mark.django_db
+def test_pkce_is_required_for_confidential_clients_too(client):
+    """RFC 9700 §2.1.1: a client secret is not a substitute for PKCE.
+
+    authlib's `CodeChallenge(required=True)` only enforces the verifier when
+    the token-endpoint auth method is `none`, and skips the authorization
+    request entirely when no challenge is sent — so a `client_secret_post`
+    relying party could run the whole code flow with no challenge at all.
+    `server.RequiredCodeChallenge` closes that.
+    """
+    user, organization, rp = _setup()
+    client.force_login(user)
+
+    params = _authorize_params(rp)
+    del params["code_challenge"]
+    del params["code_challenge_method"]
+
+    resp = client.post(
+        reverse("authorize"),
+        {**params, "allow": "true", "organization": str(organization.pk)},
+        secure=True,
+    )
+
+    # Refused, as a spec-shaped error redirect (the redirect_uri is registered,
+    # so RFC 6749 §4.1.2.1 wants the error delivered there) — and with no code.
+    assert resp.status_code == 302
+    qs = parse_qs(urlparse(resp["Location"]).query)
+    assert qs["error"] == ["invalid_request"]
+    assert "code" not in qs
+
+
+@pytest.mark.django_db
+def test_plain_code_challenge_method_is_refused(client):
+    """Discovery advertises S256 only, so `plain` must not be silently accepted.
+
+    authlib defaults a challenge carrying no method to `plain`; both that
+    default and the supported list are narrowed to S256 in
+    `server.RequiredCodeChallenge`.
+    """
+    user, organization, rp = _setup()
+    client.force_login(user)
+
+    resp = client.post(
+        reverse("authorize"),
+        {
+            **_authorize_params(rp, code_challenge=PKCE_VERIFIER, code_challenge_method="plain"),
+            "allow": "true",
+            "organization": str(organization.pk),
+        },
+        secure=True,
+    )
+
+    assert resp.status_code == 302
+    qs = parse_qs(urlparse(resp["Location"]).query)
+    assert qs["error"] == ["invalid_request"]
+    assert "code" not in qs

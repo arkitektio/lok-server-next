@@ -3,7 +3,7 @@ import logging
 from authlib.oauth2.rfc6749 import grants
 from authlib.oauth2.rfc6749.errors import InvalidGrantError
 from .models import OAuth2Token, AuthorizationCode, UsedNonce
-from .oidc_claims import resolve_email, resolve_sub
+from .oidc_claims import build_claims
 from .fakts_grants import FaktsEnvelopeMixin
 from authlib.oidc.core import grants as oidcgrants, UserInfo
 from karakter.models import Membership
@@ -37,6 +37,27 @@ class OpenIDCode(oidcgrants.OpenIDCode):
             return True
         return UsedNonce.objects.filter(client_id=client_id, nonce=nonce).exists()
 
+    def validate_openid_authorization_request(self, grant, redirect_uri):
+        """Decide `nonce`-required *per client*, not once at construction.
+
+        OIDC Core §3.1.2.1 makes `nonce` OPTIONAL for the authorization-code
+        flow (it is REQUIRED only where an id_token comes back from the
+        authorization endpoint), and — worse for interop — no discovery field
+        can advertise a stricter rule, so a conforming relying party has no way
+        to learn about one and just fails with an opaque error. The server-wide
+        `require_nonce=True` therefore had to go; clients that want the tighter
+        rule opt in through `fakts.Client.require_nonce`.
+
+        authlib fixes `require_nonce` at construction time
+        (`authlib/oidc/core/grants/code.py`), so the flag is applied here
+        instead. This runs as the `after_validate_authorization_request_payload`
+        hook, which fires *after* `grant.request.client` is set
+        (`authlib/oauth2/rfc6749/grants/authorization_code.py`) — the client is
+        always present, so the flag can never silently read as False.
+        """
+        self.require_nonce = bool(getattr(grant.request.client, "require_nonce", False))
+        return super().validate_openid_authorization_request(grant, redirect_uri)
+
     def get_jwt_config(self, grant, client):
         # Implement key rotation and retrieval as needed
         return {
@@ -61,13 +82,12 @@ class OpenIDCode(oidcgrants.OpenIDCode):
         client = getattr(membership, "_oauth_client", None)
         email_template = getattr(client, "email_template", None)
 
-        return UserInfo(
-            sub=resolve_sub(membership),
-            name=membership.user.username,
-            preferred_username=membership.user.username,
-            org=str(membership.organization_id),
-            email=resolve_email(membership, email_template),
-        )
+        # Scope-filtered, and built by the same helper the userinfo endpoint
+        # uses: `sub` MUST agree between the two (OIDC Core §5.3.2) and the
+        # claims each scope buys MUST agree with them too (§5.4). `roles` is
+        # left out of the id_token — resource servers read it off the access
+        # token or userinfo, and the list is unbounded in size.
+        return UserInfo(**build_claims(membership, scope, email_template, roles=False))
 
 
 class AuthorizationCodeGrant(FaktsEnvelopeMixin, grants.AuthorizationCodeGrant):

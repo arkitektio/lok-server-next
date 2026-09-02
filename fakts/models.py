@@ -732,6 +732,18 @@ class Client(models.Model, ClientMixin):
         "(e.g. '{username}@corp.example'). When blank, the user's own email is used. "
         "See authapp.oidc_claims.resolve_email.",
     )
+    require_nonce = models.BooleanField(
+        default=False,
+        help_text=(
+            "Reject an authorization-code request from this client that carries no `nonce`. "
+            "OIDC Core §3.1.2.1 makes `nonce` OPTIONAL for the code flow, and no discovery "
+            "field can advertise a stricter rule, so this is a deliberate non-standard "
+            "tightening that has to be agreed with the relying party out of band — hence "
+            "per-client and off by default. Only meaningful for the handful of rows "
+            "provisioned as OIDC relying parties from `openid_apps`: the clients minted "
+            "dynamically by the device-code and redeem paths never run the code flow at all."
+        ),
+    )
 
     # --- App/deployment side ---------------------------------------------
     hub = models.ForeignKey(Hub, on_delete=models.CASCADE, related_name="clients", null=True, blank=True)

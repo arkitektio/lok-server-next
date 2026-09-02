@@ -117,3 +117,51 @@ def resolve_email(membership: "Membership", email_template: Optional[str]) -> st
     if email_template:
         return email_template.format_map(build_email_variables(membership))
     return membership.user.email or f"{membership.pk}@users.noreply"
+
+
+def build_claims(
+    membership: "Membership",
+    scope: Optional[str],
+    email_template: Optional[str],
+    roles: bool = True,
+) -> Dict[str, object]:
+    """The OIDC claim set for ``membership``, filtered by the granted ``scope``.
+
+    OIDC Core §5.4 ties claims to scopes: ``profile`` buys the name claims,
+    ``email`` buys the address. Both claim producers used to accept a ``scope``
+    argument and drop it on the floor, so an RP granted nothing but ``openid``
+    still received the user's email in its id_token *and* from the userinfo
+    endpoint. authlib does not filter downstream either — ``OpenIDCode`` hands
+    whatever ``generate_user_info`` returns straight into the id_token payload
+    (``authlib/oidc/core/grants/util.py``) — so the filtering has to happen
+    here, in the one place both callers share. Sharing it is also what keeps
+    ``sub`` identical between the two paths, which §5.3.2 requires.
+
+    ``roles`` and ``org`` are deliberately *not* scope-gated. They are
+    non-standard claims (§5.4 permits additional ones) that authentikate and
+    every resource server already read; gating them behind a scope no existing
+    client requests would break the fleet for no compliance gain.
+
+    ``roles`` is skipped entirely when ``roles=False`` — the id_token carries
+    the org but not the role list, matching what it carried before.
+    """
+    claims: Dict[str, object] = {
+        "sub": resolve_sub(membership),
+        "org": str(membership.organization_id),
+    }
+
+    granted = set((scope or "").split())
+
+    if "profile" in granted:
+        username = membership.user.username
+        claims["name"] = username
+        claims["nickname"] = username
+        claims["preferred_username"] = username
+
+    if "email" in granted:
+        claims["email"] = resolve_email(membership, email_template)
+
+    if roles:
+        claims["roles"] = [role.identifier for role in membership.roles.all()]
+
+    return claims
