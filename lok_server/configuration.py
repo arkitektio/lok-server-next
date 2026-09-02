@@ -287,6 +287,47 @@ class AccountSettings(BaseModel):
     )
     login_by_code_enabled: bool = Field(default=True, description="Enable login by emailed code (ACCOUNT_LOGIN_BY_CODE_ENABLED).")
     mfa_trust_enabled: bool = Field(default=True, description="Allow trusted devices (MFA_TRUST_ENABLED).")
+    mfa_webauthn_enabled: bool = Field(
+        default=True,
+        description="Offer WebAuthn security keys/passkeys as an MFA type (adds 'webauthn' to "
+        "MFA_SUPPORTED_TYPES). Browsers only expose the WebAuthn API on a secure origin, but that "
+        "is judged against the page's own origin — not lok's transport — so this is NOT gated on "
+        "allow_insecure_transport, which is normal behind a TLS-terminating gateway.",
+    )
+    mfa_passkey_login_enabled: bool = Field(
+        default=True,
+        description="MFA_PASSKEY_LOGIN_ENABLED — let a passkey replace the password at login. "
+        "Requires mfa_webauthn_enabled; allauth gates it on 'webauthn' being a supported type.",
+    )
+    mfa_passkey_signup_enabled: bool = Field(
+        default=False,
+        description="MFA_PASSKEY_SIGNUP_ENABLED — allow signing UP with a passkey and no password. "
+        "Requires email_verification_by_code_enabled: allauth raises a Critical system check "
+        "otherwise, because a passwordless signup has no way to prove the address without a code.",
+    )
+    email_verification_by_code_enabled: bool = Field(
+        default=False,
+        description="ACCOUNT_EMAIL_VERIFICATION_BY_CODE_ENABLED — verify email addresses with a "
+        "short code the user types in, instead of a confirmation link they click. This changes "
+        "verification for EVERY signup, not just passkey ones, and makes the "
+        "headless_frontend_urls.account_confirm_email link unused. Required by "
+        "mfa_passkey_signup_enabled.",
+    )
+    mfa_webauthn_rp_id: Optional[str] = Field(
+        default=None,
+        description="WebAuthn Relying Party ID — the domain a passkey is bound to. When null, "
+        "allauth derives it per request from the Host header, which scopes each credential to a "
+        "single hostname. Pin it to the registrable parent domain (e.g. 'arkitekt.live') when one "
+        "deployment answers on several subdomains, or a passkey enrolled on one will not be "
+        "offered on another. Must equal, or be a registrable-domain suffix of, every host the SPA "
+        "is served from.",
+    )
+    mfa_totp_issuer: Optional[str] = Field(
+        default=None,
+        description="MFA_TOTP_ISSUER — the label authenticator apps show next to the code. "
+        "allauth defaults to an empty string, which leaves the entry unlabelled and unfindable "
+        "among a user's other accounts. Defaults to the deployment name when null.",
+    )
     headless_frontend_urls: HeadlessFrontendUrls = Field(default_factory=HeadlessFrontendUrls, description="SPA URLs for allauth-headless flows.")
     social_provider_apps: List[str] = Field(
         default_factory=lambda: ["allauth.socialaccount.providers.orcid", "allauth.socialaccount.providers.google"],
@@ -335,6 +376,38 @@ class AccountSettings(BaseModel):
                 "account.social_email_required is false — verification needs an email "
                 "to confirm, so a social login with no email could never complete. Set "
                 "social_email_required to true, or relax social_email_verification."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _coherent_mfa_webauthn(self) -> "AccountSettings":
+        """Reject passkey flags allauth would ignore or refuse to boot with.
+
+        allauth ANDs both passkey flags with "webauthn" being in
+        MFA_SUPPORTED_TYPES (allauth/mfa/app_settings.py:102-110), so enabling
+        one without the type silently does nothing. And passkey *signup* is a
+        Critical system check failure unless email verification is code-based
+        (allauth/mfa/checks.py:20-26) — the account has no password, so a
+        clickable confirmation link is not enough to complete it. Fail here, with
+        the reason, rather than at boot with a Django check error.
+        """
+        if self.mfa_passkey_login_enabled and not self.mfa_webauthn_enabled:
+            raise ValueError(
+                "account.mfa_passkey_login_enabled requires account.mfa_webauthn_enabled — "
+                "allauth ignores the passkey-login flag unless 'webauthn' is a supported MFA type."
+            )
+        if self.mfa_passkey_signup_enabled and not self.mfa_webauthn_enabled:
+            raise ValueError(
+                "account.mfa_passkey_signup_enabled requires account.mfa_webauthn_enabled — "
+                "allauth ignores the passkey-signup flag unless 'webauthn' is a supported MFA type."
+            )
+        if self.mfa_passkey_signup_enabled and not self.email_verification_by_code_enabled:
+            raise ValueError(
+                "account.mfa_passkey_signup_enabled requires "
+                "account.email_verification_by_code_enabled — allauth refuses to start otherwise "
+                "(MFA_PASSKEY_SIGNUP_ENABLED needs ACCOUNT_EMAIL_VERIFICATION_BY_CODE_ENABLED). "
+                "Note that turning it on switches email verification from links to codes for "
+                "every signup, not only passkey ones."
             )
         return self
 

@@ -192,6 +192,52 @@ MIDDLEWARE = [
 ACCOUNT_LOGIN_BY_CODE_ENABLED = conf.account.login_by_code_enabled and conf.email is not None
 MFA_TRUST_ENABLED = conf.account.mfa_trust_enabled  # Allow trusted devices
 
+# WebAuthn security keys / passkeys as an MFA type.
+#
+# MFA_SUPPORTED_TYPES REPLACES allauth's default (["recovery_codes", "totp"],
+# allauth/mfa/app_settings.py:91-93), so the existing types are re-listed here
+# explicitly — omitting them would silently disable TOTP for everyone already
+# enrolled. allauth only mounts the /webauthn/* headless routes when "webauthn"
+# is in this list, and reports the effective list on its /config endpoint, so the
+# SPA hides the security-key UI automatically when it isn't.
+#
+# Deliberately NOT gated on django.allow_insecure_transport, unlike
+# ACCOUNT_LOGIN_BY_CODE_ENABLED above. WebAuthn's secure-context requirement is
+# evaluated by the BROWSER against the page's own origin, and fido2 validates the
+# origin the browser reports (fido2/rpid.py:90-100) — never Django's view of the
+# request scheme. Behind a TLS-terminating gateway, allow_insecure_transport is
+# on while the browser still talks HTTPS, so gating on it would switch passkeys
+# off for exactly the standard topology. A deployment genuinely served over
+# plain http:// simply gets no WebAuthn API in the browser, and the SPA surfaces
+# that as a failed attempt rather than a missing feature. (http://localhost is a
+# secure context, so local development is unaffected either way.)
+MFA_SUPPORTED_TYPES = ["recovery_codes", "totp"] + (["webauthn"] if conf.account.mfa_webauthn_enabled else [])
+
+# Passkey as a password *replacement* at login, and at signup. allauth ANDs both
+# with "webauthn" in MFA_SUPPORTED_TYPES, and configuration.py rejects the
+# incoherent combinations up front, so these pass straight through.
+MFA_PASSKEY_LOGIN_ENABLED = conf.account.mfa_passkey_login_enabled
+MFA_PASSKEY_SIGNUP_ENABLED = conf.account.mfa_passkey_signup_enabled
+
+# Verify email addresses with a typed code rather than a clicked link. Off by
+# default; required by (and only strictly needed for) passkey signup, which has
+# no password to fall back on.
+ACCOUNT_EMAIL_VERIFICATION_BY_CODE_ENABLED = conf.account.email_verification_by_code_enabled
+
+# A passkey is bound to a Relying Party ID. allauth derives it per request from
+# the Host header (allauth/mfa/adapter.py:149-154) and offers no setting to
+# override it, so lok subclasses the MFA adapter. Leave rp_id null on a
+# single-host deployment; pin it to the registrable parent domain when one
+# deployment answers on several subdomains, or a passkey enrolled on one host is
+# simply not offered on the others.
+MFA_WEBAUTHN_RP_ID = conf.account.mfa_webauthn_rp_id
+
+# allauth defaults MFA_TOTP_ISSUER to "", which leaves the entry unlabelled in
+# the user's authenticator app. Name the deployment instead.
+MFA_TOTP_ISSUER = conf.account.mfa_totp_issuer or DEPLOYMENT_NAME
+
+MFA_ADAPTER = "lok_server.mfa_adapter.LokMFAAdapter"
+
 # Privacy policy for integrated login widgets (Google One Tap et al.). The custom
 # headless config view reports this to the SPA, which gates the One Tap widget on
 # it (strict = never load Google's script; opt-in = consent prompt; disabled = free).

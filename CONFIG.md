@@ -221,8 +221,41 @@ django-allauth flows. All optional with sensible defaults.
 | `signup_fields` | `ACCOUNT__SIGNUP_FIELDS` | list[str] | derived | `ACCOUNT_SIGNUP_FIELDS`, e.g. `["email*", "password1*", "password2*"]` (`*` = required). When omitted, derived from `login_methods`. |
 | `login_by_code_enabled` | `ACCOUNT__LOGIN_BY_CODE_ENABLED` | bool | `true` | Enable login by emailed code (`ACCOUNT_LOGIN_BY_CODE_ENABLED`). |
 | `mfa_trust_enabled` | `ACCOUNT__MFA_TRUST_ENABLED` | bool | `true` | Allow trusted devices (`MFA_TRUST_ENABLED`). |
+| `mfa_webauthn_enabled` | `ACCOUNT__MFA_WEBAUTHN_ENABLED` | bool | `true` | Offer WebAuthn security keys/passkeys as an MFA type (adds `webauthn` to `MFA_SUPPORTED_TYPES`). Browsers require a secure *page* origin, judged in the browser — so this is not gated on `django.allow_insecure_transport`, which is normal behind a TLS-terminating gateway. |
+| `mfa_passkey_login_enabled` | `ACCOUNT__MFA_PASSKEY_LOGIN_ENABLED` | bool | `true` | `MFA_PASSKEY_LOGIN_ENABLED` — let a passkey replace the password at login. Requires `mfa_webauthn_enabled`. |
+| `mfa_passkey_signup_enabled` | `ACCOUNT__MFA_PASSKEY_SIGNUP_ENABLED` | bool | `false` | `MFA_PASSKEY_SIGNUP_ENABLED` — passwordless signup. Requires `email_verification_by_code_enabled` (allauth refuses to start otherwise). |
+| `email_verification_by_code_enabled` | `ACCOUNT__EMAIL_VERIFICATION_BY_CODE_ENABLED` | bool | `false` | `ACCOUNT_EMAIL_VERIFICATION_BY_CODE_ENABLED` — verify with a typed code instead of a clicked link, for **every** signup. |
+| `mfa_webauthn_rp_id` | `ACCOUNT__MFA_WEBAUTHN_RP_ID` | str \| null | `null` | WebAuthn Relying Party ID. `null` derives it per request from the Host header (fine for a single host). Pin to the registrable parent domain (e.g. `arkitekt.live`) when one deployment answers on several subdomains. |
+| `mfa_totp_issuer` | `ACCOUNT__MFA_TOTP_ISSUER` | str \| null | `null` | `MFA_TOTP_ISSUER` — the label authenticator apps show. Defaults to the deployment name; allauth's own default is an empty string. |
 | `headless_frontend_urls` | `ACCOUNT__HEADLESS_FRONTEND_URLS__*` | object | see below | SPA URLs for allauth-headless flows. |
 | `social_provider_apps` | — (use YAML) | list[str] | `["allauth.socialaccount.providers.orcid", "allauth.socialaccount.providers.google"]` | allauth social provider apps appended to `INSTALLED_APPS`. |
+
+#### Passkeys and the Relying Party ID
+
+A passkey is bound to a **Relying Party ID** — a domain. allauth derives it per
+request from the `Host` header and offers no setting to override it, so lok
+subclasses the MFA adapter (`lok_server/mfa_adapter.py`) to honour
+`account.mfa_webauthn_rp_id`.
+
+Leave it `null` on a single-host deployment. Pin it when **one** deployment
+answers on several hostnames off one database:
+
+```yaml
+account:
+  mfa_webauthn_rp_id: example.org   # covers go.example.org AND beta.example.org
+```
+
+The value must equal, or be a registrable-domain suffix of, every origin the SPA
+is served from — browsers accept `example.org` as the RP ID for a page on
+`go.example.org`, but never the reverse, and never a public suffix such as
+`.org` itself. Get this wrong and enrolment succeeds while authentication
+silently fails on the other host, reported only as a generic "incorrect code".
+
+Passkey **signup** (`mfa_passkey_signup_enabled`) is a bigger commitment than
+passkey login: allauth requires `email_verification_by_code_enabled` alongside
+it, and that switches email verification from clickable links to typed codes for
+every signup on the deployment, leaving
+`headless_frontend_urls.account_confirm_email` unused.
 
 #### Username world vs email world
 

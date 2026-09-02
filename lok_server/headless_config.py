@@ -18,6 +18,7 @@ from allauth import app_settings as allauth_settings
 from allauth.headless.base.response import get_config_data as _account_config_data
 from allauth.headless.base.views import ConfigView
 from allauth.headless.internal.restkit.response import APIResponse
+from allauth.mfa import app_settings as mfa_settings
 from django.conf import settings
 from django.http import HttpRequest, HttpResponse
 
@@ -37,6 +38,12 @@ class PrivacyConfigResponse(APIResponse):
             from allauth.headless.mfa.response import get_config_data as mfa_config_data
 
             data.update(mfa_config_data(request))
+            # allauth reports `passkey_login_enabled` but not the signup flag, so
+            # a SPA has no way to know whether /auth/webauthn/signup exists —
+            # allauth only mounts that route when MFA_PASSKEY_SIGNUP_ENABLED is
+            # on. Add it, so the sign-up page can hide an option that would
+            # otherwise lead to a 404.
+            data["mfa"]["passkey_signup_enabled"] = mfa_settings.PASSKEY_SIGNUP_ENABLED
         if allauth_settings.USERSESSIONS_ENABLED:
             from allauth.headless.usersessions.response import (
                 get_config_data as usersessions_config_data,
